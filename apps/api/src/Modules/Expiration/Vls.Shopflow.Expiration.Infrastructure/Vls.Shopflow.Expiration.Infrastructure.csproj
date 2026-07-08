@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Vls.Shopflow.Expiration.Application\Vls.Shopflow.Expiration.Application.csproj" />
+    <ProjectReference Include="..\..\CartCheckout\Vls.Shopflow.CartCheckout.Infrastructure\Vls.Shopflow.CartCheckout.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Orders\Vls.Shopflow.Orders.Infrastructure\Vls.Shopflow.Orders.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Vls.Shopflow.PaymentsPix.Domain\Vls.Shopflow.PaymentsPix.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Domain\Vls.Shopflow.BuildingBlocks.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Application\Vls.Shopflow.BuildingBlocks.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vls.Shopflow.PaymentsPix.UnitTests" />
+  </ItemGroup>
+
+</Project>

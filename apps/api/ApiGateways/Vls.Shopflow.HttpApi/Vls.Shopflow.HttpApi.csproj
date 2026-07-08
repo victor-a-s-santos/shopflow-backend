@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Scalar.AspNetCore" />    
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Catalog\Vls.Shopflow.Catalog.Application\Vls.Shopflow.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Vls.Shopflow.Catalog.Infrastructure\Vls.Shopflow.Catalog.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Inventory\Vls.Shopflow.Inventory.Application\Vls.Shopflow.Inventory.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Inventory\Vls.Shopflow.Inventory.Infrastructure\Vls.Shopflow.Inventory.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CartCheckout\Vls.Shopflow.CartCheckout.Application\Vls.Shopflow.CartCheckout.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CartCheckout\Vls.Shopflow.CartCheckout.Infrastructure\Vls.Shopflow.CartCheckout.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Application\Vls.Shopflow.Orders.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Infrastructure\Vls.Shopflow.Orders.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\PaymentsPix\Vls.Shopflow.PaymentsPix.Application\Vls.Shopflow.PaymentsPix.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\PaymentsPix\Vls.Shopflow.PaymentsPix.Infrastructure\Vls.Shopflow.PaymentsPix.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\IdentityAccess\Vls.Shopflow.IdentityAccess.Application\Vls.Shopflow.IdentityAccess.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\IdentityAccess\Vls.Shopflow.IdentityAccess.Infrastructure\Vls.Shopflow.IdentityAccess.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\IdentityAccess\Vls.Shopflow.IdentityAccess.Domain\Vls.Shopflow.IdentityAccess.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

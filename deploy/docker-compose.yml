@@ -1,0 +1,263 @@
+services:
+
+  caddy:
+
+    image: caddy:2-alpine
+
+    container_name: shopflow-caddy
+
+    restart: unless-stopped
+
+    ports:
+
+      - "80:80"
+
+      - "443:443"
+
+    volumes:
+
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+
+      - caddy_data:/data
+
+      - caddy_config:/config
+
+    depends_on:
+
+      - api-test
+
+      - api-hml
+
+    networks:
+
+      - shopflow
+
+
+
+  postgres:
+
+    image: postgres:16-alpine
+
+    container_name: shopflow-postgres
+
+    restart: unless-stopped
+
+    environment:
+
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+
+      POSTGRES_DB: postgres
+
+    volumes:
+
+      - postgres_data:/var/lib/postgresql/data
+
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
+    healthcheck:
+
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres || exit 1"]
+
+      interval: 10s
+
+      timeout: 5s
+
+      retries: 5
+
+    networks:
+
+      - shopflow
+
+
+
+  api-test:
+
+    build:
+
+      context: ../apps/api
+
+      dockerfile: Dockerfile
+
+    container_name: shopflow-api-test
+
+    restart: unless-stopped
+
+    env_file:
+
+      - path: .env.test
+
+        required: true
+
+    environment:
+
+      ASPNETCORE_URLS: http://+:8080
+
+      ASPNETCORE_HTTP_PORTS: "8080"
+
+      ASPNETCORE_ENVIRONMENT: Testing
+
+    volumes:
+
+      - api_test_uploads:/app/wwwroot/uploads
+
+      - dataprotection_test:/app/dataprotection-keys
+
+    depends_on:
+
+      postgres:
+
+        condition: service_healthy
+
+    networks:
+
+      - shopflow
+
+
+
+  api-hml:
+
+    build:
+
+      context: ../apps/api
+
+      dockerfile: Dockerfile
+
+    container_name: shopflow-api-hml
+
+    restart: unless-stopped
+
+    env_file:
+
+      - path: .env.hml
+
+        required: true
+
+    environment:
+
+      ASPNETCORE_URLS: http://+:8080
+
+      ASPNETCORE_HTTP_PORTS: "8080"
+
+      ASPNETCORE_ENVIRONMENT: Staging
+
+    volumes:
+
+      - api_hml_uploads:/app/wwwroot/uploads
+
+      - dataprotection_hml:/app/dataprotection-keys
+
+    depends_on:
+
+      postgres:
+
+        condition: service_healthy
+
+    networks:
+
+      - shopflow
+
+
+
+  worker-test:
+
+    build:
+
+      context: ../apps/api
+
+      dockerfile: Dockerfile.worker
+
+    container_name: shopflow-worker-test
+
+    restart: unless-stopped
+
+    env_file:
+
+      - path: .env.test
+
+        required: true
+
+    environment:
+
+      DOTNET_ENVIRONMENT: Testing
+
+    depends_on:
+
+      postgres:
+
+        condition: service_healthy
+
+      api-test:
+
+        condition: service_started
+
+    networks:
+
+      - shopflow
+
+
+
+  worker-hml:
+
+    build:
+
+      context: ../apps/api
+
+      dockerfile: Dockerfile.worker
+
+    container_name: shopflow-worker-hml
+
+    restart: unless-stopped
+
+    env_file:
+
+      - path: .env.hml
+
+        required: true
+
+    environment:
+
+      DOTNET_ENVIRONMENT: Staging
+
+    depends_on:
+
+      postgres:
+
+        condition: service_healthy
+
+      api-hml:
+
+        condition: service_started
+
+    networks:
+
+      - shopflow
+
+
+
+networks:
+
+  shopflow:
+
+    driver: bridge
+
+
+
+volumes:
+
+  caddy_data:
+
+  caddy_config:
+
+  postgres_data:
+
+  api_test_uploads:
+
+  api_hml_uploads:
+
+  dataprotection_test:
+
+  dataprotection_hml:
+
+

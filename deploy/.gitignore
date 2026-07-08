@@ -1,0 +1,8 @@
+# Secrets — nunca commitar
+.env
+.env.test
+.env.hml
+*.local
+*.secret
+cookies.txt
+*.cookies

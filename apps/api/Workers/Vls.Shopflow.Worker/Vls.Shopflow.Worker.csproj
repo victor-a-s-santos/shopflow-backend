@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Vls.Shopflow.Worker-90a93007-f81e-437f-8a69-bce08b16f3da</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Expiration\Vls.Shopflow.Expiration.Application\Vls.Shopflow.Expiration.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Expiration\Vls.Shopflow.Expiration.Infrastructure\Vls.Shopflow.Expiration.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CartCheckout\Vls.Shopflow.CartCheckout.Infrastructure\Vls.Shopflow.CartCheckout.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Infrastructure\Vls.Shopflow.Orders.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\PaymentsPix\Vls.Shopflow.PaymentsPix.Infrastructure\Vls.Shopflow.PaymentsPix.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Inventory\Vls.Shopflow.Inventory.Infrastructure\Vls.Shopflow.Inventory.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

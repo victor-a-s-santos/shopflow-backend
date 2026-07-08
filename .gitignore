@@ -1,0 +1,72 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.DotSettings.user
+
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+*.rsuser
+*.nupkg
+*.snupkg
+coverage/
+coverage.*
+*.trx
+
+# Logs / temp
+*.log
+logs/
+tmp/
+temp/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+!*.env.example
+deploy/.env
+deploy/.env.test
+deploy/.env.hml
+apps/api/.env
+apps/api/.env.*
+!apps/api/.env.example
+!apps/api/*.env.example
+secrets/
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+cookies.txt
+*.cookies
+
+# Docker / runtime
+docker-data/
+postgres-data/
+caddy-data/
+caddy-config/
+dataprotection-keys/
+uploads/
+wwwroot/uploads/
+apps/api/wwwroot/uploads/
+
+# Backups / dumps
+backups/
+*.sql
+*.dump
+*.backup
+*.bak
+!deploy/postgres/*.sql
+
+# Frontend — outro repositório; não versionar no backend
+apps/web/
+node_modules/
+dist/
+build/

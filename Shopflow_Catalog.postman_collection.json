@@ -1,0 +1,745 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Shopflow — Catalog",
+    "description": "Testes de ponta a ponta do módulo Catalog (Shopflow API).\n\nVariável base: `baseUrl` = http://localhost:5127/api\n\nOrdem sugerida: pasta **1. Setup** → **2. Produto com SKUs** → **3. Validações** → **5. Imagens** (opcional) → **4. Delete** (limpeza).\n\nRequer API rodando e seed de categorias/atributos aplicado.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5127/api" },
+    { "key": "productId", "value": "" },
+    { "key": "skuId", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "colorDefinitionId", "value": "" },
+    { "key": "colorValueId", "value": "" },
+    { "key": "sizeDefinitionId", "value": "" },
+    { "key": "sizeValueId", "value": "" },
+    { "key": "nonExistentSkuId", "value": "00000000-0000-0000-0000-000000000099" }
+  ],
+  "item": [
+    {
+      "name": "1. Setup / Consulta base",
+      "item": [
+        {
+          "name": "GET /catalog/categories",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/categories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const cats = pm.response.json();",
+                  "pm.test('Lista de categorias', () => pm.expect(cats).to.be.an('array'));",
+                  "if (Array.isArray(cats) && cats.length > 0) {",
+                  "  pm.collectionVariables.set('categoryId', cats[0].id);",
+                  "  console.log('categoryId =', cats[0].id, cats[0].name);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/attributes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/attributes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const defs = pm.response.json();",
+                  "pm.test('Lista de atributos', () => pm.expect(defs).to.be.an('array'));",
+                  "const findDef = (part) => defs.find((d) =>",
+                  "  (d.name || '').toLowerCase().includes(part.toLowerCase())",
+                  ");",
+                  "const findValue = (values, names) => {",
+                  "  for (const n of names) {",
+                  "    const v = values.find((x) => (x.name || '').toLowerCase() === n.toLowerCase());",
+                  "    if (v) return v;",
+                  "  }",
+                  "  return values[0];",
+                  "};",
+                  "const cor = findDef('cor');",
+                  "const tamanho = findDef('tamanho');",
+                  "if (cor) {",
+                  "  pm.collectionVariables.set('colorDefinitionId', cor.id);",
+                  "  const colorVal = findValue(cor.values || [], ['Preto', 'Off-White']);",
+                  "  if (colorVal) {",
+                  "    pm.collectionVariables.set('colorValueId', colorVal.id);",
+                  "    console.log('Cor:', cor.name, '→', colorVal.name);",
+                  "  }",
+                  "}",
+                  "if (tamanho) {",
+                  "  pm.collectionVariables.set('sizeDefinitionId', tamanho.id);",
+                  "  const sizeVal = findValue(tamanho.values || [], ['M', 'Único', 'U']);",
+                  "  if (sizeVal) {",
+                  "    pm.collectionVariables.set('sizeValueId', sizeVal.id);",
+                  "    console.log('Tamanho:', tamanho.name, '→', sizeVal.name);",
+                  "  }",
+                  "}",
+                  "pm.test('Cor capturada', () => {",
+                  "  pm.expect(pm.collectionVariables.get('colorDefinitionId')).to.not.be.empty;",
+                  "  pm.expect(pm.collectionVariables.get('colorValueId')).to.not.be.empty;",
+                  "});",
+                  "pm.test('Tamanho capturado', () => {",
+                  "  pm.expect(pm.collectionVariables.get('sizeDefinitionId')).to.not.be.empty;",
+                  "  pm.expect(pm.collectionVariables.get('sizeValueId')).to.not.be.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/products?page=1&pageSize=20",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/products?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('PagedProductsDto', () => {",
+                  "  pm.expect(body).to.have.property('page');",
+                  "  pm.expect(body).to.have.property('items');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /catalog/products/simple (produto sem SKUs)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Produto Simples Postman\",\n  \"slug\": \"produto-simples-postman-{{$timestamp}}\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"regularPrice\": 49.90,\n  \"promotionalPrice\": null\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/simple"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Retorna id', () => pm.expect(pm.response.json()).to.have.property('id'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Produto com SKUs — fluxo completo",
+      "item": [
+        {
+          "name": "POST /catalog/products/variant",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Camiseta Postman E2E\",\n  \"slug\": \"camiseta-postman-e2e-{{$timestamp}}\",\n  \"categoryId\": \"{{categoryId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/variant"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('Retorna id', () => pm.expect(body).to.have.property('id'));",
+                  "pm.collectionVariables.set('productId', body.id);",
+                  "console.log('productId =', body.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /catalog/products/{{productId}}/variants",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"\",\n  \"regularPrice\": 99.90,\n  \"promotionalPrice\": 79.90,\n  \"active\": true,\n  \"attributes\": [\n    {\n      \"attributeDefinitionId\": \"{{colorDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{colorValueId}}\"\n    },\n    {\n      \"attributeDefinitionId\": \"{{sizeDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{sizeValueId}}\"\n    },\n    {\n      \"customName\": \"Estampa\",\n      \"customValue\": \"Listrada\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('Retorna skuId', () => pm.expect(body).to.have.property('skuId'));",
+                  "pm.collectionVariables.set('skuId', body.skuId);",
+                  "console.log('skuId =', body.skuId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/products/{{productId}}",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('Produto com SKUs', () => {",
+                  "  pm.expect(p.hasSkus).to.eql(true);",
+                  "  pm.expect(p.skus).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "pm.test('SKU criado presente', () => {",
+                  "  const skuId = pm.collectionVariables.get('skuId');",
+                  "  pm.expect(p.skus.some((s) => s.id === skuId)).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /catalog/products/{{productId}}/variants/{{skuId}}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SKU-POSTMAN-UPDATED\",\n  \"regularPrice\": 109.90,\n  \"promotionalPrice\": 89.90,\n  \"active\": true,\n  \"attributes\": [\n    {\n      \"attributeDefinitionId\": \"{{colorDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{colorValueId}}\"\n    },\n    {\n      \"attributeDefinitionId\": \"{{sizeDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{sizeValueId}}\"\n    },\n    {\n      \"customName\": \"Estampa\",\n      \"customValue\": \"Listrada Atualizada\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/products/{{productId}} (após update SKU)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const skuId = pm.collectionVariables.get('skuId');",
+                  "const sku = pm.response.json().skus.find((s) => s.id === skuId);",
+                  "pm.test('Código atualizado', () => {",
+                  "  pm.expect(sku).to.exist;",
+                  "  pm.expect(sku.code).to.eql('SKU-POSTMAN-UPDATED');",
+                  "});",
+                  "pm.test('Preço atualizado', () => {",
+                  "  pm.expect(sku.regularPrice).to.eql(109.9);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /catalog/products/{{productId}}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Camiseta Postman E2E (editada)\",\n  \"slug\": \"camiseta-postman-e2e-editada\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"isActive\": true\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /catalog/products/{{productId}}/deactivate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/deactivate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/products/{{productId}} (inativo)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Produto inativo', () => pm.expect(pm.response.json().isActive).to.eql(false));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /catalog/products/{{productId}}/activate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/activate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Validações / cenários negativos",
+      "item": [
+        {
+          "name": "POST variant — preço regular inválido (0)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SKU-INVALID-PRICE\",\n  \"regularPrice\": 0,\n  \"promotionalPrice\": null,\n  \"active\": true,\n  \"attributes\": [\n    {\n      \"attributeDefinitionId\": \"{{colorDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{colorValueId}}\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST variant — promotionalPrice > regularPrice",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SKU-BAD-PROMO\",\n  \"regularPrice\": 50.00,\n  \"promotionalPrice\": 80.00,\n  \"active\": true,\n  \"attributes\": [\n    {\n      \"attributeDefinitionId\": \"{{colorDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{colorValueId}}\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST variant — atributo global duplicado (Cor 2x)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SKU-DUP-GLOBAL\",\n  \"regularPrice\": 59.90,\n  \"promotionalPrice\": null,\n  \"active\": true,\n  \"attributes\": [\n    {\n      \"attributeDefinitionId\": \"{{colorDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{colorValueId}}\"\n    },\n    {\n      \"attributeDefinitionId\": \"{{colorDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{colorValueId}}\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 ou 500 (regra duplicata)', () => {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([400, 500]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST variant — custom attribute incompleto",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SKU-BAD-CUSTOM\",\n  \"regularPrice\": 59.90,\n  \"promotionalPrice\": null,\n  \"active\": true,\n  \"attributes\": [\n    {\n      \"customName\": \"Estampa\",\n      \"customValue\": \"\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST variant — attributes null",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SKU-NULL-ATTRS\",\n  \"regularPrice\": 59.90,\n  \"promotionalPrice\": null,\n  \"active\": true,\n  \"attributes\": null\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT variant — SKU inexistente (404)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SKU-GHOST\",\n  \"regularPrice\": 99.90,\n  \"promotionalPrice\": null,\n  \"active\": true,\n  \"attributes\": [\n    {\n      \"attributeDefinitionId\": \"{{colorDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{colorValueId}}\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants/{{nonExistentSkuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET produto inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/00000000-0000-0000-0000-000000000001"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Delete",
+      "item": [
+        {
+          "name": "DELETE /catalog/products/{{productId}}/variants/{{skuId}}",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/products/{{productId}} (sem SKUs)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const skuId = pm.collectionVariables.get('skuId');",
+                  "pm.test('SKU removido', () => {",
+                  "  const skus = pm.response.json().skus || [];",
+                  "  pm.expect(skus.some((s) => s.id === skuId)).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /catalog/products/{{productId}}",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/products/{{productId}} (após delete — 404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Imagens",
+      "item": [
+        {
+          "name": "[PENDING BACKEND] POST /catalog/products/{{productId}}/images/presigned",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"produto.jpg\",\n  \"contentType\": \"image/jpeg\"\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/images/presigned",
+            "description": "Endpoint não implementado em CatalogEndpoints.cs. Mantido para referência futura."
+          }
+        },
+        {
+          "name": "POST /catalog/products/{{productId}}/images (multipart)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "description": "Selecione um arquivo de imagem (jpg/png)",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/images",
+            "description": "Upload multipart. Campo do formulário: `file` (IFormFile). Execute após criar o produto (pasta 2) e antes do DELETE (pasta 4)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('ProductImageDto', () => {",
+                  "  pm.expect(body).to.have.property('id');",
+                  "  pm.expect(body).to.have.property('url');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/products/{{productId}} (com imagens)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Lista images', () => {",
+                  "  pm.expect(pm.response.json().images).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

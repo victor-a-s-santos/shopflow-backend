@@ -1,0 +1,10 @@
+# Placeholder até confirmação do domínio final no Registro.br.
+# DNS: registros A/AAAA de api-teste e api-hml devem apontar para o IP da VPS.
+
+api-teste.vipassessoriadigital.com.br {
+	reverse_proxy api-test:8080
+}
+
+api-hml.vipassessoriadigital.com.br {
+	reverse_proxy api-hml:8080
+}

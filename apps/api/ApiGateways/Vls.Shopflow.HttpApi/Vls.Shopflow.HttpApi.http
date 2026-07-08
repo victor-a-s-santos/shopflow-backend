@@ -1,0 +1,49 @@
+//@Vls.Shopflow.HttpApi_HostAddress = http://localhost:5127
+
+@host=http://localhost:5000
+
+### Templates de atributos (apparel)
+GET {{host}}/api/catalog/attribute-templates/apparel
+
+### Produto simples (preço promo opcional)
+POST {{host}}/api/catalog/products/simple
+Content-Type: application/json
+
+{
+  "name": "Camiseta Básica",
+  "slug": "camiseta-basica",
+  "regularPrice": 79.90,
+  "promotionalPrice": 59.90
+}
+
+### Produto com variações
+POST {{host}}/api/catalog/products/variant
+Content-Type: application/json
+
+{
+  "name": "Tênis X",
+  "slug": "tenis-x"
+}
+
+### Adicionar variação (sem code => gera Guid interno)
+POST {{host}}/api/catalog/products/{{productId}}/variants
+Content-Type: application/json
+
+{
+  "regularPrice": 299.90,
+  "promotionalPrice": 249.90,
+  "attributes": [
+    { "name": "color", "value": "black" },
+    { "name": "size", "value": "42" }
+  ],
+  "active": true
+}
+
+### Publicar produto
+POST {{host}}/api/catalog/products/{{productId}}/publish
+
+### Lista paginada
+GET {{host}}/api/catalog/products?page=1&pageSize=20
+
+### Buscar por id
+GET {{host}}/api/catalog/products/{{productId}}

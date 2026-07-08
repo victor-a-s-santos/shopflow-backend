@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY Directory.Packages.props ./
+COPY Vls.Shopflow.sln ./
+COPY src/ src/
+COPY Workers/ Workers/
+
+RUN dotnet restore Workers/Vls.Shopflow.Worker/Vls.Shopflow.Worker.csproj
+RUN dotnet publish Workers/Vls.Shopflow.Worker/Vls.Shopflow.Worker.csproj -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
+WORKDIR /app
+
+COPY --from=build /app/publish .
+
+ENTRYPOINT ["dotnet", "Vls.Shopflow.Worker.dll"]

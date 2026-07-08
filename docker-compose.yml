@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: shopflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shopflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - shopflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shopflow || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: shopflow-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5127
+      ConnectionStrings__Catalog: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__Inventory: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__CartCheckout: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__Orders: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__PaymentsPix: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__IdentityAccess: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      DataProtection__KeysPath: /var/shopflow/dataprotection-keys
+      # Admin seed — carregado do .env na raiz (ver .env.example); opcional em Development
+      SHOPFLOW_ADMIN_EMAIL: ${SHOPFLOW_ADMIN_EMAIL:-}
+      SHOPFLOW_ADMIN_PASSWORD: ${SHOPFLOW_ADMIN_PASSWORD:-}
+      SHOPFLOW_ADMIN_NAME: ${SHOPFLOW_ADMIN_NAME:-Shopflow Admin}
+      Uploads__RootPath: /app/wwwroot/uploads
+      Uploads__PublicBaseUrl: http://localhost:5127
+      DemoCatalogSeed__Enabled: "true"
+      DemoCatalogSeed__CopyImages: "true"
+      DemoCatalogSeed__CreateInventory: "true"
+      DemoCatalogSeed__DefaultStockQuantity: "20"
+    ports:
+      - "5127:5127"
+    volumes:
+      - shopflow_uploads:/app/wwwroot/uploads
+      - shopflow_dataprotection:/var/shopflow/dataprotection-keys
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.worker
+    container_name: shopflow-worker
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      ConnectionStrings__Catalog: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__Inventory: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__CartCheckout: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__Orders: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ConnectionStrings__PaymentsPix: Host=db;Port=5432;Database=shopflow;Username=postgres;Password=postgres
+      ExpirationWorker__Enabled: "true"
+      ExpirationWorker__IntervalSeconds: "60"
+      ExpirationWorker__BatchSize: "50"
+    restart: unless-stopped
+
+volumes:
+  shopflow_pgdata:
+  shopflow_uploads:
+  shopflow_dataprotection:
+

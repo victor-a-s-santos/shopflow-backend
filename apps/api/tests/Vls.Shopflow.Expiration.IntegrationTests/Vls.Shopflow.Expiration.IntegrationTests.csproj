@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Expiration\Vls.Shopflow.Expiration.Application\Vls.Shopflow.Expiration.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Expiration\Vls.Shopflow.Expiration.Infrastructure\Vls.Shopflow.Expiration.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CartCheckout\Vls.Shopflow.CartCheckout.Infrastructure\Vls.Shopflow.CartCheckout.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Infrastructure\Vls.Shopflow.Orders.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\PaymentsPix\Vls.Shopflow.PaymentsPix.Infrastructure\Vls.Shopflow.PaymentsPix.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Inventory\Vls.Shopflow.Inventory.Infrastructure\Vls.Shopflow.Inventory.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

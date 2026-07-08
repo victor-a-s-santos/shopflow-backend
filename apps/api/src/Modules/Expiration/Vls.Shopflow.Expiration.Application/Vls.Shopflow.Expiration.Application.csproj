@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CartCheckout\Vls.Shopflow.CartCheckout.Application\Vls.Shopflow.CartCheckout.Application.csproj" />
+    <ProjectReference Include="..\..\Orders\Vls.Shopflow.Orders.Application\Vls.Shopflow.Orders.Application.csproj" />
+    <ProjectReference Include="..\..\PaymentsPix\Vls.Shopflow.PaymentsPix.Application\Vls.Shopflow.PaymentsPix.Application.csproj" />
+    <ProjectReference Include="..\..\Inventory\Vls.Shopflow.Inventory.Domain\Vls.Shopflow.Inventory.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Application\Vls.Shopflow.BuildingBlocks.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vls.Shopflow.Expiration.UnitTests" />
+  </ItemGroup>
+
+</Project>

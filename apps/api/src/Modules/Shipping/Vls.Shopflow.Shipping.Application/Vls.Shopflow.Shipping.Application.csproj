@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Vls.Shopflow.Shipping.Domain\Vls.Shopflow.Shipping.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Domain\Vls.Shopflow.BuildingBlocks.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Application\Vls.Shopflow.BuildingBlocks.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="MediatR" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

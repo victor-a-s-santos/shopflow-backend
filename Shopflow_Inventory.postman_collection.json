@@ -1,0 +1,808 @@
+{
+  "info": {
+    "_postman_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "name": "Shopflow — Inventory E2E",
+    "description": "Roteiro completo de validação manual do módulo Inventory.\n\n**Pré-requisito:** API em `http://localhost:5127` com PostgreSQL e seed do Catalog aplicado.\n\n**Como executar:** Postman → Collection Runner → selecione esta collection → **Run**. A pasta **0. Setup Catalog** cria produto + SKU fresco a cada execução; em seguida rode as pastas **1. Fluxo principal** e **2. Erros**.\n\n**Variáveis preenchidas automaticamente:** `categoryId`, `productId`, `skuId`, `reservationIdConfirm`, `reservationIdCancel`.\n\n**Ordem:** 0 → 1 → 2 (não pule o Setup na primeira execução).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5127/api" },
+    { "key": "categoryId", "value": "" },
+    { "key": "colorDefinitionId", "value": "" },
+    { "key": "colorValueId", "value": "" },
+    { "key": "sizeDefinitionId", "value": "" },
+    { "key": "sizeValueId", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "skuId", "value": "" },
+    { "key": "reservationIdConfirm", "value": "" },
+    { "key": "reservationIdCancel", "value": "" },
+    { "key": "nonExistentSkuId", "value": "00000000-0000-0000-0000-000000000099" }
+  ],
+  "item": [
+    {
+      "name": "0. Setup Catalog (obter skuId)",
+      "item": [
+        {
+          "name": "GET /catalog/categories",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/categories"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const cats = pm.response.json();",
+                  "pm.test('Categorias disponíveis', () => pm.expect(cats).to.be.an('array').that.is.not.empty);",
+                  "const camisetas = cats.find((c) => (c.name || '').toLowerCase().includes('camiseta')) || cats[0];",
+                  "pm.collectionVariables.set('categoryId', camisetas.id);",
+                  "console.log('categoryId =', camisetas.id, camisetas.name);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/attributes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/attributes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const defs = pm.response.json();",
+                  "const findDef = (part) => defs.find((d) => (d.name || '').toLowerCase().includes(part));",
+                  "const findValue = (values, names) => {",
+                  "  for (const n of names) {",
+                  "    const v = (values || []).find((x) => (x.name || '').toLowerCase() === n.toLowerCase());",
+                  "    if (v) return v;",
+                  "  }",
+                  "  return (values || [])[0];",
+                  "};",
+                  "const cor = findDef('cor');",
+                  "const tamanho = findDef('tamanho');",
+                  "if (cor) {",
+                  "  pm.collectionVariables.set('colorDefinitionId', cor.id);",
+                  "  const colorVal = findValue(cor.values, ['Preto', 'Off-White']);",
+                  "  if (colorVal) pm.collectionVariables.set('colorValueId', colorVal.id);",
+                  "}",
+                  "if (tamanho) {",
+                  "  pm.collectionVariables.set('sizeDefinitionId', tamanho.id);",
+                  "  const sizeVal = findValue(tamanho.values, ['M', 'G']);",
+                  "  if (sizeVal) pm.collectionVariables.set('sizeValueId', sizeVal.id);",
+                  "}",
+                  "pm.test('Atributos capturados', () => {",
+                  "  pm.expect(pm.collectionVariables.get('colorDefinitionId')).to.not.be.empty;",
+                  "  pm.expect(pm.collectionVariables.get('sizeDefinitionId')).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /catalog/products/variant",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Produto Inventory E2E\",\n  \"slug\": \"produto-inventory-e2e-{{$timestamp}}\",\n  \"categoryId\": \"{{categoryId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/variant"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('productId', body.id);",
+                  "console.log('productId =', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /catalog/products/{{productId}}/variants",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"INV-E2E-{{$timestamp}}\",\n  \"regularPrice\": 99.90,\n  \"promotionalPrice\": null,\n  \"active\": true,\n  \"attributes\": [\n    {\n      \"attributeDefinitionId\": \"{{colorDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{colorValueId}}\"\n    },\n    {\n      \"attributeDefinitionId\": \"{{sizeDefinitionId}}\",\n      \"attributeValueDefinitionId\": \"{{sizeValueId}}\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/catalog/products/{{productId}}/variants"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('skuId retornado', () => pm.expect(body).to.have.property('skuId'));",
+                  "pm.collectionVariables.set('skuId', body.skuId);",
+                  "console.log('skuId =', body.skuId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /catalog/products/{{productId}} (validar skuId)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/catalog/products/{{productId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "const skuId = pm.collectionVariables.get('skuId');",
+                  "pm.test('SKU presente no produto', () => {",
+                  "  pm.expect(p.skus.some((s) => s.id === skuId)).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Fluxo principal",
+      "item": [
+        {
+          "name": "01 POST /inventory/skus/{{skuId}} — criar estoque inicial",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"initialQuantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('Retorna skuId', () => pm.expect(body.skuId).to.eql(pm.collectionVariables.get('skuId')));",
+                  "pm.test('Location header', () => {",
+                  "  const loc = pm.response.headers.get('Location');",
+                  "  pm.expect(loc).to.include('/api/inventory/skus/');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 GET /inventory/skus/{{skuId}} — consultar (10/0/10)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Estoque inicial', () => {",
+                  "  pm.expect(b.quantityOnHand).to.eql(10);",
+                  "  pm.expect(b.quantityReserved).to.eql(0);",
+                  "  pm.expect(b.availableQuantity).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 POST /inventory/skus/{{skuId}}/add — adicionar 5",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 5,\n  \"reason\": \"Reposição\"\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}/add"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 GET /inventory/skus/{{skuId}} — consultar (15/0/15)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Após add', () => {",
+                  "  pm.expect(b.quantityOnHand).to.eql(15);",
+                  "  pm.expect(b.quantityReserved).to.eql(0);",
+                  "  pm.expect(b.availableQuantity).to.eql(15);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 POST /inventory/skus/{{skuId}}/remove — baixar 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2,\n  \"reason\": \"Baixa manual\"\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}/remove"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 GET /inventory/skus/{{skuId}} — consultar (13/0/13)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Após remove', () => {",
+                  "  pm.expect(b.quantityOnHand).to.eql(13);",
+                  "  pm.expect(b.quantityReserved).to.eql(0);",
+                  "  pm.expect(b.availableQuantity).to.eql(13);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 POST /inventory/skus/{{skuId}}/reserve — reservar 3 (confirmar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 3,\n  \"expiresAt\": \"2026-06-01T12:00:00Z\"\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}/reserve"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('reservationId retornado', () => pm.expect(body).to.have.property('reservationId'));",
+                  "pm.collectionVariables.set('reservationIdConfirm', body.reservationId);",
+                  "console.log('reservationIdConfirm =', body.reservationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 GET /inventory/skus/{{skuId}} — consultar (13/3/10)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Após reserve', () => {",
+                  "  pm.expect(b.quantityOnHand).to.eql(13);",
+                  "  pm.expect(b.quantityReserved).to.eql(3);",
+                  "  pm.expect(b.availableQuantity).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 POST /inventory/reservations/{{reservationIdConfirm}}/confirm",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/reservations/{{reservationIdConfirm}}/confirm"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 GET /inventory/skus/{{skuId}} — consultar (10/0/10)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Após confirm', () => {",
+                  "  pm.expect(b.quantityOnHand).to.eql(10);",
+                  "  pm.expect(b.quantityReserved).to.eql(0);",
+                  "  pm.expect(b.availableQuantity).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 POST /inventory/skus/{{skuId}}/reserve — reservar 4 (cancelar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 4,\n  \"expiresAt\": null\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}/reserve"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('reservationIdCancel', body.reservationId);",
+                  "console.log('reservationIdCancel =', body.reservationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 GET /inventory/skus/{{skuId}} — consultar (10/4/6)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Reserva pendente', () => {",
+                  "  pm.expect(b.quantityOnHand).to.eql(10);",
+                  "  pm.expect(b.quantityReserved).to.eql(4);",
+                  "  pm.expect(b.availableQuantity).to.eql(6);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 POST /inventory/reservations/{{reservationIdCancel}}/cancel",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/reservations/{{reservationIdCancel}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 GET /inventory/skus/{{skuId}} — consultar (10/0/10)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Após cancel', () => {",
+                  "  pm.expect(b.quantityOnHand).to.eql(10);",
+                  "  pm.expect(b.quantityReserved).to.eql(0);",
+                  "  pm.expect(b.availableQuantity).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 GET /inventory/skus/{{skuId}}/movements?page=1&pageSize=20",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/skus/{{skuId}}/movements?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", "skus", "{{skuId}}", "movements"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Paginação', () => {",
+                  "  pm.expect(b.page).to.eql(1);",
+                  "  pm.expect(b.pageSize).to.eql(20);",
+                  "  pm.expect(b.items).to.be.an('array');",
+                  "  pm.expect(b.totalItems).to.be.at.least(7);",
+                  "});",
+                  "const types = b.items.map((i) => i.type);",
+                  "pm.test('Tipos de movimentação', () => {",
+                  "  ['InitialStockAdded','StockAdded','StockRemoved','StockReserved','ReservationConfirmed','ReservationCanceled'].forEach((t) => {",
+                  "    pm.expect(types, 'falta ' + t).to.include(t);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 GET /inventory/skus/{{skuId}}/movements?page=1&pageSize=3",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/skus/{{skuId}}/movements?page=1&pageSize=3",
+              "host": ["{{baseUrl}}"],
+              "path": ["inventory", "skus", "{{skuId}}", "movements"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "3" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Paginação parcial', () => {",
+                  "  pm.expect(b.items).to.have.lengthOf(3);",
+                  "  pm.expect(b.totalPages).to.be.at.least(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Erros",
+      "item": [
+        {
+          "name": "ERR01 POST /inventory/skus/{{nonExistentSkuId}} — SKU inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"initialQuantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{nonExistentSkuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "const b = pm.response.json();",
+                  "pm.test('SkuNotFound', () => {",
+                  "  pm.expect(b.message).to.include('not found');",
+                  "  pm.expect(b.skuId).to.eql(pm.collectionVariables.get('nonExistentSkuId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR02 POST /inventory/skus/{{nonExistentSkuId}}/add — SKU inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 1,\n  \"reason\": \"Teste\"\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{nonExistentSkuId}}/add"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR03 POST /inventory/skus/{{skuId}}/reserve — estoque insuficiente (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 99,\n  \"expiresAt\": null\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}/reserve"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "const b = pm.response.json();",
+                  "pm.test('InsufficientStock', () => {",
+                  "  pm.expect(b.requested).to.eql(99);",
+                  "  pm.expect(b.available).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR04 POST /inventory/skus/{{skuId}}/remove — estoque insuficiente (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 99,\n  \"reason\": \"Teste\"\n}"
+            },
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}/remove"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "const b = pm.response.json();",
+                  "pm.test('InsufficientStock remove', () => {",
+                  "  pm.expect(b.requested).to.eql(99);",
+                  "  pm.expect(b.available).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR05 GET /inventory/skus/{{skuId}} — estoque inalterado após erros",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/skus/{{skuId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('Quantidades preservadas', () => {",
+                  "  pm.expect(b.quantityOnHand).to.eql(10);",
+                  "  pm.expect(b.quantityReserved).to.eql(0);",
+                  "  pm.expect(b.availableQuantity).to.eql(10);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR06 POST /inventory/reservations/{{reservationIdConfirm}}/confirm — já confirmada (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/reservations/{{reservationIdConfirm}}/confirm"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "const b = pm.response.json();",
+                  "pm.test('InvalidStockReservationStatus', () => {",
+                  "  pm.expect(b.message).to.include('pending');",
+                  "  pm.expect(b.reservationId).to.eql(pm.collectionVariables.get('reservationIdConfirm'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ERR07 POST /inventory/reservations/{{reservationIdCancel}}/cancel — já cancelada (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/inventory/reservations/{{reservationIdCancel}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "const b = pm.response.json();",
+                  "pm.test('InvalidStockReservationStatus cancel', () => {",
+                  "  pm.expect(b.message).to.include('pending');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
