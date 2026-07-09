@@ -6,6 +6,8 @@ Documentação da decisão: [docs/infra/ADR-002-deploy-docker-compose-vps.md](..
 
 **Validação pré-deploy:** [docs/infra/DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md](../docs/infra/DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md)
 
+**Deploy automático (CI):** [docs/infra/RUNBOOK-004-github-actions-vps-deploy.md](../docs/infra/RUNBOOK-004-github-actions-vps-deploy.md)
+
 ## Estrutura
 
 ```

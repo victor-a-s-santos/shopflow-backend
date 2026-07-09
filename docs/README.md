@@ -28,6 +28,7 @@ Shopflow é um e-commerce modular em monorepo. Nesta fase, **dois módulos estã
 | [next-steps.md](./next-steps.md) | Próximos módulos e dívidas técnicas |
 | [infra/REPO-001-backend-github-setup.md](./infra/REPO-001-backend-github-setup.md) | Preparo do repo GitHub do backend |
 | [infra/RUNBOOK-001-vps-setup-deploy.md](./infra/RUNBOOK-001-vps-setup-deploy.md) | Deploy VPS teste/HML |
+| [infra/RUNBOOK-004-github-actions-vps-deploy.md](./infra/RUNBOOK-004-github-actions-vps-deploy.md) | Deploy automático via GitHub Actions |
 
 > O frontend vive em outro repositório. Este docs/ acompanha o **backend**.
 

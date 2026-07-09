@@ -1,0 +1,222 @@
+name: Deploy VPS
+
+on:
+  push:
+    branches:
+      - develop
+      - staging
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente a publicar
+        required: true
+        type: choice
+        options:
+          - test
+          - hml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shopflow-vps-deploy
+  cancel-in-progress: false
+
+env:
+  REMOTE_APP_DIR: /opt/shopflow/app
+  REMOTE_DEPLOY_DIR: /opt/shopflow/app/deploy
+
+jobs:
+  deploy-test:
+    name: Deploy teste (develop)
+    if: >
+      github.ref == 'refs/heads/develop' ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'test')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sync code to VPS (preserve remote .env)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.cursor' \
+            --exclude '**/bin/' \
+            --exclude '**/obj/' \
+            --exclude '.DS_Store' \
+            --exclude 'node_modules' \
+            --exclude 'apps/web' \
+            --exclude 'deploy/.env' \
+            --exclude 'deploy/.env.test' \
+            --exclude 'deploy/.env.hml' \
+            --exclude 'apps/api/wwwroot/uploads' \
+            --exclude 'backups' \
+            --exclude 'postgres-data' \
+            --exclude 'caddy-data' \
+            --exclude 'caddy-config' \
+            --exclude 'dataprotection-keys' \
+            --exclude 'uploads' \
+            ./ "${VPS_USER}@${VPS_HOST}:${REMOTE_APP_DIR}/"
+
+      - name: Build and recreate api-test / worker-test
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+
+          if [[ ! -f .env || ! -f .env.test ]]; then
+            echo "Arquivos .env ou .env.test ausentes na VPS. Não sobrescrever via CI."
+            exit 1
+          fi
+
+          docker compose config
+          docker compose build --no-cache api-test worker-test
+          docker compose up -d --force-recreate --no-deps api-test worker-test
+          docker compose ps
+          EOF
+
+      - name: Health check api-teste
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS https://api-teste.vipassessoriadigital.com.br/health; then
+              echo
+              echo "Health check OK (api-teste)"
+              exit 0
+            fi
+            echo "Aguardando API teste... tentativa ${i}/10"
+            sleep 6
+          done
+
+          echo "Health check falhou (api-teste)"
+          docker compose logs --tail=100 api-test worker-test || true
+          exit 1
+          EOF
+
+  deploy-hml:
+    name: Deploy HML (staging)
+    if: >
+      github.ref == 'refs/heads/staging' ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'hml')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sync code to VPS (preserve remote .env)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.cursor' \
+            --exclude '**/bin/' \
+            --exclude '**/obj/' \
+            --exclude '.DS_Store' \
+            --exclude 'node_modules' \
+            --exclude 'apps/web' \
+            --exclude 'deploy/.env' \
+            --exclude 'deploy/.env.test' \
+            --exclude 'deploy/.env.hml' \
+            --exclude 'apps/api/wwwroot/uploads' \
+            --exclude 'backups' \
+            --exclude 'postgres-data' \
+            --exclude 'caddy-data' \
+            --exclude 'caddy-config' \
+            --exclude 'dataprotection-keys' \
+            --exclude 'uploads' \
+            ./ "${VPS_USER}@${VPS_HOST}:${REMOTE_APP_DIR}/"
+
+      - name: Build and recreate api-hml / worker-hml
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+
+          if [[ ! -f .env || ! -f .env.hml ]]; then
+            echo "Arquivos .env ou .env.hml ausentes na VPS. Não sobrescrever via CI."
+            exit 1
+          fi
+
+          docker compose config
+          docker compose build --no-cache api-hml worker-hml
+          docker compose up -d --force-recreate --no-deps api-hml worker-hml
+          docker compose ps
+          EOF
+
+      - name: Health check api-hml
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS https://api-hml.vipassessoriadigital.com.br/health; then
+              echo
+              echo "Health check OK (api-hml)"
+              exit 0
+            fi
+            echo "Aguardando API HML... tentativa ${i}/10"
+            sleep 6
+          done
+
+          echo "Health check falhou (api-hml)"
+          docker compose logs --tail=100 api-hml worker-hml || true
+          exit 1
+          EOF

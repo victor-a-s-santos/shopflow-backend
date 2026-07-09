@@ -103,6 +103,7 @@ Arquitetura e scripts em [deploy/README.md](deploy/README.md). Resumo:
 Documentação:
 
 - [docs/infra/RUNBOOK-001-vps-setup-deploy.md](docs/infra/RUNBOOK-001-vps-setup-deploy.md)
+- [docs/infra/RUNBOOK-004-github-actions-vps-deploy.md](docs/infra/RUNBOOK-004-github-actions-vps-deploy.md) — deploy automático (GitHub Actions → VPS)
 - [docs/infra/DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md](docs/infra/DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md)
 - Preparo deste repositório: [docs/infra/REPO-001-backend-github-setup.md](docs/infra/REPO-001-backend-github-setup.md)
 
