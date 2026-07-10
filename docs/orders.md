@@ -66,11 +66,11 @@ Ao criar um `Order` nesta etapa:
 | Ação | Comportamento |
 |------|----------------|
 | Reservar estoque novamente | **Não** — evita duplicidade |
-| Confirmar reserva (venda) | **Não** — aguarda webhook Pix real |
+| Confirmar reserva (venda) | **Sim** — via webhook Mercado Pago `approved` |
 | Cancelar reserva | **Não** no Orders — feito por CartCheckout (cancel) ou worker de expiração |
 | Alterar status da CheckoutSession | **Não** — sem semântica artificial |
 
-A confirmação definitiva da reserva (venda) será tratada quando o **webhook Pix real** marcar o pedido como `Paid`.
+A confirmação definitiva da reserva (venda) ocorre quando o **webhook Pix** marca o pedido como `Paid` (`docs/payments/MP-PIX-002-webhook-confirmation.md`).
 
 Pedidos `PendingPayment` com sessão/Pix vencidos são marcados como **`Expired`** pelo worker (`docs/expiration-worker.md`), com liberação de reserva no Inventory.
 
@@ -162,5 +162,6 @@ Orders **não** referencia Inventory diretamente.
 
 ## Próximos passos
 
-1. Webhook Pix real → marcar `Order` `Paid` + confirmar reserva Inventory
-2. IdentityCustomer backend (opcional para compra)
+1. Frontend: exibir QR/status Paid e Account/Meus pedidos
+2. Guest Order Access Token
+3. Notificação por e-mail ao confirmar pagamento

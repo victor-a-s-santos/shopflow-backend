@@ -23,10 +23,11 @@
 **Objetivo:** cobrança e confirmação reais; marcar `PixPayment`/`Order` `Paid`; confirmar reserva no Inventory.
 
 **Tarefas:**
-1. Implementar `IPixPaymentProvider` real (ex.: Mercado Pago).
-2. Endpoint de webhook com idempotência.
-3. Handler: `Paid` → `ConfirmReservationAsync` no Inventory.
-4. Atualizar docs e testes de integração.
+1. ~~Implementar `IPixPaymentProvider` real (Mercado Pago Checkout Transparente / Orders)~~ — concluído
+2. ~~Webhook Order com assinatura + `GET /v1/orders/{id}`~~ — concluído (`docs/payments/MP-PIX-002-orders-provider-and-webhook.md`)
+3. ~~Handler: `processed`/`accredited` → Paid + `ConfirmReservationAsync`~~
+4. Integração frontend (QR/copia-e-cola + status Paid).
+5. E2E HML com evento Order no painel MP.
 
 ---
 

@@ -19,7 +19,8 @@ public sealed class CsrfProtectionMiddleware(RequestDelegate next)
         "/api/auth/customer/forgot-password",
         "/api/auth/customer/reset-password",
         "/api/auth/customer/confirm-email",
-        "/api/webhooks/"
+        "/api/webhooks/",
+        "/api/payments/pix/webhooks/"
     ];
 
     public async Task InvokeAsync(HttpContext context, IAntiforgery antiforgery)

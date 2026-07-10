@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\PaymentsPix\Vls.Shopflow.PaymentsPix.Application\Vls.Shopflow.PaymentsPix.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\PaymentsPix\Vls.Shopflow.PaymentsPix.Domain\Vls.Shopflow.PaymentsPix.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\PaymentsPix\Vls.Shopflow.PaymentsPix.Infrastructure\Vls.Shopflow.PaymentsPix.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

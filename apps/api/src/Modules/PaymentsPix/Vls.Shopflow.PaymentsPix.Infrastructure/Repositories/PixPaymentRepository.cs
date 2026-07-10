@@ -13,6 +13,21 @@ public sealed class PixPaymentRepository(PaymentsPixDbContext db) : IPixPaymentR
     public Task<PixPayment?> GetByIdAsync(Guid paymentId, CancellationToken cancellationToken)
         => db.PixPayments.FirstOrDefaultAsync(p => p.Id == paymentId, cancellationToken);
 
+    public Task<PixPayment?> GetByProviderPaymentIdAsync(
+        string providerPaymentId,
+        CancellationToken cancellationToken)
+        => db.PixPayments.FirstOrDefaultAsync(
+            p => p.ProviderPaymentId == providerPaymentId
+                 || p.ProviderTransactionId == providerPaymentId,
+            cancellationToken);
+
+    public Task<PixPayment?> GetByProviderOrderIdAsync(
+        string providerOrderId,
+        CancellationToken cancellationToken)
+        => db.PixPayments.FirstOrDefaultAsync(
+            p => p.ProviderOrderId == providerOrderId,
+            cancellationToken);
+
     public Task<PixPayment?> GetPendingByOrderIdAsync(Guid orderId, CancellationToken cancellationToken)
         => db.PixPayments.FirstOrDefaultAsync(
             p => p.OrderId == orderId && p.Status == PixPaymentStatus.Pending,

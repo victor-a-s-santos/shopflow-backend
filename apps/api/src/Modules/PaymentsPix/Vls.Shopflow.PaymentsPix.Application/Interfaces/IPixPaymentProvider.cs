@@ -11,10 +11,18 @@ public sealed record PixChargeRequest(
 
 public sealed record PixChargeResponse(
     PixPaymentProviderType Provider,
-    string? ProviderPaymentId,
+    string? ProviderOrderId,
+    string? ProviderTransactionId,
     string? QrCode,
     string? QrCodeImageUrl,
     string? CopyPasteCode,
+    string? TicketUrl,
+    string? ProviderStatus,
+    string? ProviderStatusDetail,
+    string? ProviderTransactionStatus,
+    string? ProviderTransactionStatusDetail,
+    string? ExternalReference,
+    string? IdempotencyKey,
     DateTimeOffset? ExpiresAt,
     PixPaymentStatus Status);
 

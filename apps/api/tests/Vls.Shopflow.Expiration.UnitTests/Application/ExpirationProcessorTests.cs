@@ -77,6 +77,14 @@ public sealed class ExpirationProcessorTests
             null,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             DateTimeOffset.UtcNow.AddMinutes(-1));
 
         var checkoutRepo = new Mock<ICheckoutSessionRepository>();

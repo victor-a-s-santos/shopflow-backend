@@ -9,6 +9,7 @@ public sealed record PixPaymentDto(
     string? QrCode,
     string? QrCodeImageUrl,
     string? CopyPasteCode,
+    string? TicketUrl,
     DateTimeOffset? ExpiresAt,
     DateTimeOffset CreatedAt,
     string Message);

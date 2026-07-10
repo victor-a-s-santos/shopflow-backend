@@ -4,6 +4,8 @@
     <ProjectReference Include="..\Vls.Shopflow.PaymentsPix.Application\Vls.Shopflow.PaymentsPix.Application.csproj" />
     <ProjectReference Include="..\Vls.Shopflow.PaymentsPix.Domain\Vls.Shopflow.PaymentsPix.Domain.csproj" />
     <ProjectReference Include="..\..\Orders\Vls.Shopflow.Orders.Infrastructure\Vls.Shopflow.Orders.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\CartCheckout\Vls.Shopflow.CartCheckout.Infrastructure\Vls.Shopflow.CartCheckout.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Inventory\Vls.Shopflow.Inventory.Application\Vls.Shopflow.Inventory.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Domain\Vls.Shopflow.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Application\Vls.Shopflow.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Infrastructure\Vls.Shopflow.BuildingBlocks.Infrastructure.csproj" />
@@ -16,6 +18,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -23,5 +26,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vls.Shopflow.PaymentsPix.UnitTests" />
+  </ItemGroup>
 
 </Project>

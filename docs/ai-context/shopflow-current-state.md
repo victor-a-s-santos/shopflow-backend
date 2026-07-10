@@ -70,8 +70,8 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 |--------|--------------|-------------|
 | **CartCheckout (backend)** | `POST/GET /api/checkout/sessions`, cancelamento, reserva de estoque na criação, compensação em falha parcial, **worker de expiração** | Confirmar sessão (pagamento real), shipping |
 | **CartCheckout (frontend)** | UI 4 etapas, `POST /api/checkout/sessions`, reserva real, cria pedido + Pix Pending | Shipping |
-| **Orders (backend)** | `POST/GET` orders; pedido `PendingPayment`; expiração via worker | Confirmação de reserva (webhook), admin/conta |
-| **PaymentsPix (backend)** | `POST/GET` Pix; provider fake; `PixPayment` Pending; idempotente; expiração via worker | Gateway real, QR, webhook, marcar Order Paid, confirmar estoque |
+| **Orders (backend)** | `POST/GET` orders; `PendingPayment` → **Paid** via webhook Pix; expiração via worker | Admin/conta, guest access token |
+| **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API** (QR real); webhook Order assinado + `GET /v1/orders`; Paid só com `processed`/`accredited` | Frontend QR, e-mail |
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |
 | **Cart (frontend)** | CRUD local por `skuId`, drawer, persistência | Sincronização com backend (não previsto ainda) |
@@ -156,7 +156,14 @@ GET    /orders/{orderId}
 GET    /orders/by-checkout-session/{checkoutSessionId}
 ```
 
-### PaymentsPix (3 endpoints)
+### PaymentsPix (4 endpoints)
+
+| Método | Path | Auth |
+|--------|------|------|
+| POST | `/api/payments/pix/orders/{orderId}` | Público |
+| POST | `/api/payments/pix/webhooks/mercado-pago` | Público + `x-signature` |
+| GET | `/api/payments/pix/{paymentId}` | Backoffice |
+| GET | `/api/payments/pix/by-order/{orderId}` | Backoffice |
 
 ```
 POST   /payments/pix/orders/{orderId}

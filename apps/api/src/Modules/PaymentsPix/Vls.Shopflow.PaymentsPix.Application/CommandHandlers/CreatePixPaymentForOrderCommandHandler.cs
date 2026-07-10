@@ -1,9 +1,11 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.PaymentsPix.Application.Commands;
 using Vls.Shopflow.PaymentsPix.Application.DataTransferObjects;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
 using Vls.Shopflow.PaymentsPix.Application.Mappers;
+using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Application.Repositories;
 using Vls.Shopflow.PaymentsPix.Domain.Entities;
 using Vls.Shopflow.PaymentsPix.Domain.Exceptions;
@@ -15,11 +17,10 @@ public sealed class CreatePixPaymentForOrderCommandHandler(
     IPixPaymentRepository paymentRepository,
     IPixPaymentProvider pixPaymentProvider,
     IPaymentsPixUnitOfWork unitOfWork,
+    IOptions<MercadoPagoOptions> mercadoPagoOptions,
     ILogger<CreatePixPaymentForOrderCommandHandler> logger)
     : IRequestHandler<CreatePixPaymentForOrderCommand, CreatePixPaymentResult>
 {
-    private static readonly TimeSpan DefaultExpiration = TimeSpan.FromMinutes(30);
-
     public async Task<CreatePixPaymentResult> Handle(
         CreatePixPaymentForOrderCommand command,
         CancellationToken cancellationToken)
@@ -46,7 +47,8 @@ public sealed class CreatePixPaymentForOrderCommandHandler(
         if (order.Total <= 0)
             throw new InvalidOrderTotalForPixPaymentException(order.OrderId, order.Total);
 
-        var expiresAt = DateTimeOffset.UtcNow.Add(DefaultExpiration);
+        var expirationMinutes = Math.Max(1, mercadoPagoOptions.Value.PixExpirationMinutes);
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(expirationMinutes);
 
         var charge = await pixPaymentProvider.CreatePixChargeAsync(
             new PixChargeRequest(
@@ -61,19 +63,28 @@ public sealed class CreatePixPaymentForOrderCommandHandler(
             order.OrderId,
             order.Total,
             charge.Provider,
-            charge.ProviderPaymentId,
+            charge.ProviderOrderId,
+            charge.ProviderTransactionId,
             charge.QrCode,
             charge.QrCodeImageUrl,
             charge.CopyPasteCode,
+            charge.TicketUrl,
+            charge.ProviderStatus,
+            charge.ProviderStatusDetail,
+            charge.ProviderTransactionStatus,
+            charge.ProviderTransactionStatusDetail,
+            charge.ExternalReference ?? order.OrderId.ToString("D"),
+            charge.IdempotencyKey ?? order.OrderId.ToString("D"),
             charge.ExpiresAt ?? expiresAt);
 
         await paymentRepository.AddAsync(payment, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Created Pix payment {PaymentId} for order {OrderId} with status Pending",
+            "Created Pix payment {PaymentId} for order {OrderId} with status Pending. ProviderOrderId={ProviderOrderId}",
             payment.Id,
-            order.OrderId);
+            order.OrderId,
+            payment.ProviderOrderId);
 
         return new CreatePixPaymentResult(PixPaymentMapper.ToDto(payment), WasCreated: true);
     }

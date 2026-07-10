@@ -35,14 +35,32 @@ internal sealed class PixPaymentMap : IEntityTypeConfiguration<PixPayment>
         map.HasIndex(x => x.ProviderPaymentId)
             .HasFilter("\"ProviderPaymentId\" IS NOT NULL");
 
-        map.Property(x => x.QrCode).HasMaxLength(2000);
+        map.Property(x => x.ProviderOrderId).HasMaxLength(200);
+        map.HasIndex(x => x.ProviderOrderId)
+            .HasFilter("\"ProviderOrderId\" IS NOT NULL");
+
+        map.Property(x => x.ProviderTransactionId).HasMaxLength(200);
+        map.HasIndex(x => x.ProviderTransactionId)
+            .HasFilter("\"ProviderTransactionId\" IS NOT NULL");
+
+        map.Property(x => x.ProviderStatus).HasMaxLength(50);
+        map.Property(x => x.ProviderStatusDetail).HasMaxLength(100);
+        map.Property(x => x.ProviderTransactionStatus).HasMaxLength(50);
+        map.Property(x => x.ProviderTransactionStatusDetail).HasMaxLength(100);
+        map.Property(x => x.ExternalReference).HasMaxLength(150);
+        map.Property(x => x.IdempotencyKey).HasMaxLength(64);
+
+        map.Property(x => x.QrCode).HasMaxLength(20000);
         map.Property(x => x.QrCodeImageUrl).HasMaxLength(2000);
         map.Property(x => x.CopyPasteCode).HasMaxLength(2000);
+        map.Property(x => x.TicketUrl).HasMaxLength(2000);
         map.Property(x => x.FailureReason).HasMaxLength(500);
 
         map.Property(x => x.CreatedAt).IsRequired();
         map.Property(x => x.ExpiresAt);
         map.Property(x => x.PaidAt);
+        map.Property(x => x.ProviderApprovedAt);
+        map.Property(x => x.ProviderUpdatedAt);
         map.Property(x => x.CanceledAt);
         map.Property(x => x.FailedAt);
 

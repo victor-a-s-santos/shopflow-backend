@@ -45,6 +45,20 @@ services:
       DemoCatalogSeed__CopyImages: "true"
       DemoCatalogSeed__CreateInventory: "true"
       DemoCatalogSeed__DefaultStockQuantity: "20"
+      PaymentsPix__Provider: ${PaymentsPix__Provider:-Fake}
+      MercadoPago__Enabled: ${MercadoPago__Enabled:-false}
+      MercadoPago__Environment: ${MercadoPago__Environment:-Sandbox}
+      MercadoPago__AccessToken: ${MercadoPago__AccessToken:-}
+      MercadoPago__PublicKey: ${MercadoPago__PublicKey:-}
+      MercadoPago__ApplicationId: ${MercadoPago__ApplicationId:-}
+      MercadoPago__UserId: ${MercadoPago__UserId:-}
+      MercadoPago__BaseUrl: ${MercadoPago__BaseUrl:-https://api.mercadopago.com}
+      MercadoPago__WebhookSecret: ${MercadoPago__WebhookSecret:-}
+      MercadoPago__NotificationUrl: ${MercadoPago__NotificationUrl:-}
+      MercadoPago__PixExpirationMinutes: ${MercadoPago__PixExpirationMinutes:-30}
+      MercadoPago__WebhookSignatureToleranceMinutes: ${MercadoPago__WebhookSignatureToleranceMinutes:-10}
+      MercadoPago__SandboxPayerFirstNameOverride: ${MercadoPago__SandboxPayerFirstNameOverride:-}
+      MercadoPago__TestPayerFirstName: ${MercadoPago__TestPayerFirstName:-}
     ports:
       - "5127:5127"
     volumes:

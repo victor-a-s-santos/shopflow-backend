@@ -8,7 +8,6 @@
 
 | Dívida | Evidência | Impacto |
 |--------|-----------|---------|
-| **Sem gateway Pix real** | `FakePixPaymentProvider`; sem QR/webhook | Cobrança e confirmação de pagamento não funcionais |
 | **Admin sem guard no frontend** | Rotas `/admin/*` sem redirect no React; API protege escrita com `Backoffice` | Risco UX em ambiente exposto |
 | **Sem CI/CD** | Nenhum pipeline no repo | Regressões manuais |
 
@@ -25,7 +24,7 @@
 | **Frontend customer auth desconectado** | Backend `/api/auth/customer/*` pronto; UI visual-only | Login/conta não funcionam na loja |
 | **Shipping pendente** | `ShippingAmount = null` | Frete sempre “a calcular” |
 | **Dashboard admin com dados fake** | `AdminDashboard` — pedidos hardcoded | Métricas enganosas |
-| **Demo seed sem descrição de produto** | `Product` sem campo descrição; seed usa só nome | Prompt pede descrição curta/longa — não persistida |
+| **Race webhook vs worker** | Approved após expiração não auto-repara Order/reservas | Log crítico; intervenção manual |
 
 ---
 
@@ -51,6 +50,7 @@
 | Worker expiração checkout | `Vls.Shopflow.Worker` + `ExpirationProcessor` |
 | IdentityAccess admin (Fase 1/2) | Cookie admin, CSRF, policy Backoffice |
 | Demo catalog seed roupas | 10 produtos, 94 SKUs, imagens em `seed-assets/` |
+| Mercado Pago Pix provider + webhook | QR real + Paid + confirma estoque (`MP-PIX-002`) |
 
 ---
 
@@ -61,12 +61,12 @@
 | Checkout convidado | Decisão de produto |
 | Auth visual-only no frontend | Backend customer pronto; integração UI pendente |
 | Cypress bloqueia `/api/payments` no checkout | Correto até frontend integrar PaymentsPix |
-| Pedido ≠ pagamento aprovado | `PendingPayment` é o estado esperado |
+| Pedido ≠ pagamento aprovado | `PendingPayment` até webhook Orders `processed`/`accredited` |
 
 ---
 
 ## Sugestão de ataque
 
 1. Frontend customer auth + CSRF
-2. Gateway Pix real + webhook
+2. Frontend QR Pix + status Paid
 3. Batch inventory endpoint

@@ -97,6 +97,20 @@ public sealed class Order : Entity<Guid>
         return order;
     }
 
+    public void MarkAsPaid(DateTimeOffset? paidAt = null)
+    {
+        if (Status == OrderStatus.Paid)
+            return;
+
+        if (Status != OrderStatus.PendingPayment)
+            throw new InvalidOperationException(
+                $"Order {Id} cannot be marked as Paid because its status is {Status}.");
+
+        Status = OrderStatus.Paid;
+        PaidAt = paidAt ?? DateTimeOffset.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
     public void Expire()
     {
         if (Status == OrderStatus.Expired)

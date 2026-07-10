@@ -11,10 +11,18 @@ public sealed class FakePixPaymentProvider : IPixPaymentProvider
     {
         var response = new PixChargeResponse(
             PixPaymentProviderType.Fake,
-            ProviderPaymentId: $"fake-dev-{request.OrderId:N}",
+            ProviderOrderId: $"fake-ord-{request.OrderId:N}",
+            ProviderTransactionId: $"fake-pay-{request.OrderId:N}",
             QrCode: null,
             QrCodeImageUrl: null,
             CopyPasteCode: null,
+            TicketUrl: null,
+            ProviderStatus: "pending",
+            ProviderStatusDetail: "fake",
+            ProviderTransactionStatus: "pending",
+            ProviderTransactionStatusDetail: "fake",
+            ExternalReference: request.OrderId.ToString("D"),
+            IdempotencyKey: request.OrderId.ToString("D"),
             ExpiresAt: request.ExpiresAt,
             Status: PixPaymentStatus.Pending);
 

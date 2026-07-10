@@ -82,12 +82,12 @@ Cada item é processado individualmente. Falha em um item incrementa `Failures` 
 
 ## Limitações (etapa atual)
 
-- Sem gateway Pix real, webhook ou confirmação de pagamento.
-- Worker não marca `Order` como `Paid` nem confirma reserva (venda).
+- Worker não marca `Order` como `Paid` (isso é responsabilidade do webhook Mercado Pago).
+- Worker **não reverte** `Paid`.
 - Sem endpoint admin manual de expiração (`POST /api/admin/maintenance/...` não implementado).
 - Consistência eventual entre schemas (sem transação distribuída).
 - `CheckoutSessionTtlMinutes` na config não reescreve `ReservationExpiresAt` de sessões já criadas.
 
 ## Próximo passo recomendado
 
-Webhook Pix real → marcar `PixPayment`/`Order` como `Paid` e **confirmar** reserva de estoque (`ConfirmReservationAsync`), em vez de cancelar.
+Frontend: exibir QR/status Paid. Webhook backend: `docs/payments/MP-PIX-002-webhook-confirmation.md`.

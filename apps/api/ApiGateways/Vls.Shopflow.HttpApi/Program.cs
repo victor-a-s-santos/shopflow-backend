@@ -522,6 +522,28 @@ app.Use(async (ctx, next) =>
 
     }
 
+    catch (Vls.Shopflow.PaymentsPix.Domain.Exceptions.MercadoPagoPixChargeFailedException ex)
+
+    {
+
+        ctx.Response.StatusCode = StatusCodes.Status502BadGateway;
+
+        await ctx.Response.WriteAsJsonAsync(new
+
+        {
+
+            message = ex.Message,
+
+            orderId = ex.OrderId,
+
+            providerStatusCode = ex.StatusCode,
+
+            providerMessage = ex.ProviderMessage
+
+        });
+
+    }
+
 });
 
 
