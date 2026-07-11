@@ -4,7 +4,7 @@ public sealed class GuestOrderAccessOptions
 {
     public const string SectionName = "GuestOrderAccess";
 
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; } = false;
 
     public int TokenTtlDays { get; set; } = 30;
 

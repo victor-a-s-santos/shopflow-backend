@@ -281,7 +281,7 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
                 pixPayment.MarkAsFailed(
                     mpOrder.Status,
                     mpOrder.StatusDetail,
-                    mpOrder.StatusDetail,
+                    "Provider order failed.",
                     mpOrder.TransactionStatus,
                     mpOrder.TransactionStatusDetail);
                 webhookEvent.MarkProcessed();
@@ -295,7 +295,7 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
                 pixPayment.MarkAsCanceled(
                     mpOrder.Status,
                     mpOrder.StatusDetail,
-                    mpOrder.StatusDetail,
+                    "Provider order canceled.",
                     mpOrder.TransactionStatus,
                     mpOrder.TransactionStatusDetail);
                 webhookEvent.MarkProcessed();
@@ -466,15 +466,10 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
         }
 
         var approvedAt = mpOrder.LastUpdatedDate ?? DateTimeOffset.UtcNow;
-        pixPayment.MarkAsPaid(
-            mpOrder.Status,
-            mpOrder.StatusDetail,
-            mpOrder.TransactionStatus,
-            mpOrder.TransactionStatusDetail,
-            approvedAt,
-            mpOrder.Id,
-            mpOrder.TransactionId);
 
+        // Order and PixPayment live in separate DbContexts. Persist Order.Paid first so a
+        // failed order write never leaves PixPayment=Paid while the order stays PendingPayment.
+        // If payment SaveChanges fails afterward, retry sees Order already Paid and completes payment.
         var orderWrite = await orderPaidWriter.MarkAsPaidAsync(
             pixPayment.OrderId,
             approvedAt,
@@ -483,20 +478,29 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
         if (!orderWrite.Found || (!orderWrite.AlreadyPaid && !orderWrite.MarkedPaid))
         {
             logger.LogError(
-                "PixPayment {PixPaymentId} marked Paid but Order {OrderId} could not be marked Paid (status={Status}).",
-                pixPayment.Id,
+                "Mercado Pago accredited but Order {OrderId} could not be marked Paid (status={Status}); PixPayment {PixPaymentId} left Pending.",
                 pixPayment.OrderId,
-                orderWrite.Status);
+                orderWrite.Status,
+                pixPayment.Id);
 
             webhookEvent.MarkFailed($"Order mark paid failed; status={orderWrite.Status}.");
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return new ProcessMercadoPagoPixWebhookResult(
                 200,
                 "OrderMarkPaidFailed",
-                "Pix payment marked Paid but order could not be updated.",
+                "Order could not be marked Paid; Pix payment was left Pending.",
                 pixPayment.Id,
                 pixPayment.OrderId);
         }
+
+        pixPayment.MarkAsPaid(
+            mpOrder.Status,
+            mpOrder.StatusDetail,
+            mpOrder.TransactionStatus,
+            mpOrder.TransactionStatusDetail,
+            approvedAt,
+            mpOrder.Id,
+            mpOrder.TransactionId);
 
         webhookEvent.MarkProcessed();
         await unitOfWork.SaveChangesAsync(cancellationToken);

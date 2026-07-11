@@ -204,7 +204,39 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
 
         result.Outcome.Should().Be("Failed");
         payment.Status.Should().Be(PixPaymentStatus.Failed);
+        payment.FailureReason.Should().Be("Provider order failed.");
+        payment.ProviderStatusDetail.Should().Be("failed");
         confirmer.Verify(x => x.ConfirmAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Canceled_SetsHumanReadableFailureReason()
+    {
+        var orderId = Guid.NewGuid();
+        const string providerOrderId = "ORD01CANCELED";
+        var payment = CreatePendingPayment(orderId, 10m, providerOrderId);
+
+        var paymentRepo = new Mock<IPixPaymentRepository>();
+        paymentRepo.Setup(x => x.GetByProviderOrderIdAsync(providerOrderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payment);
+
+        var orderClient = new Mock<IMercadoPagoOrderClient>();
+        orderClient.Setup(x => x.GetOrderAsync(providerOrderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OrderLookup(providerOrderId, "canceled", "by_collector", orderId, 10m));
+
+        var handler = CreateHandler(
+            signatureValidator: ValidSignature().Object,
+            orderClient: orderClient.Object,
+            paymentRepository: paymentRepo.Object);
+
+        var result = await handler.Handle(
+            new ProcessMercadoPagoPixWebhookCommand(providerOrderId, null, "sig", "req", "order.updated", "order", false, null),
+            CancellationToken.None);
+
+        result.Outcome.Should().Be("Canceled");
+        payment.Status.Should().Be(PixPaymentStatus.Canceled);
+        payment.FailureReason.Should().Be("Provider order canceled.");
+        payment.ProviderStatusDetail.Should().Be("by_collector");
     }
 
     [Fact]
@@ -357,6 +389,55 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
         webhookEvents.Verify(
             x => x.AddAsync(It.IsAny<MercadoPagoWebhookEvent>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_OrderMarkPaidFails_LeavesPixPaymentPending()
+    {
+        var orderId = Guid.NewGuid();
+        var checkoutSessionId = Guid.NewGuid();
+        const string providerOrderId = "ORD01ORDERFAIL";
+        var payment = CreatePendingPayment(orderId, 59.90m, providerOrderId, "qr");
+
+        var paymentRepo = new Mock<IPixPaymentRepository>();
+        paymentRepo.Setup(x => x.GetByProviderOrderIdAsync(providerOrderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payment);
+
+        var orderClient = new Mock<IMercadoPagoOrderClient>();
+        orderClient.Setup(x => x.GetOrderAsync(providerOrderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OrderLookup(
+                providerOrderId,
+                "processed",
+                "accredited",
+                orderId,
+                59.90m,
+                "processed",
+                "accredited"));
+
+        var orderWriter = new Mock<IOrderPaidWriter>();
+        orderWriter.Setup(x => x.GetAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrderPaidWriteResult(true, false, false, "PendingPayment", checkoutSessionId));
+        orderWriter.Setup(x => x.MarkAsPaidAsync(orderId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrderPaidWriteResult(true, false, false, "Cancelled", checkoutSessionId));
+
+        var reservationReader = new Mock<ICheckoutReservationIdsReader>();
+        reservationReader.Setup(x => x.GetReservationIdsByCheckoutSessionAsync(checkoutSessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var handler = CreateHandler(
+            signatureValidator: ValidSignature().Object,
+            orderClient: orderClient.Object,
+            paymentRepository: paymentRepo.Object,
+            orderPaidWriter: orderWriter.Object,
+            reservationIdsReader: reservationReader.Object);
+
+        var result = await handler.Handle(
+            new ProcessMercadoPagoPixWebhookCommand(providerOrderId, null, "sig", "req", "order.updated", "order", false, "evt-fail"),
+            CancellationToken.None);
+
+        result.Outcome.Should().Be("OrderMarkPaidFailed");
+        payment.Status.Should().Be(PixPaymentStatus.Pending);
+        orderWriter.Verify(x => x.MarkAsPaidAsync(orderId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static Mock<IMercadoPagoWebhookSignatureValidator> ValidSignature()
