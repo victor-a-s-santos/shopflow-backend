@@ -94,6 +94,17 @@ public static class InventoryEndpoints
             .WithTags("InventoryAdmin")
             .RequireAuthorization(AuthPolicies.Backoffice);
 
+        adminInv.MapPost("/skus/availability", async (
+            ISender sender,
+            GetSkuAvailabilityBatchRequest req,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(
+                new GetSkuAvailabilityBatchQuery(req.SkuIds ?? []),
+                ct);
+            return Results.Ok(result);
+        });
+
         adminInv.MapPost("/skus/{skuId:guid}/reserve", async (
             ISender sender,
             Guid skuId,
@@ -130,3 +141,5 @@ public sealed record CreateInventoryForSkuRequest(int InitialQuantity = 0);
 public sealed record StockChangeRequest(int Quantity, string? Reason);
 
 public sealed record ReserveStockRequest(int Quantity, DateTimeOffset? ExpiresAt);
+
+public sealed record GetSkuAvailabilityBatchRequest(IReadOnlyList<Guid>? SkuIds);

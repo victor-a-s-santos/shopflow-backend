@@ -17,8 +17,8 @@
 
 | Dívida | Evidência | Impacto |
 |--------|-----------|---------|
-| **N+1 no Admin Inventory** | `AdminInventory.tsx` — `useQueries` com `getBySkuId` por SKU visível | Lentidão com muitos SKUs |
-| **Endpoints batch ausentes** | Só GET individual por SKU no Inventory | Frontend não agrega estoque em uma call |
+| **N+1 no Admin Inventory** | Listagem Estoque ainda pode usar GET individual | Melhorar listagem Admin Estoque |
+| **Batch Product Edit** | ~~ausente~~ → `POST /api/admin/inventory/skus/availability` | Wiring frontend Product Edit |
 | **Lint frontend (erros pré-existentes)** | `npm run lint` — `textarea.tsx`, `api.ts`, `tailwind.config.ts` | CI futuro falhará |
 | **Upload local de imagens** | `Uploads__RootPath` filesystem | Não escala; sem CDN/R2 |
 | **Frontend customer auth desconectado** | Backend `/api/auth/customer/*` pronto; UI visual-only | Login/conta não funcionam na loja |

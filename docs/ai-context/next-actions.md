@@ -37,7 +37,7 @@
 |---|--------|-----------------|
 | 1 | **Gateway Pix real + webhook** | Cobrança e confirmação reais; marcar Order Paid; confirmar reserva |
 | 2 | **Frontend customer auth** | Backend pronto; conectar UI com cookies + CSRF |
-| 3 | **Endpoints batch** (Catalog/Inventory) | Reduzir N+1 no Admin Inventory |
+| 3 | **Frontend batch Inventory** | Backend `POST /api/admin/inventory/skus/availability` pronto; reduzir N+1 no Product Edit |
 | 4 | **Gateway Pix real + webhook** | Cobrança real (pausado até HML/domínio se necessário) |
 | 5 | **Frontend guest order status + Account** | Token backend pronto (`SEC-006`); wiring UI Pix |
 | 6 | **Shipping** | Frete real; hoje `ShippingAmount` é null |

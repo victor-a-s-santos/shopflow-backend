@@ -258,6 +258,107 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
         result.Outcome.Should().Be("IgnoredType");
     }
 
+    [Fact]
+    public async Task Handle_DuplicateProviderEventId_AlreadyProcessed_DoesNotInsert()
+    {
+        const string providerEventId = "evt-already-processed";
+        var existing = MercadoPagoWebhookEvent.CreateReceived(
+            "ORD1", providerEventId, "req", "order.updated", "order", false, true);
+        existing.MarkProcessed();
+
+        var webhookEvents = new Mock<IMercadoPagoWebhookEventRepository>();
+        webhookEvents.Setup(x => x.GetByProviderEventIdAsync(providerEventId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var handler = CreateHandler(
+            signatureValidator: ValidSignature().Object,
+            webhookEventRepository: webhookEvents.Object);
+
+        var result = await handler.Handle(
+            new ProcessMercadoPagoPixWebhookCommand("ORD1", null, "sig", "req", "order.updated", "order", false, providerEventId),
+            CancellationToken.None);
+
+        result.StatusCode.Should().Be(200);
+        result.Outcome.Should().Be("AlreadyProcessed");
+        webhookEvents.Verify(
+            x => x.AddAsync(It.IsAny<MercadoPagoWebhookEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_DuplicateProviderEventId_AlreadyIgnored_DoesNotInsert()
+    {
+        const string providerEventId = "evt-already-ignored";
+        var existing = MercadoPagoWebhookEvent.CreateReceived(
+            "ORD1", providerEventId, "req", "payment.updated", "payment", false, true);
+        existing.MarkIgnored("Webhook type 'payment' ignored; expected order.");
+
+        var webhookEvents = new Mock<IMercadoPagoWebhookEventRepository>();
+        webhookEvents.Setup(x => x.GetByProviderEventIdAsync(providerEventId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var handler = CreateHandler(
+            signatureValidator: ValidSignature().Object,
+            webhookEventRepository: webhookEvents.Object);
+
+        var result = await handler.Handle(
+            new ProcessMercadoPagoPixWebhookCommand("ORD1", null, "sig", "req", "order.updated", "order", false, providerEventId),
+            CancellationToken.None);
+
+        result.StatusCode.Should().Be(200);
+        result.Outcome.Should().Be("AlreadyIgnored");
+        webhookEvents.Verify(
+            x => x.AddAsync(It.IsAny<MercadoPagoWebhookEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Theory]
+    [InlineData("Failed")]
+    [InlineData("Received")]
+    public async Task Handle_DuplicateProviderEventId_FailedOrReceived_ReusesRowWithoutInsert(string priorStatus)
+    {
+        var orderId = Guid.NewGuid();
+        const string providerOrderId = "ORD01RETRY";
+        const string providerEventId = "evt-retry";
+        var payment = CreatePendingPayment(orderId, 10m, providerOrderId);
+
+        var existing = MercadoPagoWebhookEvent.CreateReceived(
+            providerOrderId, providerEventId, "req", "order.updated", "order", false, true);
+        if (priorStatus == "Failed")
+            existing.MarkFailed("previous failure");
+
+        existing.ProcessingStatus.Should().Be(priorStatus);
+
+        var webhookEvents = new Mock<IMercadoPagoWebhookEventRepository>();
+        webhookEvents.Setup(x => x.GetByProviderEventIdAsync(providerEventId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing);
+
+        var paymentRepo = new Mock<IPixPaymentRepository>();
+        paymentRepo.Setup(x => x.GetByProviderOrderIdAsync(providerOrderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payment);
+
+        var orderClient = new Mock<IMercadoPagoOrderClient>();
+        orderClient.Setup(x => x.GetOrderAsync(providerOrderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OrderLookup(providerOrderId, "action_required", "waiting_transfer", orderId, 10m));
+
+        var handler = CreateHandler(
+            signatureValidator: ValidSignature().Object,
+            orderClient: orderClient.Object,
+            paymentRepository: paymentRepo.Object,
+            webhookEventRepository: webhookEvents.Object);
+
+        var result = await handler.Handle(
+            new ProcessMercadoPagoPixWebhookCommand(
+                providerOrderId, null, "sig", "req", "order.updated", "order", false, providerEventId),
+            CancellationToken.None);
+
+        result.Outcome.Should().Be("Pending");
+        existing.ProcessingStatus.Should().Be("Processed");
+        webhookEvents.Verify(
+            x => x.AddAsync(It.IsAny<MercadoPagoWebhookEvent>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private static Mock<IMercadoPagoWebhookSignatureValidator> ValidSignature()
     {
         var signature = new Mock<IMercadoPagoWebhookSignatureValidator>();

@@ -96,14 +96,7 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
         }
 
         var providerOrderId = signatureDataId;
-        var webhookEvent = MercadoPagoWebhookEvent.CreateReceived(
-            providerOrderId,
-            command.ProviderEventId,
-            command.XRequestId,
-            command.Action,
-            command.Type,
-            command.LiveMode,
-            signatureValid: true);
+        MercadoPagoWebhookEvent webhookEvent;
 
         if (!string.IsNullOrWhiteSpace(command.ProviderEventId))
         {
@@ -111,17 +104,51 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
                 command.ProviderEventId!,
                 cancellationToken);
 
-            if (existing is not null && existing.ProcessingStatus == "Processed")
+            if (existing is not null)
             {
-                return new ProcessMercadoPagoPixWebhookResult(
-                    200,
-                    "AlreadyProcessed",
-                    "Webhook event already processed.");
+                // Unique index on ProviderEventId — never insert a second row for the same id.
+                if (existing.ProcessingStatus is "Processed" or "Ignored")
+                {
+                    return new ProcessMercadoPagoPixWebhookResult(
+                        200,
+                        existing.ProcessingStatus == "Processed" ? "AlreadyProcessed" : "AlreadyIgnored",
+                        existing.ProcessingStatus == "Processed"
+                            ? "Webhook event already processed."
+                            : "Webhook event already ignored.");
+                }
+
+                // Received / Failed: reuse the row and retry processing.
+                webhookEvent = existing;
+                webhookEvent.ResetForReprocessing();
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                webhookEvent = MercadoPagoWebhookEvent.CreateReceived(
+                    providerOrderId,
+                    command.ProviderEventId,
+                    command.XRequestId,
+                    command.Action,
+                    command.Type,
+                    command.LiveMode,
+                    signatureValid: true);
+                await webhookEventRepository.AddAsync(webhookEvent, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
             }
         }
-
-        await webhookEventRepository.AddAsync(webhookEvent, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        else
+        {
+            webhookEvent = MercadoPagoWebhookEvent.CreateReceived(
+                providerOrderId,
+                providerEventId: null,
+                command.XRequestId,
+                command.Action,
+                command.Type,
+                command.LiveMode,
+                signatureValid: true);
+            await webhookEventRepository.AddAsync(webhookEvent, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
 
         try
         {

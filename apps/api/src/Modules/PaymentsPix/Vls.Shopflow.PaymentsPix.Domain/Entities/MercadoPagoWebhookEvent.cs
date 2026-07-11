@@ -62,6 +62,17 @@ public sealed class MercadoPagoWebhookEvent
         ErrorMessage = Truncate(reason, 500);
     }
 
+    /// <summary>
+    /// Resets a Received/Failed row so the same ProviderEventId can be retried
+    /// without inserting a duplicate (unique index).
+    /// </summary>
+    public void ResetForReprocessing()
+    {
+        ProcessingStatus = "Received";
+        ErrorMessage = null;
+        ProcessedAt = null;
+    }
+
     private static string Truncate(string value, int maxLength)
         => value.Length <= maxLength ? value : value[..maxLength];
 }
