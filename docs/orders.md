@@ -76,11 +76,15 @@ Pedidos `PendingPayment` com sessão/Pix vencidos são marcados como **`Expired`
 
 ## Endpoints
 
-| Método | Path | Status | Descrição |
-|--------|------|--------|-----------|
-| `POST` | `/api/orders/from-checkout-session` | 201 | Cria pedido `PendingPayment` |
-| `GET` | `/api/orders/{orderId}` | 200 | Consulta pedido por ID |
-| `GET` | `/api/orders/by-checkout-session/{checkoutSessionId}` | 200 | Consulta pedido por sessão |
+| Método | Path | Auth | Descrição |
+|--------|------|------|-----------|
+| `POST` | `/api/orders/from-checkout-session` | Público (checkout) | Cria pedido `PendingPayment` + `guestAccessToken` (uma vez) |
+| `GET` | `/api/orders/guest/{orderId}/status` | Header `X-ORDER-ACCESS-TOKEN` | Status limitado (sem PII sensível) |
+| `GET` | `/api/orders/{orderId}` | Backoffice | Consulta completa |
+| `GET` | `/api/orders/by-checkout-session/{checkoutSessionId}` | Backoffice | Consulta por sessão |
+
+Guest token: [`docs/security/SEC-006-guest-order-access-token.md`](./security/SEC-006-guest-order-access-token.md), [`docs/orders/ORD-002-guest-order-status.md`](./orders/ORD-002-guest-order-status.md).
+
 
 ### Request — criar pedido
 
@@ -125,7 +129,9 @@ Pedidos `PendingPayment` com sessão/Pix vencidos são marcados como **`Expired`
   "subtotal": 200,
   "shipping": null,
   "total": 200,
-  "createdAt": "2026-05-23T12:00:00Z"
+  "createdAt": "2026-05-23T12:00:00Z",
+  "guestAccessToken": "<token-bruto-apenas-nesta-resposta>",
+  "guestAccessTokenExpiresAt": "2026-06-22T12:00:00Z"
 }
 ```
 
@@ -134,22 +140,24 @@ Pedidos `PendingPayment` com sessão/Pix vencidos são marcados como **`Expired`
 | Status | Situação |
 |--------|----------|
 | 400 | Request inválido (`checkoutSessionId` ausente) |
+| 401 | Guest status: token ausente/inválido/expirado/revogado |
 | 404 | Checkout session não encontrada; pedido não encontrado |
 | 409 | Sessão em status inválido; pedido já existe para a sessão |
 
 ## Banco de dados
 
 - Schema: `orders`
-- Tabelas: `orders.orders`, `orders.order_items`
+- Tabelas: `orders.orders`, `orders.order_items`, `orders.guest_order_access_tokens`
 - History table: `orders.__EFMigrationsHistory`
 - Constraint: `checkout_session_id` **unique**
-- Índices: `customer_email`, `created_at`
+- Índices: `customer_email`, `created_at`, token hash / orderId
 
 ## Integração cross-module
 
-| Porta (Orders.Application) | Implementação (Orders.Infrastructure) |
-|----------------------------|----------------------------------------|
-| `ICheckoutSessionReader` | `CheckoutSessionReader` — lê `CartCheckoutDbContext` (read-only) |
+| Porta (Orders.Application) | Implementação |
+|----------------------------|---------------|
+| `ICheckoutSessionReader` | `CheckoutSessionReader` (CartCheckout) |
+| `IOrderPixPaymentStatusReader` | `OrderPixPaymentStatusReader` (PaymentsPix) |
 
 Orders **não** referencia Inventory diretamente.
 
@@ -157,11 +165,11 @@ Orders **não** referencia Inventory diretamente.
 
 | Projeto | Cobertura |
 |---------|-----------|
-| `Vls.Shopflow.Orders.UnitTests` | Domain + Application handlers |
+| `Vls.Shopflow.Orders.UnitTests` | Domain + create/guest status handlers + hasher |
 | `Vls.Shopflow.Orders.IntegrationTests` | Persistência real com PostgreSQL (`SHOPFLOW_TEST_DB`) |
 
 ## Próximos passos
 
-1. Frontend: exibir QR/status Paid e Account/Meus pedidos
-2. Guest Order Access Token
-3. Notificação por e-mail ao confirmar pagamento
+1. Frontend: guardar `guestAccessToken` e consultar `/orders/guest/{id}/status`
+2. Notificação por e-mail ao confirmar pagamento
+3. Enrichment de attributes/image no status guest (opcional)

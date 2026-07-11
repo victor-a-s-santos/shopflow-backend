@@ -112,5 +112,5 @@ Detalhes: `docs/expiration-worker.md`.
 
 ## Próximos passos
 
-1. Gateway Pix + webhook → confirmar reserva (venda) em vez de expirar
+1. Frontend: status Paid via Guest Order Access Token (`SEC-006`)
 2. Shipping no snapshot da sessão

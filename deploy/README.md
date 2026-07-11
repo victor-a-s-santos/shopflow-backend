@@ -198,6 +198,29 @@ Runbook: [docs/infra/RUNBOOK-001-vps-setup-deploy.md](../docs/infra/RUNBOOK-001-
 
 Os subdomínios `teste` e `hml` estão reservados para o frontend. Quando houver build de produção do `apps/web`, adicione os blocos correspondentes no `caddy/Caddyfile`.
 
+## Reverse proxy e headers encaminhados
+
+A API escuta **HTTP** dentro do Docker. TLS termina no Caddy (e, se usado, no Cloudflare). Para cookies `Secure` (admin, customer, CSRF/antiforgery) e `Request.Scheme` corretos, o proxy deve enviar:
+
+| Header | Origem |
+|--------|--------|
+| `X-Forwarded-For` | **Automático** no `reverse_proxy` do Caddy (não sobrescrever com `header_up`) |
+| `X-Forwarded-Proto` | `{scheme}` (explícito no Caddyfile; https quando o cliente chega via TLS) |
+| `X-Forwarded-Host` | `{host}` (explícito) |
+| `X-Real-IP` | `{remote_host}` (explícito) |
+
+Configurado em `caddy/Caddyfile`. No ASP.NET (`Program.cs`): `UseForwardedHeaders()` no início do pipeline, com `KnownIPNetworks`/`KnownProxies` limpos para confiar no Caddy na rede Docker. **Não** relaxar `AntiforgeryOptions.Cookie.SecurePolicy` para `SameAsRequest` em Testing/Staging/Production.
+
+O CSRF depende principalmente de `X-Forwarded-Proto`. `X-Forwarded-For` alimenta IP do cliente (rate limit / logs). Com Cloudflare na frente, sem `trusted_proxies` o Caddy usa o IP da edge CF — suficiente para a correção do antiforgery.
+
+Smoke CSRF (após deploy):
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  https://api-teste.vipassessoriadigital.com.br/api/auth/csrf
+# esperado: 200
+```
+
 ## Troubleshooting
 
 | Problema | Ação |
@@ -208,6 +231,7 @@ Os subdomínios `teste` e `hml` estão reservados para o frontend. Quando houver
 | `POSTGRES_PASSWORD is required` | Crie `.env` a partir de `.env.example` |
 | `env file .env.test not found` | Copie `.env.test.example` para `.env.test` |
 | API crash no startup (admin seed) | Defina `SHOPFLOW_ADMIN_EMAIL` e `SHOPFLOW_ADMIN_PASSWORD` em `.env.test` ou `.env.hml` |
+| `GET /api/auth/csrf` 500 — Antiforgery SecurePolicy=Always but request is not SSL | Confirme `X-Forwarded-Proto` no Caddyfile, redeploy Caddy + API, e que `UseForwardedHeaders` está ativo |
 
 ## O que não está incluído
 

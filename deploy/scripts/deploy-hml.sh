@@ -23,6 +23,8 @@ fi
 echo "==> Build e deploy — ambiente HOMOLOGAÇÃO"
 docker compose build api-hml worker-hml
 docker compose up -d postgres api-hml worker-hml caddy
+# Bind-mounted Caddyfile: reload so proxy header changes apply without full recreate.
+docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 
 echo "==> Status"
 docker compose ps api-hml worker-hml caddy postgres

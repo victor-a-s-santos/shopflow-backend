@@ -26,7 +26,7 @@
 1. ~~Implementar `IPixPaymentProvider` real (Mercado Pago Checkout Transparente / Orders)~~ — concluído
 2. ~~Webhook Order com assinatura + `GET /v1/orders/{id}`~~ — concluído (`docs/payments/MP-PIX-002-orders-provider-and-webhook.md`)
 3. ~~Handler: `processed`/`accredited` → Paid + `ConfirmReservationAsync`~~
-4. Integração frontend (QR/copia-e-cola + status Paid).
+4. Integração frontend (QR/copia-e-cola + status Paid via `GET /api/orders/guest/{orderId}/status`).
 5. E2E HML com evento Order no painel MP.
 
 ---
@@ -39,7 +39,7 @@
 | 2 | **Frontend customer auth** | Backend pronto; conectar UI com cookies + CSRF |
 | 3 | **Endpoints batch** (Catalog/Inventory) | Reduzir N+1 no Admin Inventory |
 | 4 | **Gateway Pix real + webhook** | Cobrança real (pausado até HML/domínio se necessário) |
-| 5 | **Guest Order Access Token + Account** | Meus pedidos vinculados |
+| 5 | **Frontend guest order status + Account** | Token backend pronto (`SEC-006`); wiring UI Pix |
 | 6 | **Shipping** | Frete real; hoje `ShippingAmount` é null |
 | 7 | **Notifications** | E-mail real (confirm/reset/pedido) |
 
@@ -49,7 +49,7 @@
 
 **Backend concluído** (jun/2026): endpoints `/api/auth/customer/*`, cookie HttpOnly separado, testes de integração.
 
-**Pendente:** integração frontend (`authService`, `AuthContext`, CSRF), Account real, Guest Order Access Token.
+**Pendente:** integração frontend (`authService`, `AuthContext`, CSRF), Account real; guest status UI com `X-ORDER-ACCESS-TOKEN`.
 
 Checkout convidado permanece público e prioritário.
 

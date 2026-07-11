@@ -1,5 +1,6 @@
 using MediatR;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
+using Vls.Shopflow.IdentityAccess.Infrastructure;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 
@@ -7,6 +8,8 @@ namespace Vls.Shopflow.HttpApi.Endpoints;
 
 public static class OrdersEndpoints
 {
+    public const string OrderAccessTokenHeaderName = "X-ORDER-ACCESS-TOKEN";
+
     public static RouteGroupBuilder MapOrdersEndpoints(this RouteGroupBuilder group)
     {
         var orders = group.MapGroup("/orders").WithTags("Orders");
@@ -23,7 +26,20 @@ public static class OrdersEndpoints
             return Results.Created($"/api/orders/{result.OrderId}", result);
         });
 
-        // Full order data (PII) — backoffice only until guest access token exists (Phase 4).
+        orders.MapGet("/guest/{orderId:guid}/status", async (
+            ISender sender,
+            HttpRequest request,
+            Guid orderId,
+            CancellationToken ct) =>
+        {
+            var accessToken = request.Headers[OrderAccessTokenHeaderName].FirstOrDefault();
+            var result = await sender.Send(new GetGuestOrderStatusQuery(orderId, accessToken), ct);
+            return Results.Ok(result);
+        })
+        .RequireRateLimiting(DependencyInjection.GuestOrderStatusRateLimitPolicy)
+        .AllowAnonymous();
+
+        // Full order data (PII) — backoffice only.
         orders.MapGet("/{orderId:guid}", async (
             ISender sender,
             Guid orderId,

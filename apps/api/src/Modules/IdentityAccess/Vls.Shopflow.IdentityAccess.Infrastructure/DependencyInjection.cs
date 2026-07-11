@@ -25,6 +25,7 @@ public static class DependencyInjection
     public const string CustomerRegisterRateLimitPolicy = "customer-register";
     public const string CustomerForgotPasswordRateLimitPolicy = "customer-forgot-password";
     public const string CustomerResetPasswordRateLimitPolicy = "customer-reset-password";
+    public const string GuestOrderStatusRateLimitPolicy = "guest-order-status";
     public const string CorsPolicyName = "AllowFrontend";
 
     public static IServiceCollection AddIdentityAccessModule(
@@ -268,6 +269,22 @@ public static class DependencyInjection
                     {
                         Window = TimeSpan.FromMinutes(1),
                         PermitLimit = environment.IsDevelopment() ? 100 : 5,
+                        QueueLimit = 0
+                    }));
+
+            var guestOrderRateLimit = configuration.GetValue("GuestOrderAccess:RateLimitPerMinute", 30);
+            if (guestOrderRateLimit <= 0)
+                guestOrderRateLimit = 30;
+            if (environment.IsDevelopment() && guestOrderRateLimit < 100)
+                guestOrderRateLimit = Math.Max(guestOrderRateLimit, 100);
+
+            options.AddPolicy(GuestOrderStatusRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = guestOrderRateLimit,
                         QueueLimit = 0
                     }));
         });

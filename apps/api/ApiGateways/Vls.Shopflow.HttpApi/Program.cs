@@ -4,6 +4,8 @@ using FluentValidation;
 
 using MediatR;
 
+using Microsoft.AspNetCore.HttpOverrides;
+
 using Microsoft.AspNetCore.Identity;
 
 using Microsoft.EntityFrameworkCore;
@@ -85,6 +87,18 @@ builder.Services.AddOrdersModuleFromConfig(builder.Configuration, enableSensitiv
 builder.Services.AddPaymentsPixModuleFromConfig(builder.Configuration, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
 
 builder.Services.AddIdentityAccessModuleFromConfig(builder.Configuration, builder.Environment, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
+
+// API runs HTTP inside Docker behind Caddy/Cloudflare TLS termination.
+// Forwarded headers restore Request.Scheme=https so Secure cookies (antiforgery) work.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                               | ForwardedHeaders.XForwardedProto
+                               | ForwardedHeaders.XForwardedHost;
+    // Trust reverse proxies on the Docker network (Caddy) and edge (Cloudflare).
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
     ?.Where(static o => !string.IsNullOrWhiteSpace(o))
@@ -231,6 +245,10 @@ if (app.Environment.IsDevelopment())
 }
 
 
+
+// Must run before exception handling, CORS, auth, cookies, CSRF and endpoints
+// that depend on Request.Scheme (Secure antiforgery cookies behind TLS proxy).
+app.UseForwardedHeaders();
 
 app.Use(async (ctx, next) =>
 
@@ -449,6 +467,26 @@ app.Use(async (ctx, next) =>
             existingOrderId = ex.ExistingOrderId
 
         });
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessDeniedException)
+
+    {
+
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+
+        await ctx.Response.WriteAsJsonAsync(new { message = "Order access denied." });
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessMisconfiguredException ex)
+
+    {
+
+        ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+
+        await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });
 
     }
 

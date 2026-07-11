@@ -1,9 +1,11 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Entities;
 using Vls.Shopflow.Orders.Domain.Exceptions;
@@ -13,7 +15,10 @@ namespace Vls.Shopflow.Orders.Application.CommandHandlers;
 public sealed class CreateOrderFromCheckoutSessionCommandHandler(
     ICheckoutSessionReader checkoutSessionReader,
     IOrderRepository orderRepository,
+    IGuestOrderAccessTokenRepository guestTokenRepository,
+    IGuestOrderAccessTokenHasher tokenHasher,
     IOrdersUnitOfWork unitOfWork,
+    IOptions<GuestOrderAccessOptions> guestOrderAccessOptions,
     ILogger<CreateOrderFromCheckoutSessionCommandHandler> logger)
     : IRequestHandler<CreateOrderFromCheckoutSessionCommand, OrderDto>
 {
@@ -55,13 +60,29 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
             items);
 
         await orderRepository.AddAsync(order, cancellationToken);
+
+        string? rawToken = null;
+        DateTimeOffset? tokenExpiresAt = null;
+        var options = guestOrderAccessOptions.Value;
+
+        if (options.Enabled)
+        {
+            var ttlDays = Math.Max(1, options.TokenTtlDays);
+            tokenExpiresAt = DateTimeOffset.UtcNow.AddDays(ttlDays);
+            rawToken = tokenHasher.GenerateRawToken();
+            var hash = tokenHasher.Hash(rawToken);
+            var accessToken = GuestOrderAccessToken.Create(order.Id, hash, tokenExpiresAt.Value);
+            await guestTokenRepository.AddAsync(accessToken, cancellationToken);
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Created order {OrderId} from checkout session {CheckoutSessionId} with status PendingPayment",
+            "Created order {OrderId} from checkout session {CheckoutSessionId} with status PendingPayment. GuestAccessTokenIssued={TokenIssued}",
             order.Id,
-            session.Id);
+            session.Id,
+            rawToken is not null);
 
-        return OrderMapper.ToDto(order);
+        return OrderMapper.ToDto(order, rawToken, tokenExpiresAt);
     }
 }

@@ -18,4 +18,15 @@ public interface IOrderRepository
         CancellationToken cancellationToken);
 }
 
+public interface IGuestOrderAccessTokenRepository
+{
+    Task AddAsync(GuestOrderAccessToken token, CancellationToken cancellationToken);
+
+    Task<GuestOrderAccessToken?> FindActiveByOrderIdAndHashAsync(
+        Guid orderId,
+        string tokenHash,
+        DateTimeOffset asOfUtc,
+        CancellationToken cancellationToken);
+}
+
 public interface IOrdersUnitOfWork : IUnitOfWork;

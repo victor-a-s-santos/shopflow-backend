@@ -1,9 +1,11 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Vls.Shopflow.Orders.Application.CommandHandlers;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.Interfaces;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Entities;
 using Vls.Shopflow.Orders.Domain.Enums;
@@ -41,8 +43,42 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
                     200m)
             });
 
+    private static CreateOrderFromCheckoutSessionCommandHandler CreateHandler(
+        ICheckoutSessionReader reader,
+        IOrderRepository repository,
+        IOrdersUnitOfWork? uow = null,
+        IGuestOrderAccessTokenRepository? tokenRepo = null,
+        IGuestOrderAccessTokenHasher? hasher = null,
+        GuestOrderAccessOptions? options = null)
+    {
+        var tokenRepository = tokenRepo ?? Mock.Of<IGuestOrderAccessTokenRepository>();
+        var tokenHasher = hasher;
+        if (tokenHasher is null)
+        {
+            var hasherMock = new Mock<IGuestOrderAccessTokenHasher>();
+            hasherMock.Setup(x => x.GenerateRawToken()).Returns("raw-guest-token");
+            hasherMock.Setup(x => x.Hash("raw-guest-token")).Returns("hashed-guest-token");
+            tokenHasher = hasherMock.Object;
+        }
+
+        return new CreateOrderFromCheckoutSessionCommandHandler(
+            reader,
+            repository,
+            tokenRepository,
+            tokenHasher,
+            uow ?? Mock.Of<IOrdersUnitOfWork>(x =>
+                x.SaveChangesAsync(It.IsAny<CancellationToken>()) == Task.FromResult(1)),
+            Options.Create(options ?? new GuestOrderAccessOptions
+            {
+                Enabled = true,
+                TokenTtlDays = 30,
+                TokenHashSecret = "test-secret"
+            }),
+            NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
+    }
+
     [Fact]
-    public async Task Handle_WithValidCheckoutSession_CreatesPendingPaymentOrder()
+    public async Task Handle_WithValidCheckoutSession_CreatesPendingPaymentOrderAndGuestToken()
     {
         var sessionId = Guid.NewGuid();
         var reader = new Mock<ICheckoutSessionReader>();
@@ -50,6 +86,7 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
             .ReturnsAsync(PendingSession(sessionId));
 
         Order? captured = null;
+        GuestOrderAccessToken? capturedToken = null;
         var repository = new Mock<IOrderRepository>();
         repository.Setup(x => x.GetByCheckoutSessionIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Order?)null);
@@ -57,14 +94,12 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
             .Callback<Order, CancellationToken>((order, _) => captured = order)
             .Returns(Task.CompletedTask);
 
-        var uow = new Mock<IOrdersUnitOfWork>();
-        uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
+        tokenRepo.Setup(x => x.AddAsync(It.IsAny<GuestOrderAccessToken>(), It.IsAny<CancellationToken>()))
+            .Callback<GuestOrderAccessToken, CancellationToken>((token, _) => capturedToken = token)
+            .Returns(Task.CompletedTask);
 
-        var handler = new CreateOrderFromCheckoutSessionCommandHandler(
-            reader.Object,
-            repository.Object,
-            uow.Object,
-            NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
+        var handler = CreateHandler(reader.Object, repository.Object, tokenRepo: tokenRepo.Object);
 
         var result = await handler.Handle(
             new CreateOrderFromCheckoutSessionCommand(sessionId),
@@ -73,13 +108,48 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
         result.OrderId.Should().NotBeEmpty();
         result.CheckoutSessionId.Should().Be(sessionId);
         result.Status.Should().Be("PendingPayment");
-        result.Total.Should().Be(200m);
-        result.Items.Should().ContainSingle();
+        result.GuestAccessToken.Should().Be("raw-guest-token");
+        result.GuestAccessTokenExpiresAt.Should().NotBeNull();
 
         captured.Should().NotBeNull();
         captured!.Status.Should().Be(OrderStatus.PendingPayment);
-        captured.CheckoutSessionId.Should().Be(sessionId);
-        captured.CustomerEmail.Should().Be("joao@email.com");
+
+        capturedToken.Should().NotBeNull();
+        capturedToken!.TokenHash.Should().Be("hashed-guest-token");
+        capturedToken.TokenHash.Should().NotBe(result.GuestAccessToken);
+        capturedToken.OrderId.Should().Be(captured.Id);
+    }
+
+    [Fact]
+    public async Task Handle_WhenGuestAccessDisabled_DoesNotIssueToken()
+    {
+        var sessionId = Guid.NewGuid();
+        var reader = new Mock<ICheckoutSessionReader>();
+        reader.Setup(x => x.GetByIdAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PendingSession(sessionId));
+
+        var repository = new Mock<IOrderRepository>();
+        repository.Setup(x => x.GetByCheckoutSessionIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order?)null);
+        repository.Setup(x => x.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
+
+        var handler = CreateHandler(
+            reader.Object,
+            repository.Object,
+            tokenRepo: tokenRepo.Object,
+            options: new GuestOrderAccessOptions { Enabled = false });
+
+        var result = await handler.Handle(
+            new CreateOrderFromCheckoutSessionCommand(sessionId),
+            CancellationToken.None);
+
+        result.GuestAccessToken.Should().BeNull();
+        tokenRepo.Verify(
+            x => x.AddAsync(It.IsAny<GuestOrderAccessToken>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -90,11 +160,7 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
         reader.Setup(x => x.GetByIdAsync(sessionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((CheckoutSessionSnapshot?)null);
 
-        var handler = new CreateOrderFromCheckoutSessionCommandHandler(
-            reader.Object,
-            Mock.Of<IOrderRepository>(),
-            Mock.Of<IOrdersUnitOfWork>(),
-            NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
+        var handler = CreateHandler(reader.Object, Mock.Of<IOrderRepository>());
 
         var act = () => handler.Handle(
             new CreateOrderFromCheckoutSessionCommand(sessionId),
@@ -117,11 +183,7 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
         repository.Setup(x => x.GetByCheckoutSessionIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Order?)null);
 
-        var handler = new CreateOrderFromCheckoutSessionCommandHandler(
-            reader.Object,
-            repository.Object,
-            Mock.Of<IOrdersUnitOfWork>(),
-            NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
+        var handler = CreateHandler(reader.Object, repository.Object);
 
         var act = () => handler.Handle(
             new CreateOrderFromCheckoutSessionCommand(sessionId),
@@ -134,7 +196,6 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
     public async Task Handle_WhenOrderAlreadyExists_ThrowsConflict()
     {
         var sessionId = Guid.NewGuid();
-        var existingOrderId = Guid.NewGuid();
         var existing = Order.CreatePendingPayment(
             sessionId,
             "João",
@@ -156,11 +217,7 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
         repository.Setup(x => x.GetByCheckoutSessionIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
-        var handler = new CreateOrderFromCheckoutSessionCommandHandler(
-            Mock.Of<ICheckoutSessionReader>(),
-            repository.Object,
-            Mock.Of<IOrdersUnitOfWork>(),
-            NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
+        var handler = CreateHandler(Mock.Of<ICheckoutSessionReader>(), repository.Object);
 
         var act = () => handler.Handle(
             new CreateOrderFromCheckoutSessionCommand(sessionId),

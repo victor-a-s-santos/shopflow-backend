@@ -159,9 +159,10 @@ Se já existir `PixPayment` com status `Pending` para o mesmo `orderId`, o endpo
 
 ## Próximos passos
 
-1. Integração frontend (exibir QR/copia-e-cola + status Paid)
+1. Integração frontend (QR/copia-e-cola + polling de status via Guest Order Access Token)
 2. Notificação por e-mail ao confirmar pagamento
 3. Refund/chargeback
 
+Guest status: `docs/security/SEC-006-guest-order-access-token.md`  
 Webhook + provider Orders: `docs/payments/MP-PIX-002-orders-provider-and-webhook.md`  
 Notas históricas do provider: `docs/payments-mercado-pago-pix.md`

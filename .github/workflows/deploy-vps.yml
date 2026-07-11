@@ -96,6 +96,10 @@ jobs:
           docker compose config
           docker compose build --no-cache api-test worker-test
           docker compose up -d --force-recreate --no-deps api-test worker-test
+          # Caddyfile is bind-mounted; recreate alone does not reload running Caddy.
+          # Ensure caddy is up, then reload so X-Forwarded-* changes take effect.
+          docker compose up -d caddy
+          docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
           docker compose ps
           EOF
 
@@ -194,6 +198,10 @@ jobs:
           docker compose config
           docker compose build --no-cache api-hml worker-hml
           docker compose up -d --force-recreate --no-deps api-hml worker-hml
+          # Caddyfile is bind-mounted; recreate alone does not reload running Caddy.
+          # Ensure caddy is up, then reload so X-Forwarded-* changes take effect.
+          docker compose up -d caddy
+          docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
           docker compose ps
           EOF
 

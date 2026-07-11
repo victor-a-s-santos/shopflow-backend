@@ -21,7 +21,7 @@ Evento no painel Mercado Pago: **Order** (não `payment`).
 ## Fora de escopo
 
 - `/v1/payments` como fluxo principal
-- Frontend
+- Frontend (status público via Guest Order Access Token — ver `docs/security/SEC-006-guest-order-access-token.md`)
 - `simulate-paid`
 - Cartão, boleto, Checkout Pro, refund/chargeback completo
 

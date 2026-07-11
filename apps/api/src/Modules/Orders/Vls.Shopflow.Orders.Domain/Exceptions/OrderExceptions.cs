@@ -48,3 +48,22 @@ public sealed class OrderNotFoundByCheckoutSessionException : Exception
         : base($"No order was found for checkout session {checkoutSessionId}.")
         => CheckoutSessionId = checkoutSessionId;
 }
+
+/// <summary>
+/// Opaque denial for guest order access — same message whether order/token is missing or invalid.
+/// </summary>
+public sealed class GuestOrderAccessDeniedException : Exception
+{
+    public GuestOrderAccessDeniedException()
+        : base("Order access denied.")
+    {
+    }
+}
+
+public sealed class GuestOrderAccessMisconfiguredException : Exception
+{
+    public GuestOrderAccessMisconfiguredException(string message)
+        : base(message)
+    {
+    }
+}

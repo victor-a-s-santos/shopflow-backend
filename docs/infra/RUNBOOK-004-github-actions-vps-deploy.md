@@ -16,7 +16,8 @@ Runbook para publicar o **Shopflow Backend** na VPS existente usando GitHub Acti
 | Push `staging` → rebuild `api-hml` + `worker-hml` | Cloudflare / frontend |
 | `workflow_dispatch` manual (test ou hml) | Mercado Pago |
 | Sync de código para `/opt/shopflow/app` | Envio de `.env` reais |
-| Health check HTTPS das APIs | `docker compose down`, recreate de postgres/caddy |
+| Health check HTTPS das APIs | `docker compose down`, recreate de postgres |
+| `caddy up` + `caddy reload` (Caddyfile bind-mount) | Force-recreate destrutivo do container Caddy |
 
 PaymentsPix permanece Fake/Pending.
 
@@ -110,10 +111,12 @@ Regras:
    - `docker compose config`
    - `docker compose build --no-cache api-test worker-test`
    - `docker compose up -d --force-recreate --no-deps api-test worker-test`
+   - `docker compose up -d caddy`
+   - `docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile`
 6. Health: `curl -fsS https://api-teste.vipassessoriadigital.com.br/health`
 7. Em falha: `docker compose logs --tail=100 api-test worker-test`
 
-`--no-deps` evita recriar `postgres` e `caddy`. Volumes permanecem.
+`--no-deps` evita recriar `postgres` ao forçar recreate da API/worker. O Caddy **não** é recriado com a API (bind-mount do Caddyfile), então o workflow garante `up -d caddy` + `caddy reload` para aplicar mudanças de proxy (`X-Forwarded-*`) sem derrubar TLS desnecessariamente. Volumes permanecem.
 
 ---
 

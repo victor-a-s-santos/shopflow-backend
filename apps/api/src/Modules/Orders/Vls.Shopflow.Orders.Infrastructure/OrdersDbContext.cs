@@ -7,6 +7,7 @@ public sealed class OrdersDbContext : DbContext
 {
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<GuestOrderAccessToken> GuestOrderAccessTokens => Set<GuestOrderAccessToken>();
 
     public OrdersDbContext(DbContextOptions<OrdersDbContext> options) : base(options) { }
 

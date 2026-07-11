@@ -11,3 +11,6 @@ public sealed record GetOrderByIdQuery(Guid OrderId)
 
 public sealed record GetOrderByCheckoutSessionIdQuery(Guid CheckoutSessionId)
     : IQuery<OrderDto>;
+
+public sealed record GetGuestOrderStatusQuery(Guid OrderId, string? AccessToken)
+    : IQuery<GuestOrderStatusDto>;
