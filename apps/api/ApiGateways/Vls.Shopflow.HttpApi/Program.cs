@@ -90,15 +90,8 @@ builder.Services.AddIdentityAccessModuleFromConfig(builder.Configuration, builde
 
 // API runs HTTP inside Docker behind Caddy/Cloudflare TLS termination.
 // Forwarded headers restore Request.Scheme=https so Secure cookies (antiforgery) work.
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
-                               | ForwardedHeaders.XForwardedProto
-                               | ForwardedHeaders.XForwardedHost;
-    // Trust reverse proxies on the Docker network (Caddy) and edge (Cloudflare).
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
-});
+// Only trust X-Forwarded-* from private Docker/loopback peers (Caddy), never from any client.
+builder.Services.Configure<ForwardedHeadersOptions>(Vls.Shopflow.HttpApi.ForwardedHeadersConfiguration.Configure);
 
 var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
     ?.Where(static o => !string.IsNullOrWhiteSpace(o))

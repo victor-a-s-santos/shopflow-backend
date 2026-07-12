@@ -209,9 +209,9 @@ A API escuta **HTTP** dentro do Docker. TLS termina no Caddy (e, se usado, no Cl
 | `X-Forwarded-Host` | `{host}` (explícito) |
 | `X-Real-IP` | `{remote_host}` (explícito) |
 
-Configurado em `caddy/Caddyfile`. No ASP.NET (`Program.cs`): `UseForwardedHeaders()` no início do pipeline, com `KnownIPNetworks`/`KnownProxies` limpos para confiar no Caddy na rede Docker. **Não** relaxar `AntiforgeryOptions.Cookie.SecurePolicy` para `SameAsRequest` em Testing/Staging/Production.
+Configurado em `caddy/Caddyfile`. No ASP.NET (`Program.cs`): `UseForwardedHeaders()` no início do pipeline, com `KnownIPNetworks` limitado a redes privadas Docker/loopback (RFC1918 + `127.0.0.0/8` / ULA IPv6) — **nunca** limpar e deixar vazio (isso aceitaria `X-Forwarded-*` de qualquer cliente). O peer TCP da API é o **Caddy**; faixas do Cloudflare vão em `trusted_proxies` do Caddy, não no ASP.NET. **Não** relaxar `AntiforgeryOptions.Cookie.SecurePolicy` para `SameAsRequest` em Testing/Staging/Production.
 
-O CSRF depende principalmente de `X-Forwarded-Proto`. `X-Forwarded-For` alimenta IP do cliente (rate limit / logs). Com Cloudflare na frente, sem `trusted_proxies` o Caddy usa o IP da edge CF — suficiente para a correção do antiforgery.
+O CSRF depende principalmente de `X-Forwarded-Proto`. `X-Forwarded-For` alimenta IP do cliente (rate limit / logs). Com Cloudflare na frente, sem `trusted_proxies` no Caddy o valor visto é o IP da edge CF — suficiente para a correção do antiforgery.
 
 Smoke CSRF (após deploy):
 
