@@ -683,6 +683,7 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
         var configuredAppId = Normalize(options.ApplicationId);
         var configuredUserId = Normalize(options.UserId);
 
+        // Signature diagnostics (sdk/manual) are logged in detail on mismatch; keep envelope lean on success.
         logger.LogInformation(
             "Mercado Pago webhook envelope. " +
             "body_application_id={BodyApplicationId} configured_application_id={ConfiguredApplicationId} " +
@@ -726,12 +727,16 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
         var configuredUserId = Normalize(options.UserId);
 
         logger.LogWarning(
-            "Mercado Pago webhook signature invalid (possible AccessToken/WebhookSecret/app mismatch). " +
+            "Mercado Pago webhook signature invalid. " +
+            "sdk_signature_valid={SdkValid} manual_signature_valid={ManualValid} " +
+            "signature_validator_final={ValidatorFinal} sdk_exception_type={SdkExceptionType} " +
+            "manual_failure_reason={ManualFailure} " +
             "has_x_signature={HasXSignature} has_x_request_id={HasXRequestId} has_query_data_id={HasQueryDataId} " +
             "has_body_data_id={HasBodyDataId} query_data_id_masked={QueryDataIdMasked} body_data_id_masked={BodyDataIdMasked} " +
             "data_id_query_was_lowercased={DataIdLowercased} ts_present={TsPresent} v1_present={V1Present} " +
             "request_id_masked={RequestIdMasked} secret_configured={SecretConfigured} " +
-            "webhook_secret_fingerprint={WebhookSecretFingerprint} " +
+            "webhook_secret_fingerprint={WebhookSecretFingerprint} secret_length={SecretLength} " +
+            "secret_trimmed_changed={SecretTrimmedChanged} " +
             "timestamp_age_seconds={TimestampAgeSeconds} timestamp_within_tolerance={TimestampWithinTolerance} " +
             "received_v1_prefix={ReceivedV1Prefix} computed_official_prefix={ComputedPrefix} " +
             "manifest_parts_included={ManifestParts} failure_reason={FailureReasonCode} detail={Detail} " +
@@ -739,6 +744,11 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
             "application_id_matches_config={ApplicationIdMatches} " +
             "body_user_id={BodyUserId} configured_user_id={ConfiguredUserId} user_id_matches_config={UserIdMatches} " +
             "body_live_mode={BodyLiveMode} configured_environment={ConfiguredEnvironment} type={Type} action={Action}",
+            d.SdkSignatureValid,
+            d.ManualSignatureValid,
+            d.SignatureValidatorFinal,
+            d.SdkExceptionType,
+            d.ManualFailureReason,
             d.HasXSignature,
             d.HasXRequestId,
             d.HasQueryDataId,
@@ -750,7 +760,9 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
             d.V1Present,
             d.RequestIdMasked,
             d.SecretConfigured,
-            secretFingerprint,
+            d.WebhookSecretFingerprint ?? secretFingerprint,
+            d.SecretLength,
+            d.SecretTrimmedChanged,
             d.TimestampAgeSeconds,
             d.TimestampWithinTolerance,
             d.ReceivedV1Prefix,

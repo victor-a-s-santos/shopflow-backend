@@ -62,7 +62,9 @@ public static class DependencyInjection
         services.AddScoped<ICheckoutReservationIdsReader, CheckoutReservationIdsReader>();
         services.AddScoped<IInventoryReservationConfirmer, InventoryReservationConfirmer>();
         services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.IOrderPixPaymentStatusReader, OrderPixPaymentStatusReader>();
-        services.AddSingleton<IMercadoPagoWebhookSignatureValidator, MercadoPagoWebhookSignatureValidator>();
+        services.AddSingleton<IMercadoPagoOfficialWebhookSignatureClient, MercadoPagoOfficialWebhookSignatureClient>();
+        services.AddSingleton<ManualMercadoPagoWebhookSignatureValidator>();
+        services.AddSingleton<IMercadoPagoWebhookSignatureValidator, CompositeMercadoPagoWebhookSignatureValidator>();
 
         var baseUrl = configuration?["MercadoPago:BaseUrl"]?.TrimEnd('/')
                       ?? "https://api.mercadopago.com";

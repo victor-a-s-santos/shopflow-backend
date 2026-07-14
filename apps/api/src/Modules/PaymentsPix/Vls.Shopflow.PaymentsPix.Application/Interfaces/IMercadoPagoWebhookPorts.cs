@@ -15,7 +15,15 @@ public sealed record MercadoPagoWebhookSignatureDiagnostics(
     string ManifestPartsIncluded,
     string? QueryDataIdMasked,
     string? RequestIdMasked,
-    string FailureReasonCode);
+    string FailureReasonCode,
+    bool? SdkSignatureValid = null,
+    bool? ManualSignatureValid = null,
+    string SignatureValidatorFinal = "Rejected",
+    string? SdkExceptionType = null,
+    string? ManualFailureReason = null,
+    int? SecretLength = null,
+    bool? SecretTrimmedChanged = null,
+    string? WebhookSecretFingerprint = null);
 
 public sealed record MercadoPagoWebhookSignatureValidationResult(
     bool IsValid,
@@ -33,6 +41,17 @@ public interface IMercadoPagoWebhookSignatureValidator
 
     /// <summary>Legacy helper used by older tests; prefer <see cref="Validate"/>.</summary>
     bool IsValid(string? xSignature, string? xRequestId, string dataId, string secret, out string? failureReason);
+}
+
+/// <summary>Thin adapter over MercadoPago.Webhook.WebhookSignatureValidator for unit tests.</summary>
+public interface IMercadoPagoOfficialWebhookSignatureClient
+{
+    void Validate(
+        string xSignature,
+        string? xRequestId,
+        string? queryDataId,
+        string secret,
+        TimeSpan? tolerance);
 }
 
 public sealed record MercadoPagoOrderLookup(

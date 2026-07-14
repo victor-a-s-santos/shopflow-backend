@@ -8,13 +8,12 @@ using Vls.Shopflow.PaymentsPix.Application.Options;
 namespace Vls.Shopflow.PaymentsPix.Infrastructure.MercadoPago;
 
 /// <summary>
-/// Validates Mercado Pago webhook signatures per official docs (without SDK):
-/// manifest = id:&lt;query data.id lowercase&gt;;request-id:&lt;x-request-id&gt;;ts:&lt;ts&gt;;
-/// Missing data.id / x-request-id are omitted from the manifest before HMAC.
+/// Manual HMAC validation (docs without SDK): alphanumerics lowercased in the manifest.
+/// The official C# SDK (since case-preserve fix) includes data.id as received — use SDK as primary.
+/// This class remains the diagnostic oracle for sdk_valid vs manual_valid divergence.
 /// </summary>
-public sealed class MercadoPagoWebhookSignatureValidator(
+public sealed class ManualMercadoPagoWebhookSignatureValidator(
     IOptions<MercadoPagoOptions> options)
-    : IMercadoPagoWebhookSignatureValidator
 {
     public MercadoPagoWebhookSignatureValidationResult Validate(
         string? xSignature,

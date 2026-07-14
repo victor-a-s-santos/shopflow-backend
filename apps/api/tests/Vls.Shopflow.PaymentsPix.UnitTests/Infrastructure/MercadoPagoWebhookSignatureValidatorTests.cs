@@ -14,8 +14,8 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         var dataId = "123456";
         var requestId = "abc-request-id";
         var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        var manifest = MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
-        var v1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
 
         var validator = CreateValidator();
         var valid = validator.IsValid($"ts={ts},v1={v1}", requestId, dataId, secret, out var reason);
@@ -31,8 +31,8 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         var dataId = "ORD01JQ4S4KY8HWQ6NA5PXB65B3D3";
         var requestId = "2066ca19-c6f1-498a-be75-1923005edd06";
         var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-        var manifest = MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
-        var v1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
 
         var result = CreateValidator().Validate($"ts={ts},v1={v1}", requestId, dataId, secret);
 
@@ -48,11 +48,11 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         var secret = "test-webhook-secret";
         var dataId = "123456";
         var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        var manifest = MercadoPagoWebhookSignatureValidator.BuildManifest(
-            MercadoPagoWebhookSignatureValidator.NormalizeDataIdForManifest(dataId),
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifest(
+            ManualMercadoPagoWebhookSignatureValidator.NormalizeDataIdForManifest(dataId),
             requestIdOrNull: null,
             ts);
-        var v1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
 
         var result = CreateValidator().Validate($"ts={ts},v1={v1}", xRequestId: null, dataId, secret);
 
@@ -67,8 +67,8 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         var secret = "test-webhook-secret";
         var requestId = "abc-request-id";
         var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        var manifest = MercadoPagoWebhookSignatureValidator.BuildManifest(null, requestId, ts);
-        var v1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifest(null, requestId, ts);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
 
         var result = CreateValidator().Validate($"ts={ts},v1={v1}", requestId, queryDataId: null, secret);
 
@@ -85,16 +85,16 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         var bodyId = "ORD01DIFFERENTBODY";
         var requestId = "req-1";
         var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        var manifest = MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(queryId, requestId, ts);
-        var v1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(queryId, requestId, ts);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
 
         var result = CreateValidator().Validate($"ts={ts},v1={v1}", requestId, queryId, secret);
 
         result.IsValid.Should().BeTrue();
 
         // Signing with body id would not match the query-based v1.
-        var bodyManifest = MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(bodyId, requestId, ts);
-        var bodyV1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, bodyManifest);
+        var bodyManifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(bodyId, requestId, ts);
+        var bodyV1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, bodyManifest);
         bodyV1.Should().NotBe(v1);
     }
 
@@ -158,14 +158,14 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
     [Fact]
     public void BuildManifest_UsesOfficialFormat()
     {
-        MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw("99", "req-1", "1700000000")
+        ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw("99", "req-1", "1700000000")
             .Should().Be("id:99;request-id:req-1;ts:1700000000;");
     }
 
     [Fact]
     public void BuildManifest_LowercasesAlphanumericOrderIds()
     {
-        MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw("ORD01ABC", "req-1", "1700000000")
+        ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw("ORD01ABC", "req-1", "1700000000")
             .Should().Be("id:ord01abc;request-id:req-1;ts:1700000000;");
     }
 
@@ -176,8 +176,8 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         var dataId = "ORD01JP84C939T20S0P1DN382FQ6K";
         var requestId = "abc-request-id";
         var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        var manifest = MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
-        var v1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
 
         var validator = CreateValidator();
         var valid = validator.IsValid($"ts={ts},v1={v1}", requestId, dataId, secret, out var reason);
@@ -194,8 +194,8 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         var dataId = "ORDTST01KXGT3VPJ322GGMGAN6P0G9S2";
         var requestId = "abc-request-id";
         var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
-        var manifest = MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
-        var v1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
 
         var result = CreateValidator().Validate($"ts={ts},v1={v1}", requestId, dataId, secret);
 
@@ -206,11 +206,11 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
     [Fact]
     public void FixedTimeEqualsHex_RejectsDifferentValues()
     {
-        var a = MercadoPagoWebhookSignatureValidator.ComputeHmacHex("secret", "manifest-a");
-        var b = MercadoPagoWebhookSignatureValidator.ComputeHmacHex("secret", "manifest-b");
+        var a = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex("secret", "manifest-a");
+        var b = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex("secret", "manifest-b");
 
-        MercadoPagoWebhookSignatureValidator.FixedTimeEqualsHex(a, b).Should().BeFalse();
-        MercadoPagoWebhookSignatureValidator.FixedTimeEqualsHex(a, a).Should().BeTrue();
+        ManualMercadoPagoWebhookSignatureValidator.FixedTimeEqualsHex(a, b).Should().BeFalse();
+        ManualMercadoPagoWebhookSignatureValidator.FixedTimeEqualsHex(a, a).Should().BeTrue();
     }
 
     [Fact]
@@ -220,8 +220,8 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         var dataId = "123456";
         var requestId = "abc-request-id";
         var ts = DateTimeOffset.UtcNow.AddMinutes(-30).ToUnixTimeSeconds().ToString();
-        var manifest = MercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
-        var v1 = MercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(secret, manifest);
 
         var validator = CreateValidator(toleranceMinutes: 10);
         var valid = validator.IsValid($"ts={ts},v1={v1}", requestId, dataId, secret, out var reason);
@@ -230,7 +230,7 @@ public sealed class MercadoPagoWebhookSignatureValidatorTests
         reason.Should().Be("Signature timestamp outside tolerance window.");
     }
 
-    private static MercadoPagoWebhookSignatureValidator CreateValidator(int toleranceMinutes = 10)
+    private static ManualMercadoPagoWebhookSignatureValidator CreateValidator(int toleranceMinutes = 10)
         => new(Options.Create(new MercadoPagoOptions
         {
             WebhookSignatureToleranceMinutes = toleranceMinutes

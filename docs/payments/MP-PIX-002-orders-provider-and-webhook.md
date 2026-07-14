@@ -102,29 +102,32 @@ Status terminais para o mesmo `ProviderEventId`: `Processed`, `Ignored`, `Lookup
 
 Logs mascaram `ProviderOrderId` (prefixo/sufixo); **nunca** logar AccessToken, WebhookSecret ou `x-signature` completa.
 
-## Assinatura (doc oficial Mercado Pago)
+## Assinatura (SDK oficial + oráculo manual)
 
-HMAC-SHA256 hex lowercase com `MercadoPago__WebhookSecret` (`MercadoPagoWebhookSignatureValidator`).
+Pacote NuGet: **`mercadopago-sdk` 3.3.0** (`MercadoPago.Webhook.WebhookSignatureValidator`).
 
-**Fontes (nunca o body para HMAC):**
+| Camada | Comportamento |
+|--------|----------------|
+| **Primária** | `CompositeMercadoPagoWebhookSignatureValidator` → SDK `Validate(xSignature, xRequestId, queryDataId, secret, tolerance)` |
+| **Diagnóstico** | Manual HMAC (docs “without SDK”): data.id **lowercase** no manifest — útil para ver `sdk_valid` vs `manual_valid` |
+| **Fallback** | Só se o SDK lançar exceção inesperada (não `InvalidWebhookSignatureException`) |
+
+**Entrada do SDK (nunca body):**
 
 | Campo | Origem |
 |-------|--------|
-| `data.id` | **somente** `Request.Query["data.id"]` — alfanumérico em **lowercase** no manifest |
+| `data.id` | `Request.Query["data.id"]` **como recebido** (SDK preserva case após fix no SDK; não fazer lowercase antes) |
 | `x-request-id` | header |
-| `ts` / `v1` | header `x-signature` (`ts=…,v1=…`) |
+| `x-signature` | header (`ts` em ms tipicamente; `v1`) |
+| `secret` | `MercadoPago__WebhookSecret` com `.Trim()` nas pontas |
 
-**Manifest:**
+Decisão: SDK aceita → webhook aceito (mesmo se manual rejeitar por lowercase). SDK rejeita → **401** (mesmo se manual aceitar). Ambos rejeitam → 401.
 
-```
-id:<data.id>;request-id:<x-request-id>;ts:<ts>;
-```
+Logs: `sdk_signature_valid`, `manual_signature_valid`, `signature_validator_final` (`Sdk` / `ManualFallback` / `Rejected`), `secret_length`, `secret_trimmed_changed`, fingerprint — **nunca** secret/token/x-signature/v1 completos.
 
-Se `data.id` ou `x-request-id` estiverem ausentes, **omitir** esse trecho do manifest antes do HMAC (doc oficial). `ts` aceita segundos **ou** millissegundos (Orders usa ms com frequência). Tolerância: `WebhookSignatureToleranceMinutes`.
+**.env:** sem aspas, sem espaço/quebra no fim do secret. Fingerprint local: `printf '%s' "$SECRET" | shasum -a 256 | cut -c1-8`.
 
-Shopflow: assinatura válida **sem** query `data.id` → `200 MissingQueryDataId` (Ignored), nunca Paid. Query ≠ body (case-insensitive) → `200 DataIdMismatch`. Body **nunca** substitui query no HMAC. Fallback `Query["id"]` removido.
-
-Mismatch: log seguro com flags/máscaras/prefixes de v1 — **sem** secret, AccessToken, x-signature completa ou v1 completo.
+Shopflow: assinatura válida **sem** query `data.id` → `200 MissingQueryDataId`. Query ≠ body → `200 DataIdMismatch`.
 
 Diagnóstico de `signature_mismatch`: secret da **mesma** app do AccessToken, evento **Order (Mercado Pago)**, URL com query preservada, HMAC com query `data.id` (não body).
 
