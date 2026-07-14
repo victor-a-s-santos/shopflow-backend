@@ -124,6 +124,25 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
+{
+    var paymentsPixLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("PaymentsPix.Startup");
+    var provider = builder.Configuration["PaymentsPix:Provider"] ?? "Fake";
+    var mpEnvironment = builder.Configuration["MercadoPago:Environment"] ?? "(unset)";
+    var accessTokenConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["MercadoPago:AccessToken"]);
+    var webhookSecretConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["MercadoPago:WebhookSecret"]);
+    var notificationUrlConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["MercadoPago:NotificationUrl"]);
+    paymentsPixLogger.LogInformation(
+        "PaymentsPix provider: {Provider}. MercadoPago environment: {Environment}. " +
+        "MercadoPago access token configured: {AccessTokenConfigured}. " +
+        "MercadoPago webhook secret configured: {WebhookSecretConfigured}. " +
+        "MercadoPago notification URL configured: {NotificationUrlConfigured}.",
+        provider,
+        mpEnvironment,
+        accessTokenConfigured,
+        webhookSecretConfigured,
+        notificationUrlConfigured);
+}
+
 
 
 var uploadsRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "uploads");

@@ -63,8 +63,20 @@ public sealed class MercadoPagoWebhookEvent
     }
 
     /// <summary>
+    /// Provider order lookup returned 400/404 or id format is not an Orders API id
+    /// (e.g. painel simulation with data.id=123456). Not retryable as payment confirmation.
+    /// </summary>
+    public void MarkLookupFailed(string reason)
+    {
+        ProcessingStatus = "LookupFailed";
+        ProcessedAt = DateTimeOffset.UtcNow;
+        ErrorMessage = Truncate(reason, 500);
+    }
+
+    /// <summary>
     /// Resets a Received/Failed row so the same ProviderEventId can be retried
     /// without inserting a duplicate (unique index).
+    /// LookupFailed/Ignored/Processed are terminal for that event id.
     /// </summary>
     public void ResetForReprocessing()
     {

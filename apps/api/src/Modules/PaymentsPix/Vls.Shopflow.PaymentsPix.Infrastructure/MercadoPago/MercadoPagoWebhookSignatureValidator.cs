@@ -7,10 +7,127 @@ using Vls.Shopflow.PaymentsPix.Application.Options;
 
 namespace Vls.Shopflow.PaymentsPix.Infrastructure.MercadoPago;
 
+/// <summary>
+/// Validates Mercado Pago webhook signatures per official docs (without SDK):
+/// manifest = id:&lt;query data.id lowercase&gt;;request-id:&lt;x-request-id&gt;;ts:&lt;ts&gt;;
+/// Missing data.id / x-request-id are omitted from the manifest before HMAC.
+/// </summary>
 public sealed class MercadoPagoWebhookSignatureValidator(
     IOptions<MercadoPagoOptions> options)
     : IMercadoPagoWebhookSignatureValidator
 {
+    public MercadoPagoWebhookSignatureValidationResult Validate(
+        string? xSignature,
+        string? xRequestId,
+        string? queryDataId,
+        string? secret)
+    {
+        var hasXSignature = !string.IsNullOrWhiteSpace(xSignature);
+        var hasXRequestId = !string.IsNullOrWhiteSpace(xRequestId);
+        var hasQueryDataId = !string.IsNullOrWhiteSpace(queryDataId);
+        var secretConfigured = !string.IsNullOrWhiteSpace(secret);
+
+        string? dataIdRaw = hasQueryDataId ? queryDataId!.Trim() : null;
+        string? dataIdForManifest = dataIdRaw is null ? null : NormalizeDataIdForManifest(dataIdRaw);
+        var dataIdWasLowercased = dataIdRaw is not null
+                                  && !string.Equals(dataIdRaw, dataIdForManifest, StringComparison.Ordinal);
+
+        string? requestId = hasXRequestId ? xRequestId!.Trim() : null;
+
+        if (!hasXSignature)
+            return Fail(
+                "Missing x-signature header.",
+                "missing_signature",
+                BuildDiagnostics(
+                    hasXSignature, hasXRequestId, hasQueryDataId, dataIdWasLowercased,
+                    tsPresent: false, v1Present: false, secretConfigured,
+                    null, null, null, null,
+                    BuildManifestPartsList(dataIdForManifest, requestId, tsIncluded: false),
+                    MaskId(dataIdRaw), MaskId(requestId)));
+
+        if (!secretConfigured)
+            return Fail(
+                "Webhook secret is not configured.",
+                "missing_secret",
+                BuildDiagnostics(
+                    hasXSignature, hasXRequestId, hasQueryDataId, dataIdWasLowercased,
+                    tsPresent: false, v1Present: false, secretConfigured: false,
+                    null, null, null, null,
+                    BuildManifestPartsList(dataIdForManifest, requestId, tsIncluded: false),
+                    MaskId(dataIdRaw), MaskId(requestId)));
+
+        if (!TryParseSignature(xSignature!, out var ts, out var v1))
+        {
+            var tsPresent = !string.IsNullOrWhiteSpace(ts);
+            var v1Present = !string.IsNullOrWhiteSpace(v1);
+            var code = !tsPresent ? "missing_ts" : !v1Present ? "missing_v1" : "invalid_signature_format";
+            return Fail(
+                "Invalid x-signature format.",
+                code,
+                BuildDiagnostics(
+                    hasXSignature, hasXRequestId, hasQueryDataId, dataIdWasLowercased,
+                    tsPresent, v1Present, secretConfigured,
+                    null, null, Prefix(v1, 8), null,
+                    BuildManifestPartsList(dataIdForManifest, requestId, tsPresent),
+                    MaskId(dataIdRaw), MaskId(requestId)));
+        }
+
+        if (!TryParseSignedAt(ts, out var signedAt, out var ageSeconds))
+        {
+            return Fail(
+                "Invalid signature timestamp.",
+                "invalid_ts",
+                BuildDiagnostics(
+                    hasXSignature, hasXRequestId, hasQueryDataId, dataIdWasLowercased,
+                    tsPresent: true, v1Present: true, secretConfigured,
+                    null, null, Prefix(v1, 8), null,
+                    BuildManifestPartsList(dataIdForManifest, requestId, tsIncluded: true),
+                    MaskId(dataIdRaw), MaskId(requestId)));
+        }
+
+        var toleranceMinutes = Math.Max(1, options.Value.WebhookSignatureToleranceMinutes);
+        var withinTolerance = Math.Abs(ageSeconds) <= TimeSpan.FromMinutes(toleranceMinutes).TotalSeconds;
+        if (!withinTolerance)
+        {
+            return Fail(
+                "Signature timestamp outside tolerance window.",
+                "timestamp_out_of_tolerance",
+                BuildDiagnostics(
+                    hasXSignature, hasXRequestId, hasQueryDataId, dataIdWasLowercased,
+                    tsPresent: true, v1Present: true, secretConfigured,
+                    ageSeconds, false, Prefix(v1, 8), null,
+                    BuildManifestPartsList(dataIdForManifest, requestId, tsIncluded: true),
+                    MaskId(dataIdRaw), MaskId(requestId)));
+        }
+
+        var manifest = BuildManifest(dataIdForManifest, requestId, ts);
+        var expected = ComputeHmacHex(secret!.Trim(), manifest);
+
+        if (!FixedTimeEqualsHex(expected, v1))
+        {
+            return Fail(
+                "Signature mismatch.",
+                "signature_mismatch",
+                BuildDiagnostics(
+                    hasXSignature, hasXRequestId, hasQueryDataId, dataIdWasLowercased,
+                    tsPresent: true, v1Present: true, secretConfigured,
+                    ageSeconds, true, Prefix(v1, 8), Prefix(expected, 8),
+                    BuildManifestPartsList(dataIdForManifest, requestId, tsIncluded: true),
+                    MaskId(dataIdRaw), MaskId(requestId)));
+        }
+
+        return new MercadoPagoWebhookSignatureValidationResult(
+            true,
+            null,
+            "ok",
+            BuildDiagnostics(
+                hasXSignature, hasXRequestId, hasQueryDataId, dataIdWasLowercased,
+                tsPresent: true, v1Present: true, secretConfigured,
+                ageSeconds, true, Prefix(v1, 8), Prefix(expected, 8),
+                BuildManifestPartsList(dataIdForManifest, requestId, tsIncluded: true),
+                MaskId(dataIdRaw), MaskId(requestId)));
+    }
+
     public bool IsValid(
         string? xSignature,
         string? xRequestId,
@@ -18,73 +135,85 @@ public sealed class MercadoPagoWebhookSignatureValidator(
         string secret,
         out string? failureReason)
     {
-        failureReason = null;
-
-        if (string.IsNullOrWhiteSpace(xSignature))
-        {
-            failureReason = "Missing x-signature header.";
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(xRequestId))
-        {
-            failureReason = "Missing x-request-id header.";
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(dataId))
-        {
-            failureReason = "Missing data.id.";
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(secret))
-        {
-            failureReason = "Webhook secret is not configured.";
-            return false;
-        }
-
-        if (!TryParseSignature(xSignature, out var ts, out var v1))
-        {
-            failureReason = "Invalid x-signature format.";
-            return false;
-        }
-
-        var toleranceMinutes = Math.Max(1, options.Value.WebhookSignatureToleranceMinutes);
-        if (!long.TryParse(ts, NumberStyles.Integer, CultureInfo.InvariantCulture, out var tsUnix))
-        {
-            failureReason = "Invalid signature timestamp.";
-            return false;
-        }
-
-        var signedAt = DateTimeOffset.FromUnixTimeSeconds(tsUnix);
-        var age = DateTimeOffset.UtcNow - signedAt;
-        if (age.Duration() > TimeSpan.FromMinutes(toleranceMinutes))
-        {
-            failureReason = "Signature timestamp outside tolerance window.";
-            return false;
-        }
-
-        var manifestDataId = NormalizeDataIdForManifest(dataId);
-        var manifest = $"id:{manifestDataId};request-id:{xRequestId};ts:{ts};";
-        var expected = ComputeHmacHex(secret, manifest);
-
-        if (!FixedTimeEqualsHex(expected, v1))
-        {
-            failureReason = "Signature mismatch.";
-            return false;
-        }
-
-        return true;
+        var result = Validate(xSignature, xRequestId, dataId, secret);
+        failureReason = result.FailureReason;
+        return result.IsValid;
     }
 
+    private static MercadoPagoWebhookSignatureValidationResult Fail(
+        string reason,
+        string code,
+        MercadoPagoWebhookSignatureDiagnostics diagnostics)
+        => new(false, reason, code, diagnostics with { FailureReasonCode = code });
+
+    private static MercadoPagoWebhookSignatureDiagnostics BuildDiagnostics(
+        bool hasXSignature,
+        bool hasXRequestId,
+        bool hasQueryDataId,
+        bool dataIdQueryWasLowercased,
+        bool tsPresent,
+        bool v1Present,
+        bool secretConfigured,
+        long? timestampAgeSeconds,
+        bool? timestampWithinTolerance,
+        string? receivedV1Prefix,
+        string? computedOfficialPrefix,
+        string manifestPartsIncluded,
+        string? queryDataIdMasked,
+        string? requestIdMasked)
+        => new(
+            hasXSignature,
+            hasXRequestId,
+            hasQueryDataId,
+            dataIdQueryWasLowercased,
+            tsPresent,
+            v1Present,
+            secretConfigured,
+            timestampAgeSeconds,
+            timestampWithinTolerance,
+            receivedV1Prefix,
+            computedOfficialPrefix,
+            manifestPartsIncluded,
+            queryDataIdMasked,
+            requestIdMasked,
+            FailureReasonCode: "pending");
+
     /// <summary>
-    /// Mercado Pago docs: alphanumeric data.id values with uppercase letters must be lowercased in the manifest.
+    /// Official rule: alphanumeric data.id with uppercase must be lowercased in the manifest.
+    /// Safe to always ToLowerInvariant (numeric ids are unchanged).
     /// </summary>
     internal static string NormalizeDataIdForManifest(string dataId)
+        => dataId.Trim().ToLowerInvariant();
+
+    /// <summary>
+    /// Builds official manifest. Omit id / request-id parts when those values are absent.
+    /// Always ends with ';'. dataId should already be normalized (lowercase) when present.
+    /// </summary>
+    internal static string BuildManifest(string? dataIdNormalizedOrNull, string? requestIdOrNull, string ts)
     {
-        var trimmed = dataId.Trim();
-        return trimmed.Any(char.IsLetter) ? trimmed.ToLowerInvariant() : trimmed;
+        var parts = new List<string>(3);
+        if (!string.IsNullOrWhiteSpace(dataIdNormalizedOrNull))
+            parts.Add($"id:{dataIdNormalizedOrNull.Trim()}");
+        if (!string.IsNullOrWhiteSpace(requestIdOrNull))
+            parts.Add($"request-id:{requestIdOrNull.Trim()}");
+        parts.Add($"ts:{ts}");
+        return string.Join(";", parts) + ";";
+    }
+
+    /// <summary>Convenience: normalizes raw query data.id then builds manifest.</summary>
+    internal static string BuildManifestFromRaw(string dataId, string requestId, string ts)
+        => BuildManifest(NormalizeDataIdForManifest(dataId), requestId, ts);
+
+    private static string BuildManifestPartsList(string? dataId, string? requestId, bool tsIncluded)
+    {
+        var parts = new List<string>(3);
+        if (!string.IsNullOrWhiteSpace(dataId))
+            parts.Add("id");
+        if (!string.IsNullOrWhiteSpace(requestId))
+            parts.Add("request-id");
+        if (tsIncluded)
+            parts.Add("ts");
+        return string.Join("/", parts);
     }
 
     internal static bool TryParseSignature(string xSignature, out string ts, out string v1)
@@ -107,8 +236,32 @@ public sealed class MercadoPagoWebhookSignatureValidator(
         return !string.IsNullOrWhiteSpace(ts) && !string.IsNullOrWhiteSpace(v1);
     }
 
-    internal static string BuildManifest(string dataId, string requestId, string ts)
-        => $"id:{NormalizeDataIdForManifest(dataId)};request-id:{requestId};ts:{ts};";
+    /// <summary>
+    /// Official Orders docs describe ts as milliseconds; some payment examples use seconds.
+    /// Values with 13+ digits (or &gt; 1e12) are treated as Unix milliseconds.
+    /// </summary>
+    internal static bool TryParseSignedAt(string ts, out DateTimeOffset signedAt, out long ageSeconds)
+    {
+        signedAt = default;
+        ageSeconds = 0;
+
+        if (!long.TryParse(ts, NumberStyles.Integer, CultureInfo.InvariantCulture, out var tsUnix))
+            return false;
+
+        try
+        {
+            signedAt = ts.Length >= 13 || tsUnix > 9_999_999_999L
+                ? DateTimeOffset.FromUnixTimeMilliseconds(tsUnix)
+                : DateTimeOffset.FromUnixTimeSeconds(tsUnix);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
+        }
+
+        ageSeconds = (long)(DateTimeOffset.UtcNow - signedAt).TotalSeconds;
+        return true;
+    }
 
     internal static string ComputeHmacHex(string secret, string manifest)
     {
@@ -133,5 +286,25 @@ public sealed class MercadoPagoWebhookSignatureValidator(
         {
             return false;
         }
+    }
+
+    internal static string? MaskId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var trimmed = value.Trim();
+        if (trimmed.Length <= 10)
+            return "***";
+
+        return $"{trimmed[..6]}…{trimmed[^4..]}";
+    }
+
+    private static string? Prefix(string? value, int length)
+    {
+        if (string.IsNullOrEmpty(value))
+            return null;
+
+        return value.Length <= length ? value : value[..length];
     }
 }

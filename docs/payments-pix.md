@@ -8,7 +8,7 @@ Módulo responsável por registrar intenções/cobranças Pix associadas a pedid
 - Provider abstrato (`IPixPaymentProvider`) com implementações:
   - **`FakePixPaymentProvider`** — dev sem API externa
   - **`MercadoPagoPixPaymentProvider`** — Checkout API Orders (`POST /v1/orders`)
-- Webhook Mercado Pago (`POST /api/payments/pix/webhooks/mercado-pago`) com validação `x-signature` + `GET /v1/orders/{id}`
+- Webhook Mercado Pago (`POST /api/payments/pix/webhooks/mercado-pago`) com validação `x-signature` (query `data.id` lowercased no HMAC) + `GET /v1/orders/{id}` (só IDs `ORD…`/`ORDTST…`; simulação do painel → `SimulatorEvent` 200, sem Paid)
 - Em `processed`/`accredited`: PixPayment Paid + Order Paid + confirmação de reserva Inventory
 - `PixPayment` nasce com status **`Pending`**
 - Amount copiado do `Total` do pedido (sem recalcular)
@@ -112,7 +112,7 @@ Se já existir `PixPayment` com status `Pending` para o mesmo `orderId`, o endpo
 | Método | Path | Status | Descrição |
 |--------|------|--------|-----------|
 | `POST` | `/api/payments/pix/orders/{orderId}` | 201 / 200 | Cria ou retorna PixPayment Pending |
-| `POST` | `/api/payments/pix/webhooks/mercado-pago` | 200 / 401 | Webhook Orders (assinatura + GET order) |
+| `POST` | `/api/payments/pix/webhooks/mercado-pago` | 200 / 401 / 503 | Webhook Orders (assinatura + GET order; simulação painéis = 200 Ignored/LookupFailed) |
 | `GET` | `/api/payments/pix/{paymentId}` | 200 | Consulta por ID (admin) |
 | `GET` | `/api/payments/pix/by-order/{orderId}` | 200 | Consulta mais recente do pedido (admin) |
 

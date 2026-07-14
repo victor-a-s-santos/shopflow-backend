@@ -3,6 +3,7 @@ using System.Text;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Vls.Shopflow.PaymentsPix.Application.Interfaces;
 using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Infrastructure.MercadoPago;
 
@@ -60,16 +61,17 @@ public sealed class MercadoPagoOrderClientTests
         captured.RequestUri!.AbsolutePath.Should().Be("/v1/orders/ORD01JP84C939T20S0P1DN382FQ6K");
         captured.Headers.Authorization!.Parameter.Should().Be("token-abc");
 
-        result.Should().NotBeNull();
-        result!.Status.Should().Be("processed");
-        result.StatusDetail.Should().Be("accredited");
-        result.PaymentMethodId.Should().Be("pix");
-        result.TotalAmount.Should().Be(59.90m);
-        result.TransactionId.Should().Be("PAY01JP84C939T20S0P1DN6FCMWQC");
+        result.Status.Should().Be(MercadoPagoOrderLookupStatus.Found);
+        result.Order.Should().NotBeNull();
+        result.Order!.Status.Should().Be("processed");
+        result.Order.StatusDetail.Should().Be("accredited");
+        result.Order.PaymentMethodId.Should().Be("pix");
+        result.Order.TotalAmount.Should().Be(59.90m);
+        result.Order.TransactionId.Should().Be("PAY01JP84C939T20S0P1DN6FCMWQC");
     }
 
     [Fact]
-    public async Task GetOrderAsync_WhenNotFound_ReturnsNull()
+    public async Task GetOrderAsync_WhenNotFound_ReturnsNotFoundStatus()
     {
         var handler = new StubHandler((_, _) => new HttpResponseMessage(HttpStatusCode.NotFound));
         var client = new MercadoPagoOrderClient(
@@ -77,8 +79,56 @@ public sealed class MercadoPagoOrderClientTests
             Options.Create(new MercadoPagoOptions { AccessToken = "token-abc" }),
             NullLogger<MercadoPagoOrderClient>.Instance);
 
-        var result = await client.GetOrderAsync("missing", CancellationToken.None);
-        result.Should().BeNull();
+        var result = await client.GetOrderAsync("ORD01MISSING", CancellationToken.None);
+        result.Status.Should().Be(MercadoPagoOrderLookupStatus.NotFound);
+        result.Order.Should().BeNull();
+        result.HttpStatusCode.Should().Be(404);
+    }
+
+    [Fact]
+    public async Task GetOrderAsync_WhenBadRequest_ReturnsBadRequestStatus_DoesNotThrow()
+    {
+        var handler = new StubHandler((_, _) => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("""{"message":"invalid id"}""", Encoding.UTF8, "application/json")
+        });
+        var client = new MercadoPagoOrderClient(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.mercadopago.com/") },
+            Options.Create(new MercadoPagoOptions { AccessToken = "token-abc" }),
+            NullLogger<MercadoPagoOrderClient>.Instance);
+
+        var result = await client.GetOrderAsync("123456", CancellationToken.None);
+        result.Status.Should().Be(MercadoPagoOrderLookupStatus.BadRequest);
+        result.Order.Should().BeNull();
+        result.HttpStatusCode.Should().Be(400);
+    }
+
+    [Fact]
+    public async Task GetOrderAsync_WhenUnauthorized_ReturnsUnauthorizedStatus()
+    {
+        var handler = new StubHandler((_, _) => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        var client = new MercadoPagoOrderClient(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.mercadopago.com/") },
+            Options.Create(new MercadoPagoOptions { AccessToken = "bad-token" }),
+            NullLogger<MercadoPagoOrderClient>.Instance);
+
+        var result = await client.GetOrderAsync("ORD01X", CancellationToken.None);
+        result.Status.Should().Be(MercadoPagoOrderLookupStatus.Unauthorized);
+        result.HttpStatusCode.Should().Be(401);
+    }
+
+    [Fact]
+    public async Task GetOrderAsync_WhenServerError_ReturnsTransientFailure()
+    {
+        var handler = new StubHandler((_, _) => new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var client = new MercadoPagoOrderClient(
+            new HttpClient(handler) { BaseAddress = new Uri("https://api.mercadopago.com/") },
+            Options.Create(new MercadoPagoOptions { AccessToken = "token-abc" }),
+            NullLogger<MercadoPagoOrderClient>.Instance);
+
+        var result = await client.GetOrderAsync("ORD01X", CancellationToken.None);
+        result.Status.Should().Be(MercadoPagoOrderLookupStatus.TransientFailure);
+        result.HttpStatusCode.Should().Be(500);
     }
 
     private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> handler)

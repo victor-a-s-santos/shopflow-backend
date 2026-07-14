@@ -33,8 +33,7 @@ public static class PaymentsPixEndpoints
             using var document = await JsonDocument.ParseAsync(request.Body, cancellationToken: ct);
             var root = document.RootElement;
 
-            var dataIdFromQuery = request.Query["data.id"].FirstOrDefault()
-                                  ?? request.Query["id"].FirstOrDefault();
+            var dataIdFromQuery = request.Query["data.id"].FirstOrDefault();
 
             string? dataIdFromBody = null;
             if (root.TryGetProperty("data", out var dataElement)

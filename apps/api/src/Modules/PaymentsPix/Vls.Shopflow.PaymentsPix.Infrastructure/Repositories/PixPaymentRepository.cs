@@ -24,9 +24,14 @@ public sealed class PixPaymentRepository(PaymentsPixDbContext db) : IPixPaymentR
     public Task<PixPayment?> GetByProviderOrderIdAsync(
         string providerOrderId,
         CancellationToken cancellationToken)
-        => db.PixPayments.FirstOrDefaultAsync(
-            p => p.ProviderOrderId == providerOrderId,
+    {
+        var trimmed = providerOrderId.Trim();
+        // MP query data.id may differ in case from the value persisted at charge time.
+        return db.PixPayments.FirstOrDefaultAsync(
+            p => p.ProviderOrderId != null
+                 && p.ProviderOrderId.ToLower() == trimmed.ToLower(),
             cancellationToken);
+    }
 
     public Task<PixPayment?> GetPendingByOrderIdAsync(Guid orderId, CancellationToken cancellationToken)
         => db.PixPayments.FirstOrDefaultAsync(

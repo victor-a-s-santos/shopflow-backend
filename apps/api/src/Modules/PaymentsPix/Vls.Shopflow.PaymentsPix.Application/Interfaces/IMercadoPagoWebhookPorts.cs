@@ -1,7 +1,37 @@
 namespace Vls.Shopflow.PaymentsPix.Application.Interfaces;
 
+public sealed record MercadoPagoWebhookSignatureDiagnostics(
+    bool HasXSignature,
+    bool HasXRequestId,
+    bool HasQueryDataId,
+    bool DataIdQueryWasLowercased,
+    bool TsPresent,
+    bool V1Present,
+    bool SecretConfigured,
+    long? TimestampAgeSeconds,
+    bool? TimestampWithinTolerance,
+    string? ReceivedV1Prefix,
+    string? ComputedOfficialPrefix,
+    string ManifestPartsIncluded,
+    string? QueryDataIdMasked,
+    string? RequestIdMasked,
+    string FailureReasonCode);
+
+public sealed record MercadoPagoWebhookSignatureValidationResult(
+    bool IsValid,
+    string? FailureReason,
+    string FailureReasonCode,
+    MercadoPagoWebhookSignatureDiagnostics Diagnostics);
+
 public interface IMercadoPagoWebhookSignatureValidator
 {
+    MercadoPagoWebhookSignatureValidationResult Validate(
+        string? xSignature,
+        string? xRequestId,
+        string? queryDataId,
+        string? secret);
+
+    /// <summary>Legacy helper used by older tests; prefer <see cref="Validate"/>.</summary>
     bool IsValid(string? xSignature, string? xRequestId, string dataId, string secret, out string? failureReason);
 }
 
@@ -23,9 +53,24 @@ public sealed record MercadoPagoOrderLookup(
     DateTimeOffset? LastUpdatedDate,
     DateTimeOffset? CreatedDate);
 
+public enum MercadoPagoOrderLookupStatus
+{
+    Found,
+    NotFound,
+    BadRequest,
+    Unauthorized,
+    TransientFailure
+}
+
+public sealed record MercadoPagoOrderLookupResult(
+    MercadoPagoOrderLookupStatus Status,
+    MercadoPagoOrderLookup? Order,
+    int? HttpStatusCode,
+    string? ErrorMessage);
+
 public interface IMercadoPagoOrderClient
 {
-    Task<MercadoPagoOrderLookup?> GetOrderAsync(string orderId, CancellationToken cancellationToken);
+    Task<MercadoPagoOrderLookupResult> GetOrderAsync(string orderId, CancellationToken cancellationToken);
 }
 
 public interface IOrderPaidWriter

@@ -50,7 +50,7 @@
 | Worker expiração checkout | `Vls.Shopflow.Worker` + `ExpirationProcessor` |
 | IdentityAccess admin (Fase 1/2) | Cookie admin, CSRF, policy Backoffice |
 | Demo catalog seed roupas | 10 produtos, 94 SKUs, imagens em `seed-assets/` |
-| Mercado Pago Pix provider + webhook | QR real + Paid + confirma estoque (`MP-PIX-002`) |
+| Mercado Pago Pix provider + webhook | QR real + Paid + confirma estoque (`MP-PIX-002`); HMAC oficial (query `data.id` lowercase); simulação painel → SimulatorEvent/LookupFailed (sem stack 400) |
 
 ---
 
@@ -62,6 +62,7 @@
 | Auth visual-only no frontend | Backend customer pronto; integração UI pendente |
 | Cypress bloqueia `/api/payments` no checkout | Correto até frontend integrar PaymentsPix |
 | Pedido ≠ pagamento aprovado | `PendingPayment` até webhook Orders `processed`/`accredited` |
+| Simulação webhook painel MP | `data.id` tipo `123456` ≠ Order real; não confirma Paid — usar checkout que cria `ORD`/`ORDTST` |
 
 ---
 
