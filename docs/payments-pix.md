@@ -8,7 +8,7 @@ Módulo responsável por registrar intenções/cobranças Pix associadas a pedid
 - Provider abstrato (`IPixPaymentProvider`) com implementações:
   - **`FakePixPaymentProvider`** — dev sem API externa
   - **`MercadoPagoPixPaymentProvider`** — Checkout API Orders (`POST /v1/orders`)
-- Webhook Mercado Pago (`POST /api/payments/pix/webhooks/mercado-pago`) com validação `x-signature` (query `data.id` lowercased no HMAC) + `GET /v1/orders/{id}` (só IDs `ORD…`/`ORDTST…`; simulação do painel → `SimulatorEvent` 200, sem Paid)
+- Webhook Mercado Pago (`POST /api/payments/pix/webhooks/mercado-pago`) com validação `x-signature` (query `data.id` lowercased no HMAC) + diagnóstico seguro de `application_id`/`user_id`/`live_mode` + fingerprint SHA256 do WebhookSecret; `GET /v1/orders/{id}` (só IDs `ORD…`/`ORDTST…`; simulação → `SimulatorEvent` 200)
 - Em `processed`/`accredited`: PixPayment Paid + Order Paid + confirmação de reserva Inventory
 - `PixPayment` nasce com status **`Pending`**
 - Amount copiado do `Total` do pedido (sem recalcular)

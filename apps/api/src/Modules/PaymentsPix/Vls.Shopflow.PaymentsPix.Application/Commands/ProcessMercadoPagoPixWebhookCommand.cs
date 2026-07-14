@@ -10,7 +10,11 @@ public sealed record ProcessMercadoPagoPixWebhookCommand(
     string? Action,
     string? Type,
     bool LiveMode,
-    string? ProviderEventId)
+    string? ProviderEventId,
+    string? ApplicationId = null,
+    string? UserId = null,
+    string? DataStatus = null,
+    string? DataStatusDetail = null)
     : IRequest<ProcessMercadoPagoPixWebhookResult>;
 
 public sealed record ProcessMercadoPagoPixWebhookResult(

@@ -71,7 +71,7 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 | **CartCheckout (backend)** | `POST/GET /api/checkout/sessions`, cancelamento, reserva de estoque na criação, compensação em falha parcial, **worker de expiração** | Confirmar sessão (pagamento real), shipping |
 | **CartCheckout (frontend)** | UI 4 etapas, `POST /api/checkout/sessions`, reserva real, cria pedido + Pix Pending | Shipping |
 | **Orders (backend)** | `POST` create + **guest status** com token; `PendingPayment` → **Paid** via webhook Pix; GETs completos Backoffice | Admin/conta UI |
-| **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API** (QR real); webhook Order assinado (query `data.id` lowercase no HMAC) + `GET /v1/orders`; Paid só com `processed`/`accredited`; simulador `123456` → `SimulatorEvent` sem Paid | Frontend QR, e-mail |
+| **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API**; webhook HMAC (query `data.id`) + logs de app/secret (`application_id`/`user_id`/fingerprint); Paid só `processed`/`accredited` | Frontend QR, e-mail |
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |
 | **Cart (frontend)** | CRUD local por `skuId`, drawer, persistência | Sincronização com backend (não previsto ainda) |

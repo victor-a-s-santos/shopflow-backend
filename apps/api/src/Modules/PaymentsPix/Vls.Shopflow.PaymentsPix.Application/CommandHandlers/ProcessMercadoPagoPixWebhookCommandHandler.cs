@@ -5,6 +5,7 @@ using Vls.Shopflow.PaymentsPix.Application.Commands;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
 using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Application.Repositories;
+using Vls.Shopflow.PaymentsPix.Application.Security;
 using Vls.Shopflow.PaymentsPix.Domain.Entities;
 using Vls.Shopflow.PaymentsPix.Domain.Enums;
 
@@ -57,9 +58,11 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
             dataIdFromQuery,
             options.WebhookSecret);
 
+        LogWebhookEnvelope(command, dataIdFromQuery, dataIdFromBody, signatureResult.IsValid, signatureResult.FailureReasonCode);
+
         if (!signatureResult.IsValid)
         {
-            LogSignatureFailure(signatureResult, dataIdFromBody);
+            LogSignatureFailure(signatureResult, command, dataIdFromQuery, dataIdFromBody, options);
             return new ProcessMercadoPagoPixWebhookResult(
                 401,
                 "InvalidSignature",
@@ -117,9 +120,8 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
 
         var providerOrderId = dataIdFromQuery;
         logger.LogInformation(
-            "Mercado Pago webhook received. MaskedOrderId={MaskedOrderId} DataIdSource=query SignatureValid=true LiveMode={LiveMode} Type={Type} Action={Action}",
+            "Mercado Pago webhook accepted after signature. MaskedOrderId={MaskedOrderId} Type={Type} Action={Action}",
             MaskProviderOrderId(providerOrderId),
-            command.LiveMode,
             command.Type,
             command.Action);
 
@@ -668,38 +670,112 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
         return Guid.TryParse(externalReference, out var parsed) && parsed == orderId;
     }
 
+    private void LogWebhookEnvelope(
+        ProcessMercadoPagoPixWebhookCommand command,
+        string? dataIdFromQuery,
+        string? dataIdFromBody,
+        bool signatureValid,
+        string? failureReasonCode)
+    {
+        var options = mercadoPagoOptions.Value;
+        var bodyAppId = Normalize(command.ApplicationId);
+        var bodyUserId = Normalize(command.UserId);
+        var configuredAppId = Normalize(options.ApplicationId);
+        var configuredUserId = Normalize(options.UserId);
+
+        logger.LogInformation(
+            "Mercado Pago webhook envelope. " +
+            "body_application_id={BodyApplicationId} configured_application_id={ConfiguredApplicationId} " +
+            "application_id_matches_config={ApplicationIdMatches} " +
+            "body_user_id={BodyUserId} configured_user_id={ConfiguredUserId} user_id_matches_config={UserIdMatches} " +
+            "body_live_mode={BodyLiveMode} configured_environment={ConfiguredEnvironment} " +
+            "type={Type} action={Action} " +
+            "query_data_id_masked={QueryDataIdMasked} body_data_id_masked={BodyDataIdMasked} " +
+            "data_status={DataStatus} data_status_detail={DataStatusDetail} " +
+            "signature_valid={SignatureValid} failure_reason={FailureReason}",
+            bodyAppId,
+            configuredAppId,
+            IdsMatch(bodyAppId, configuredAppId),
+            bodyUserId,
+            configuredUserId,
+            IdsMatch(bodyUserId, configuredUserId),
+            command.LiveMode,
+            options.Environment,
+            command.Type,
+            command.Action,
+            string.IsNullOrWhiteSpace(dataIdFromQuery) ? null : MaskProviderOrderId(dataIdFromQuery),
+            string.IsNullOrWhiteSpace(dataIdFromBody) ? null : MaskProviderOrderId(dataIdFromBody),
+            command.DataStatus,
+            command.DataStatusDetail,
+            signatureValid,
+            signatureValid ? null : failureReasonCode);
+    }
+
     private void LogSignatureFailure(
         MercadoPagoWebhookSignatureValidationResult signatureResult,
-        string? dataIdFromBody)
+        ProcessMercadoPagoPixWebhookCommand command,
+        string? dataIdFromQuery,
+        string? dataIdFromBody,
+        MercadoPagoOptions options)
     {
         var d = signatureResult.Diagnostics;
+        var secretFingerprint = MercadoPagoSecretFingerprint.Compute(options.WebhookSecret);
+        var bodyAppId = Normalize(command.ApplicationId);
+        var bodyUserId = Normalize(command.UserId);
+        var configuredAppId = Normalize(options.ApplicationId);
+        var configuredUserId = Normalize(options.UserId);
+
         logger.LogWarning(
-            "Mercado Pago webhook signature invalid. " +
+            "Mercado Pago webhook signature invalid (possible AccessToken/WebhookSecret/app mismatch). " +
             "has_x_signature={HasXSignature} has_x_request_id={HasXRequestId} has_query_data_id={HasQueryDataId} " +
             "has_body_data_id={HasBodyDataId} query_data_id_masked={QueryDataIdMasked} body_data_id_masked={BodyDataIdMasked} " +
             "data_id_query_was_lowercased={DataIdLowercased} ts_present={TsPresent} v1_present={V1Present} " +
             "request_id_masked={RequestIdMasked} secret_configured={SecretConfigured} " +
+            "webhook_secret_fingerprint={WebhookSecretFingerprint} " +
             "timestamp_age_seconds={TimestampAgeSeconds} timestamp_within_tolerance={TimestampWithinTolerance} " +
             "received_v1_prefix={ReceivedV1Prefix} computed_official_prefix={ComputedPrefix} " +
-            "manifest_parts_included={ManifestParts} failure_reason={FailureReasonCode} detail={Detail}",
+            "manifest_parts_included={ManifestParts} failure_reason={FailureReasonCode} detail={Detail} " +
+            "body_application_id={BodyApplicationId} configured_application_id={ConfiguredApplicationId} " +
+            "application_id_matches_config={ApplicationIdMatches} " +
+            "body_user_id={BodyUserId} configured_user_id={ConfiguredUserId} user_id_matches_config={UserIdMatches} " +
+            "body_live_mode={BodyLiveMode} configured_environment={ConfiguredEnvironment} type={Type} action={Action}",
             d.HasXSignature,
             d.HasXRequestId,
             d.HasQueryDataId,
             !string.IsNullOrWhiteSpace(dataIdFromBody),
-            d.QueryDataIdMasked,
+            d.QueryDataIdMasked ?? (string.IsNullOrWhiteSpace(dataIdFromQuery) ? null : MaskProviderOrderId(dataIdFromQuery)),
             string.IsNullOrWhiteSpace(dataIdFromBody) ? null : MaskProviderOrderId(dataIdFromBody),
             d.DataIdQueryWasLowercased,
             d.TsPresent,
             d.V1Present,
             d.RequestIdMasked,
             d.SecretConfigured,
+            secretFingerprint,
             d.TimestampAgeSeconds,
             d.TimestampWithinTolerance,
             d.ReceivedV1Prefix,
             d.ComputedOfficialPrefix,
             d.ManifestPartsIncluded,
             signatureResult.FailureReasonCode,
-            signatureResult.FailureReason);
+            signatureResult.FailureReason,
+            bodyAppId,
+            configuredAppId,
+            IdsMatch(bodyAppId, configuredAppId),
+            bodyUserId,
+            configuredUserId,
+            IdsMatch(bodyUserId, configuredUserId),
+            command.LiveMode,
+            options.Environment,
+            command.Type,
+            command.Action);
+    }
+
+    private static bool? IdsMatch(string? left, string? right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+            return null;
+
+        return string.Equals(left, right, StringComparison.Ordinal);
     }
 
     private async Task<(MercadoPagoWebhookEvent Event, ProcessMercadoPagoPixWebhookResult? AlreadyResult)>

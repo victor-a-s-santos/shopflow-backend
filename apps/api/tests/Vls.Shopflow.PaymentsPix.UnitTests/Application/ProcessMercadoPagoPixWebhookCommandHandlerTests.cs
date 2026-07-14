@@ -680,6 +680,77 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
         orderWriter.Verify(x => x.MarkAsPaidAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_InvalidSignature_WithBodyApplicationIds_StillReturns401()
+    {
+        var signature = new Mock<IMercadoPagoWebhookSignatureValidator>();
+        var diagnostics = new MercadoPagoWebhookSignatureDiagnostics(
+            true, true, true, true, true, true, true, 12, true, "aabbccdd", "11223344",
+            "id/request-id/ts", "ORDTS…9S2", "2066ca…dd06", "signature_mismatch");
+        signature.Setup(x => x.Validate(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>()))
+            .Returns(new MercadoPagoWebhookSignatureValidationResult(
+                false, "Signature mismatch.", "signature_mismatch", diagnostics));
+
+        var handler = CreateHandler(
+            signatureValidator: signature.Object,
+            mercadoPagoOptions: new MercadoPagoOptions
+            {
+                WebhookSecret = "configured-secret",
+                ApplicationId = "111111",
+                UserId = "222222",
+                Environment = "Sandbox"
+            });
+
+        var result = await handler.Handle(
+            new ProcessMercadoPagoPixWebhookCommand(
+                "ORDTST01KXGT3VPJ322GGMGAN6P0G9S2",
+                "ORDTST01KXGT3VPJ322GGMGAN6P0G9S2",
+                "ts=1,v1=abc",
+                "req",
+                "order.updated",
+                "order",
+                false,
+                "evt-1",
+                ApplicationId: "999999",
+                UserId: "888888",
+                DataStatus: "action_required",
+                DataStatusDetail: "waiting_transfer"),
+            CancellationToken.None);
+
+        result.StatusCode.Should().Be(401);
+        result.Outcome.Should().Be("InvalidSignature");
+    }
+
+    [Fact]
+    public async Task Handle_MissingBodyApplicationIds_DoesNotBreakValidFlow()
+    {
+        var orderId = Guid.NewGuid();
+        const string providerOrderId = "ORD01NOAPPIDS";
+        var payment = CreatePendingPayment(orderId, 10m, providerOrderId);
+
+        var paymentRepo = new Mock<IPixPaymentRepository>();
+        paymentRepo.Setup(x => x.GetByProviderOrderIdAsync(providerOrderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payment);
+
+        var orderClient = new Mock<IMercadoPagoOrderClient>();
+        orderClient.Setup(x => x.GetOrderAsync(providerOrderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FoundLookup(OrderLookup(providerOrderId, "action_required", "waiting_transfer", orderId, 10m)));
+
+        var handler = CreateHandler(
+            signatureValidator: ValidSignature().Object,
+            orderClient: orderClient.Object,
+            paymentRepository: paymentRepo.Object);
+
+        var result = await handler.Handle(
+            new ProcessMercadoPagoPixWebhookCommand(
+                providerOrderId, null, "sig", "req", "order.updated", "order", false, null,
+                ApplicationId: null, UserId: null, DataStatus: null, DataStatusDetail: null),
+            CancellationToken.None);
+
+        result.Outcome.Should().Be("Pending");
+        payment.Status.Should().Be(PixPaymentStatus.Pending);
+    }
+
     private static Mock<IMercadoPagoWebhookSignatureValidator> ValidSignature()
     {
         var signature = new Mock<IMercadoPagoWebhookSignatureValidator>();
@@ -725,14 +796,15 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
         IOrderPaidWriter? orderPaidWriter = null,
         ICheckoutReservationIdsReader? reservationIdsReader = null,
         IInventoryReservationConfirmer? reservationConfirmer = null,
-        IPaymentsPixUnitOfWork? unitOfWork = null)
+        IPaymentsPixUnitOfWork? unitOfWork = null,
+        MercadoPagoOptions? mercadoPagoOptions = null)
     {
         var webhookEvents = webhookEventRepository ?? Mock.Of<IMercadoPagoWebhookEventRepository>();
         var uow = unitOfWork ?? Mock.Of<IPaymentsPixUnitOfWork>(x =>
             x.SaveChangesAsync(It.IsAny<CancellationToken>()) == Task.FromResult(1));
 
         return new ProcessMercadoPagoPixWebhookCommandHandler(
-            Options.Create(new MercadoPagoOptions { WebhookSecret = "secret" }),
+            Options.Create(mercadoPagoOptions ?? new MercadoPagoOptions { WebhookSecret = "secret" }),
             signatureValidator ?? ValidSignature().Object,
             orderClient ?? Mock.Of<IMercadoPagoOrderClient>(),
             paymentRepository ?? Mock.Of<IPixPaymentRepository>(),

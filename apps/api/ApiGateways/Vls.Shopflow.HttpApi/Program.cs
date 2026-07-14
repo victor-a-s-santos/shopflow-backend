@@ -130,17 +130,32 @@ var app = builder.Build();
     var mpEnvironment = builder.Configuration["MercadoPago:Environment"] ?? "(unset)";
     var accessTokenConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["MercadoPago:AccessToken"]);
     var webhookSecretConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["MercadoPago:WebhookSecret"]);
-    var notificationUrlConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["MercadoPago:NotificationUrl"]);
+    var notificationUrl = builder.Configuration["MercadoPago:NotificationUrl"];
+    var notificationUrlConfigured = !string.IsNullOrWhiteSpace(notificationUrl);
+    var configuredApplicationId = builder.Configuration["MercadoPago:ApplicationId"];
+    var configuredUserId = builder.Configuration["MercadoPago:UserId"];
+    var webhookSecretFingerprint = app.Environment.IsProduction()
+        ? null
+        : Vls.Shopflow.PaymentsPix.Application.Security.MercadoPagoSecretFingerprint.Compute(
+            builder.Configuration["MercadoPago:WebhookSecret"]);
     paymentsPixLogger.LogInformation(
         "PaymentsPix provider: {Provider}. MercadoPago environment: {Environment}. " +
         "MercadoPago access token configured: {AccessTokenConfigured}. " +
         "MercadoPago webhook secret configured: {WebhookSecretConfigured}. " +
-        "MercadoPago notification URL configured: {NotificationUrlConfigured}.",
+        "MercadoPago notification URL configured: {NotificationUrlConfigured}. " +
+        "MercadoPago notification URL: {NotificationUrl}. " +
+        "MercadoPago application_id configured: {ApplicationIdConfigured}. " +
+        "MercadoPago user_id configured: {UserIdConfigured}. " +
+        "MercadoPago webhook_secret_fingerprint: {WebhookSecretFingerprint}.",
         provider,
         mpEnvironment,
         accessTokenConfigured,
         webhookSecretConfigured,
-        notificationUrlConfigured);
+        notificationUrlConfigured,
+        notificationUrlConfigured ? notificationUrl : "(unset)",
+        string.IsNullOrWhiteSpace(configuredApplicationId) ? "(unset)" : configuredApplicationId.Trim(),
+        string.IsNullOrWhiteSpace(configuredUserId) ? "(unset)" : configuredUserId.Trim(),
+        webhookSecretFingerprint ?? "(hidden-in-production)");
 }
 
 

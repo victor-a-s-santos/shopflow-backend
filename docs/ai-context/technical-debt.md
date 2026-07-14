@@ -50,7 +50,7 @@
 | Worker expiração checkout | `Vls.Shopflow.Worker` + `ExpirationProcessor` |
 | IdentityAccess admin (Fase 1/2) | Cookie admin, CSRF, policy Backoffice |
 | Demo catalog seed roupas | 10 produtos, 94 SKUs, imagens em `seed-assets/` |
-| Mercado Pago Pix provider + webhook | QR real + Paid + confirma estoque (`MP-PIX-002`); HMAC oficial (query `data.id` lowercase); simulação painel → SimulatorEvent/LookupFailed (sem stack 400) |
+| Mercado Pago Pix provider + webhook | QR real + Paid (`MP-PIX-002`); HMAC oficial; logs de app/secret mismatch (`application_id`, fingerprint); simulador → SimulatorEvent |
 
 ---
 

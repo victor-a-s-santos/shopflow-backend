@@ -36,12 +36,28 @@ public static class PaymentsPixEndpoints
             var dataIdFromQuery = request.Query["data.id"].FirstOrDefault();
 
             string? dataIdFromBody = null;
-            if (root.TryGetProperty("data", out var dataElement)
-                && dataElement.TryGetProperty("id", out var idElement))
+            string? dataStatus = null;
+            string? dataStatusDetail = null;
+            if (root.TryGetProperty("data", out var dataElement))
             {
-                dataIdFromBody = idElement.ValueKind == JsonValueKind.Number
-                    ? idElement.GetRawText()
-                    : idElement.GetString();
+                if (dataElement.TryGetProperty("id", out var idElement))
+                {
+                    dataIdFromBody = idElement.ValueKind == JsonValueKind.Number
+                        ? idElement.GetRawText()
+                        : idElement.GetString();
+                }
+
+                if (dataElement.TryGetProperty("status", out var statusElement)
+                    && statusElement.ValueKind == JsonValueKind.String)
+                {
+                    dataStatus = statusElement.GetString();
+                }
+
+                if (dataElement.TryGetProperty("status_detail", out var statusDetailElement)
+                    && statusDetailElement.ValueKind == JsonValueKind.String)
+                {
+                    dataStatusDetail = statusDetailElement.GetString();
+                }
             }
 
             var providerEventId = root.TryGetProperty("id", out var eventIdElement)
@@ -61,6 +77,9 @@ public static class PaymentsPixEndpoints
             var liveMode = root.TryGetProperty("live_mode", out var liveModeElement)
                            && liveModeElement.ValueKind is JsonValueKind.True;
 
+            var applicationId = ReadJsonStringOrNumber(root, "application_id");
+            var userId = ReadJsonStringOrNumber(root, "user_id");
+
             var result = await sender.Send(
                 new ProcessMercadoPagoPixWebhookCommand(
                     dataIdFromQuery,
@@ -70,7 +89,11 @@ public static class PaymentsPixEndpoints
                     action,
                     type,
                     liveMode,
-                    providerEventId),
+                    providerEventId,
+                    applicationId,
+                    userId,
+                    dataStatus,
+                    dataStatusDetail),
                 ct);
 
             return Results.Json(
@@ -106,5 +129,18 @@ public static class PaymentsPixEndpoints
         .RequireAuthorization(AuthPolicies.Backoffice);
 
         return group;
+    }
+
+    private static string? ReadJsonStringOrNumber(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var element))
+            return null;
+
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.GetRawText(),
+            _ => null
+        };
     }
 }

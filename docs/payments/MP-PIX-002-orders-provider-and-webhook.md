@@ -127,6 +127,30 @@ Shopflow: assinatura válida **sem** query `data.id` → `200 MissingQueryDataId
 Mismatch: log seguro com flags/máscaras/prefixes de v1 — **sem** secret, AccessToken, x-signature completa ou v1 completo.
 
 Diagnóstico de `signature_mismatch`: secret da **mesma** app do AccessToken, evento **Order (Mercado Pago)**, URL com query preservada, HMAC com query `data.id` (não body).
+
+### Validar app / AccessToken / WebhookSecret (mesmo mismatch operacional)
+
+Quando o manifest oficial está correto mas o HMAC ainda diverge, a causa mais comum é **secret de outra aplicação/ambiente**.
+
+No log do webhook (sempre) e no mismatch (Warning):
+
+| Campo log | Comparar com |
+|-----------|----------------|
+| `body_application_id` | App ID no painel MP onde o **WebhookSecret** foi copiado; e `MercadoPago__ApplicationId` se preenchido |
+| `body_user_id` | User/seller da conta; `MercadoPago__UserId` se preenchido |
+| `body_live_mode` | `false` → credenciais/URL de teste; `true` → produção |
+| `configured_environment` | `MercadoPago__Environment` (Sandbox/Production) |
+| `webhook_secret_fingerprint` | primeiros 8 hex de SHA256(secret) — comparar entre containers/envs **sem** ver o secret |
+| `application_id_matches_config` / `user_id_matches_config` | `false` ⇒ config desalinhada do body |
+
+Startup (Testing/Staging/Development): loga `NotificationUrl`, `ApplicationId`/`UserId` configurados e `webhook_secret_fingerprint`. Em Production o fingerprint fica oculto no startup (continua no log de mismatch).
+
+Checklist operacional:
+
+1. AccessToken usado em `POST /v1/orders` e WebhookSecret devem ser da **mesma** app MP.
+2. URL modo teste vs produção no painel usa secrets distintos — escolher o par certo.
+3. Evento: **Order (Mercado Pago)** / tópico `orders`.
+4. Preencher `MercadoPago__ApplicationId` e `MercadoPago__UserId` nos `.env` ajuda a ver `*_matches_config=false` imediatamente.
 ## Migration
 
 `AddPixPaymentOrdersApiFields` — colunas Orders em `pix_payments`; renomeia `mercado_pago_webhook_events.ProviderPaymentId` → `ProviderOrderId`.
