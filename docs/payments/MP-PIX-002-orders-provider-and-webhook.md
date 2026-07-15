@@ -36,15 +36,40 @@ MercadoPago__AccessToken=APP_USR-...
 MercadoPago__PublicKey=
 MercadoPago__WebhookSecret=
 MercadoPago__NotificationUrl=https://api-hml.seudominio.com.br/api/payments/pix/webhooks/mercado-pago
+# Prefer false to rely on panel Webhooks URL (create-time URLs take priority per MP docs).
+MercadoPago__SendNotificationUrlInOrderCreate=false
 MercadoPago__PixExpirationMinutes=30
 MercadoPago__WebhookSignatureToleranceMinutes=10
 # Sandbox only — order Pix de teste com auto-aprovação
 MercadoPago__SandboxPayerFirstNameOverride=APRO
+# Worker fallback — GET /v1/orders for Pending MercadoPago Pix (does not replace webhooks)
+MercadoPagoReconciliation__Enabled=false
+MercadoPagoReconciliation__IntervalSeconds=60
+MercadoPagoReconciliation__BatchSize=20
+MercadoPagoReconciliation__MaxAgeMinutes=180
 ```
 
 Alias legado: `MercadoPago__TestPayerFirstName` → `SandboxPayerFirstNameOverride`.
 
-`notification_url` **não** é enviado no payload de `POST /v1/orders` nesta etapa; configure o webhook no painel MP apontando para o endpoint Shopflow.
+### `notification_url` vs painel Webhooks
+
+Segundo a documentação Mercado Pago, **URLs enviadas na criação do pagamento têm prioridade** sobre as configuradas em “Suas integrações” / Webhooks.
+
+| `SendNotificationUrlInOrderCreate` | Comportamento |
+|------------------------------------|---------------|
+| `false` (default) | **Não** envia `notification_url` no `POST /v1/orders` → MP usa a URL do painel Webhooks |
+| `true` + `NotificationUrl` preenchida | Envia `notification_url` no payload (prioridade sobre o painel) |
+
+`NotificationUrl` no env continua útil para checklist/startup mesmo quando não é enviada no payload.
+
+**Teste de assinatura (painel):**
+
+1. Painel MP (modo teste): URL = endpoint Shopflow, evento **Order**, secret da tela Webhooks → `MercadoPago__WebhookSecret`.
+2. `MercadoPago__SendNotificationUrlInOrderCreate=false` + recriar API.
+3. Gerar Pix novo; log deve mostrar `notification_url sent: false`.
+4. Pagar no sandbox; validar `sdk_signature_valid=true` nos logs.
+
+Se com `false` o SDK passar e com URL no create falhar, a causa provável é canal/secret diferente entre URL do create e secret do painel.
 
 ## Criação (`POST /api/payments/pix/orders/{orderId}`)
 
@@ -154,16 +179,37 @@ Checklist operacional:
 2. URL modo teste vs produção no painel usa secrets distintos — escolher o par certo.
 3. Evento: **Order (Mercado Pago)** / tópico `orders`.
 4. Preencher `MercadoPago__ApplicationId` e `MercadoPago__UserId` nos `.env` ajuda a ver `*_matches_config=false` imediatamente.
+
+## Reconciliação (fallback MVP — Worker)
+
+Não substitui o webhook. Polling seguro de `PixPayment` **Pending** com `Provider=MercadoPago` e `ProviderOrderId` preenchido:
+
+1. Worker `MercadoPagoPixReconciliationWorker` (mesmo processo do Expiration).
+2. `GET /v1/orders/{ProviderOrderId}` via `IMercadoPagoOrderClient`.
+3. Mesma fonte de verdade / transição Paid do webhook (`MercadoPagoPixPaidTransitionService`): reserva → Order Paid → Pix Paid (idempotente).
+4. `action_required` / `waiting_transfer` → mantém Pending.
+5. 404/400/5xx/timeout → item ignorado na rodada (batch continua); retry na próxima.
+
+| Config | Default |
+|--------|---------|
+| `MercadoPagoReconciliation__Enabled` | `false` |
+| `IntervalSeconds` | 60 |
+| `BatchSize` | 20 |
+| `MaxAgeMinutes` | 180 |
+
+Worker precisa de `MercadoPago__AccessToken` (e `PaymentsPix__Provider=MercadoPago` quando o provider HTTP for usado; o client de GET usa o token de `MercadoPagoOptions` independentemente).
+
 ## Migration
 
 `AddPixPaymentOrdersApiFields` — colunas Orders em `pix_payments`; renomeia `mercado_pago_webhook_events.ProviderPaymentId` → `ProviderOrderId`.
 
 ## Testes
 
-`Vls.Shopflow.PaymentsPix.UnitTests` — provider Orders, order client (400/404/401/5xx sem throw crítico), assinatura, webhook Paid/Pending/Failed/mismatch/IgnoredType, painel `data.id=123456` → Ignored, ORDTST → GET, LookupFailed.
+`Vls.Shopflow.PaymentsPix.UnitTests` — provider Orders (`notification_url` opcional), order client (400/404/401/5xx sem throw crítico), assinatura, webhook Paid/Pending/Failed/mismatch/IgnoredType, reconciliação Pending/Paid/idempotente/lookup skip, painel `data.id=123456` → Ignored, ORDTST → GET, LookupFailed.
 
 ## Dívida
 
 - Refund/chargeback completo
 - Estratégia se reserva já expirou quando MP acredita
 - Frontend QR + polling/status Paid
+- Remover captura raw temporária (`MP-PIX-003`) após diagnóstico de signature

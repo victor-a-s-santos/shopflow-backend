@@ -166,4 +166,5 @@ Se já existir `PixPayment` com status `Pending` para o mesmo `orderId`, o endpo
 Guest status: `docs/security/SEC-006-guest-order-access-token.md`  
 Webhook + provider Orders: `docs/payments/MP-PIX-002-orders-provider-and-webhook.md`  
 Captura temporária webhook bruto (Testing/HML): `docs/payments/MP-PIX-003-webhook-raw-capture-temporary.md`  
+Orders + webhook + `notification_url` opcional + reconciliação: `docs/payments/MP-PIX-002-orders-provider-and-webhook.md`  
 Notas históricas do provider: `docs/payments-mercado-pago-pix.md`

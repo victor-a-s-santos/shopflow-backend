@@ -7,6 +7,7 @@ using Vls.Shopflow.PaymentsPix.Application.Commands;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
 using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Application.Repositories;
+using Vls.Shopflow.PaymentsPix.Application.Services;
 using Vls.Shopflow.PaymentsPix.Domain.Entities;
 using Vls.Shopflow.PaymentsPix.Domain.Enums;
 
@@ -810,6 +811,13 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
         var uow = unitOfWork ?? Mock.Of<IPaymentsPixUnitOfWork>(x =>
             x.SaveChangesAsync(It.IsAny<CancellationToken>()) == Task.FromResult(1));
 
+        var paidTransition = new MercadoPagoPixPaidTransitionService(
+            orderPaidWriter ?? Mock.Of<IOrderPaidWriter>(),
+            reservationIdsReader ?? Mock.Of<ICheckoutReservationIdsReader>(),
+            reservationConfirmer ?? Mock.Of<IInventoryReservationConfirmer>(),
+            uow,
+            NullLogger<MercadoPagoPixPaidTransitionService>.Instance);
+
         return new ProcessMercadoPagoPixWebhookCommandHandler(
             Options.Create(mercadoPagoOptions ?? new MercadoPagoOptions { WebhookSecret = "secret" }),
             signatureValidator ?? ValidSignature().Object,
@@ -817,9 +825,7 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
             orderClient ?? Mock.Of<IMercadoPagoOrderClient>(),
             paymentRepository ?? Mock.Of<IPixPaymentRepository>(),
             webhookEvents,
-            orderPaidWriter ?? Mock.Of<IOrderPaidWriter>(),
-            reservationIdsReader ?? Mock.Of<ICheckoutReservationIdsReader>(),
-            reservationConfirmer ?? Mock.Of<IInventoryReservationConfirmer>(),
+            paidTransition,
             uow,
             NullLogger<ProcessMercadoPagoPixWebhookCommandHandler>.Instance);
     }

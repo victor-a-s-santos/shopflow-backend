@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
@@ -17,6 +18,11 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
+    };
+
+    private static readonly JsonSerializerOptions RequestJsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
     private readonly HttpClient _httpClient;
@@ -62,12 +68,16 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
         var externalReference = request.OrderId.ToString("D");
         var idempotencyKey = externalReference;
 
+        var notificationUrlConfigured = !string.IsNullOrWhiteSpace(_options.NotificationUrl);
+        var notificationUrlSent = _options.SendNotificationUrlInOrderCreate && notificationUrlConfigured;
+
         var payload = new MercadoPagoCreateOrderRequest
         {
             Type = "online",
             ExternalReference = externalReference,
             TotalAmount = amount,
             ProcessingMode = "automatic",
+            NotificationUrl = notificationUrlSent ? _options.NotificationUrl.Trim() : null,
             Payer = new MercadoPagoOrderPayerRequest
             {
                 Email = payerEmail,
@@ -94,16 +104,19 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "v1/orders")
         {
-            Content = JsonContent.Create(payload)
+            Content = JsonContent.Create(payload, options: RequestJsonOptions)
         };
 
         httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.AccessToken);
         httpRequest.Headers.Add("X-Idempotency-Key", idempotencyKey);
 
         _logger.LogInformation(
-            "Creating Mercado Pago Pix order for Shopflow order {OrderId} amount {Amount}",
+            "Creating Mercado Pago Pix order for Shopflow order {OrderId} amount {Amount}. " +
+            "MercadoPago notification_url sent: {NotificationUrlSent}. NotificationUrl configured: {NotificationUrlConfigured}.",
             request.OrderId,
-            request.Amount);
+            request.Amount,
+            notificationUrlSent,
+            notificationUrlConfigured);
 
         using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);

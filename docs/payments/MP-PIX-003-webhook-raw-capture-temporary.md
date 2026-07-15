@@ -44,6 +44,16 @@ Campos úteis: `raw_query_string`, `query_data_id_exact`, `header_x_request_id_e
 - `x-signature` completo em log (não é a secret, mas não compartilhar publicamente).
 - Body JSON truncado — ainda assim só em Testing/HML.
 
+## Relação com `notification_url`
+
+Antes de capturar raw em loops longos, teste o canal do painel:
+
+```env
+MercadoPago__SendNotificationUrlInOrderCreate=false
+```
+
+Documentação MP: URL enviada na criação da order tem prioridade sobre a URL do painel Webhooks. Ver `MP-PIX-002`.
+
 ## Como desabilitar / remover
 
 1. `MercadoPago__WebhookRawCaptureEnabled=false` (ou remover a var) e recriar o container.

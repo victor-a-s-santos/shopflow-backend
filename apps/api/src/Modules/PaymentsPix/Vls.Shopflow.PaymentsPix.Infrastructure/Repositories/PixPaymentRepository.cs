@@ -57,4 +57,19 @@ public sealed class PixPaymentRepository(PaymentsPixDbContext db) : IPixPaymentR
             .OrderBy(p => p.ExpiresAt ?? p.CreatedAt)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PixPayment>> GetPendingMercadoPagoForReconciliationBatchAsync(
+        DateTimeOffset createdAfterUtc,
+        int batchSize,
+        CancellationToken cancellationToken)
+        => await db.PixPayments
+            .Where(p =>
+                p.Status == PixPaymentStatus.Pending
+                && p.Provider == PixPaymentProviderType.MercadoPago
+                && p.ProviderOrderId != null
+                && p.ProviderOrderId != ""
+                && p.CreatedAt >= createdAfterUtc)
+            .OrderBy(p => p.CreatedAt)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
 }

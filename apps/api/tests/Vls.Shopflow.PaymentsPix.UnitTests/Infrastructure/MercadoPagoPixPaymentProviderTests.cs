@@ -113,6 +113,61 @@ public sealed class MercadoPagoPixPaymentProviderTests
     }
 
     [Fact]
+    public async Task CreatePixChargeAsync_WhenSendNotificationUrlFalse_OmitsNotificationUrl()
+    {
+        string? requestBody = null;
+        var handler = new StubHttpMessageHandler((request, _) =>
+        {
+            requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return SuccessOrderResponse();
+        });
+
+        var provider = CreateProvider(
+            handler,
+            new MercadoPagoOptions
+            {
+                AccessToken = "test-access-token",
+                NotificationUrl = "https://api-teste.example/api/payments/pix/webhooks/mercado-pago",
+                SendNotificationUrlInOrderCreate = false
+            });
+
+        await provider.CreatePixChargeAsync(
+            new PixChargeRequest(Guid.NewGuid(), 10m, "João", "a@b.com", DateTimeOffset.UtcNow.AddMinutes(30)),
+            CancellationToken.None);
+
+        using var json = JsonDocument.Parse(requestBody!);
+        json.RootElement.TryGetProperty("notification_url", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreatePixChargeAsync_WhenSendNotificationUrlTrue_IncludesNotificationUrl()
+    {
+        const string notificationUrl = "https://api-teste.example/api/payments/pix/webhooks/mercado-pago";
+        string? requestBody = null;
+        var handler = new StubHttpMessageHandler((request, _) =>
+        {
+            requestBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return SuccessOrderResponse();
+        });
+
+        var provider = CreateProvider(
+            handler,
+            new MercadoPagoOptions
+            {
+                AccessToken = "test-access-token",
+                NotificationUrl = notificationUrl,
+                SendNotificationUrlInOrderCreate = true
+            });
+
+        await provider.CreatePixChargeAsync(
+            new PixChargeRequest(Guid.NewGuid(), 10m, "João", "a@b.com", DateTimeOffset.UtcNow.AddMinutes(30)),
+            CancellationToken.None);
+
+        using var json = JsonDocument.Parse(requestBody!);
+        json.RootElement.GetProperty("notification_url").GetString().Should().Be(notificationUrl);
+    }
+
+    [Fact]
     public async Task CreatePixChargeAsync_WhenAccessTokenMissing_Throws()
     {
         var handler = new StubHttpMessageHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK));
@@ -146,12 +201,44 @@ public sealed class MercadoPagoPixPaymentProviderTests
         MercadoPagoPixPaymentProvider.FormatAmount(100m).Should().Be("100.00");
     }
 
-    private static MercadoPagoPixPaymentProvider CreateProvider(HttpMessageHandler handler)
+    private static MercadoPagoPixPaymentProvider CreateProvider(
+        HttpMessageHandler handler,
+        MercadoPagoOptions? options = null)
     {
         return new MercadoPagoPixPaymentProvider(
             new HttpClient(handler) { BaseAddress = new Uri("https://api.mercadopago.com/") },
-            Options.Create(new MercadoPagoOptions { AccessToken = "test-access-token" }),
+            Options.Create(options ?? new MercadoPagoOptions { AccessToken = "test-access-token" }),
             NullLogger<MercadoPagoPixPaymentProvider>.Instance);
+    }
+
+    private static HttpResponseMessage SuccessOrderResponse()
+    {
+        const string responseJson = """
+            {
+              "id": "ORD01JP84C939T20S0P1DN382FQ6K",
+              "status": "action_required",
+              "status_detail": "waiting_transfer",
+              "transactions": {
+                "payments": [
+                  {
+                    "id": "PAY01JP84C939T20S0P1DN6FCMWQC",
+                    "status": "action_required",
+                    "status_detail": "waiting_transfer",
+                    "payment_method": {
+                      "id": "pix",
+                      "type": "bank_transfer",
+                      "qr_code": "00020126580014BR.GOV.BCB.PIX0136abc123"
+                    }
+                  }
+                ]
+              }
+            }
+            """;
+
+        return new HttpResponseMessage(HttpStatusCode.Created)
+        {
+            Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+        };
     }
 
     private sealed class StubHttpMessageHandler(

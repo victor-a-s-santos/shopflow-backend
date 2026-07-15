@@ -55,6 +55,7 @@ services:
       MercadoPago__BaseUrl: ${MercadoPago__BaseUrl:-https://api.mercadopago.com}
       MercadoPago__WebhookSecret: ${MercadoPago__WebhookSecret:-}
       MercadoPago__NotificationUrl: ${MercadoPago__NotificationUrl:-}
+      MercadoPago__SendNotificationUrlInOrderCreate: ${MercadoPago__SendNotificationUrlInOrderCreate:-false}
       MercadoPago__PixExpirationMinutes: ${MercadoPago__PixExpirationMinutes:-30}
       MercadoPago__WebhookSignatureToleranceMinutes: ${MercadoPago__WebhookSignatureToleranceMinutes:-10}
       MercadoPago__SandboxPayerFirstNameOverride: ${MercadoPago__SandboxPayerFirstNameOverride:-}
@@ -92,6 +93,15 @@ services:
       ExpirationWorker__Enabled: "true"
       ExpirationWorker__IntervalSeconds: "60"
       ExpirationWorker__BatchSize: "50"
+      PaymentsPix__Provider: ${PaymentsPix__Provider:-Fake}
+      MercadoPago__Enabled: ${MercadoPago__Enabled:-false}
+      MercadoPago__Environment: ${MercadoPago__Environment:-Sandbox}
+      MercadoPago__AccessToken: ${MercadoPago__AccessToken:-}
+      MercadoPago__BaseUrl: ${MercadoPago__BaseUrl:-https://api.mercadopago.com}
+      MercadoPagoReconciliation__Enabled: ${MercadoPagoReconciliation__Enabled:-false}
+      MercadoPagoReconciliation__IntervalSeconds: ${MercadoPagoReconciliation__IntervalSeconds:-60}
+      MercadoPagoReconciliation__BatchSize: ${MercadoPagoReconciliation__BatchSize:-20}
+      MercadoPagoReconciliation__MaxAgeMinutes: ${MercadoPagoReconciliation__MaxAgeMinutes:-180}
     restart: unless-stopped
 
 volumes:

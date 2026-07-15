@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
 using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Application.Repositories;
+using Vls.Shopflow.PaymentsPix.Application.Services;
 using Vls.Shopflow.PaymentsPix.Infrastructure.MercadoPago;
 using Vls.Shopflow.PaymentsPix.Infrastructure.Providers;
 using Vls.Shopflow.PaymentsPix.Infrastructure.Repositories;
@@ -48,6 +49,8 @@ public static class DependencyInjection
 
         services.Configure<PaymentsPixOptions>(configuration.GetSection(PaymentsPixOptions.SectionName));
         services.Configure<MercadoPagoOptions>(configuration.GetSection(MercadoPagoOptions.SectionName));
+        services.Configure<MercadoPagoReconciliationOptions>(
+            configuration.GetSection(MercadoPagoReconciliationOptions.SectionName));
 
         return services.AddPaymentsPixModule(cs, configuration, enableSensitiveLoggingOnDev);
     }
@@ -61,6 +64,8 @@ public static class DependencyInjection
         services.AddScoped<IOrderPaidWriter, OrderPaidWriter>();
         services.AddScoped<ICheckoutReservationIdsReader, CheckoutReservationIdsReader>();
         services.AddScoped<IInventoryReservationConfirmer, InventoryReservationConfirmer>();
+        services.AddScoped<IMercadoPagoPixPaidTransitionService, MercadoPagoPixPaidTransitionService>();
+        services.AddScoped<IMercadoPagoPixReconciliationProcessor, MercadoPagoPixReconciliationProcessor>();
         services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.IOrderPixPaymentStatusReader, OrderPixPaymentStatusReader>();
         services.AddSingleton<IMercadoPagoOfficialWebhookSignatureClient, MercadoPagoOfficialWebhookSignatureClient>();
         services.AddSingleton<ManualMercadoPagoWebhookSignatureValidator>();

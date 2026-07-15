@@ -16,6 +16,13 @@ internal sealed class MercadoPagoCreateOrderRequest
     [JsonPropertyName("processing_mode")]
     public string ProcessingMode { get; init; } = "automatic";
 
+    /// <summary>
+    /// Optional. When set, MP prioritizes this URL over the Webhooks panel URL.
+    /// Omit (null) to use panel-configured Webhooks only.
+    /// </summary>
+    [JsonPropertyName("notification_url")]
+    public string? NotificationUrl { get; init; }
+
     [JsonPropertyName("payer")]
     public MercadoPagoOrderPayerRequest Payer { get; init; } = new();
 

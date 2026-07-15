@@ -22,6 +22,14 @@ public interface IPixPaymentRepository
         DateTimeOffset createdBeforeUtc,
         int batchSize,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Pending MercadoPago Pix with ProviderOrderId, created on/after <paramref name="createdAfterUtc"/>.
+    /// </summary>
+    Task<IReadOnlyList<PixPayment>> GetPendingMercadoPagoForReconciliationBatchAsync(
+        DateTimeOffset createdAfterUtc,
+        int batchSize,
+        CancellationToken cancellationToken);
 }
 
 public interface IMercadoPagoWebhookEventRepository

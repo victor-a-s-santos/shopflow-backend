@@ -22,6 +22,13 @@ public sealed class MercadoPagoOptions
 
     public string NotificationUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// When true and <see cref="NotificationUrl"/> is set, include <c>notification_url</c> on
+    /// <c>POST /v1/orders</c>. When false (default), omit it so Mercado Pago uses the Webhooks
+    /// panel URL. MP docs: URLs sent at payment creation take priority over panel URLs.
+    /// </summary>
+    public bool SendNotificationUrlInOrderCreate { get; set; }
+
     public int PixExpirationMinutes { get; set; } = 30;
 
     public int WebhookSignatureToleranceMinutes { get; set; } = 10;

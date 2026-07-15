@@ -50,7 +50,7 @@
 | Worker expiração checkout | `Vls.Shopflow.Worker` + `ExpirationProcessor` |
 | IdentityAccess admin (Fase 1/2) | Cookie admin, CSRF, policy Backoffice |
 | Demo catalog seed roupas | 10 produtos, 94 SKUs, imagens em `seed-assets/` |
-| Mercado Pago Pix provider + webhook | QR real + Paid (`MP-PIX-002`); assinatura via `mercadopago-sdk` 3.3.0 (case preserve) + oráculo manual lowercase; simulador → SimulatorEvent |
+| Mercado Pago Pix provider + webhook | QR real + Paid (`MP-PIX-002`); `notification_url` opcional; assinatura `mercadopago-sdk` 3.3.0; reconciliação Worker fallback; raw capture temp (`MP-PIX-003`) — remover após diagnóstico |
 
 ---
 
