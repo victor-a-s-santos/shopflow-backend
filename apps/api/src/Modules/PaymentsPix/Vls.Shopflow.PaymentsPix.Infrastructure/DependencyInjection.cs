@@ -65,6 +65,9 @@ public static class DependencyInjection
         services.AddSingleton<IMercadoPagoOfficialWebhookSignatureClient, MercadoPagoOfficialWebhookSignatureClient>();
         services.AddSingleton<ManualMercadoPagoWebhookSignatureValidator>();
         services.AddSingleton<IMercadoPagoWebhookSignatureValidator, CompositeMercadoPagoWebhookSignatureValidator>();
+        services.AddSingleton<IMercadoPagoWebhookSignatureProbe, MercadoPagoWebhookSignatureProbe>();
+        // TEMPORARY DIAGNOSTIC ONLY — singleton for MaxEvents counter; remove after diagnosis.
+        services.AddSingleton<IMercadoPagoWebhookRawCapture, MercadoPagoWebhookRawCapture>();
 
         var baseUrl = configuration?["MercadoPago:BaseUrl"]?.TrimEnd('/')
                       ?? "https://api.mercadopago.com";

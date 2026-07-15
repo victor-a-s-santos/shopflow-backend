@@ -14,7 +14,13 @@ public sealed record ProcessMercadoPagoPixWebhookCommand(
     string? ApplicationId = null,
     string? UserId = null,
     string? DataStatus = null,
-    string? DataStatusDetail = null)
+    string? DataStatusDetail = null,
+    // TEMPORARY DIAGNOSTIC ONLY — populated by HTTP layer for raw capture in Testing/HML.
+    string? RawQueryString = null,
+    string? QueryTypeExact = null,
+    string? BodyRawJson = null,
+    string? RequestPath = null,
+    string? RequestMethod = null)
     : IRequest<ProcessMercadoPagoPixWebhookResult>;
 
 public sealed record ProcessMercadoPagoPixWebhookResult(

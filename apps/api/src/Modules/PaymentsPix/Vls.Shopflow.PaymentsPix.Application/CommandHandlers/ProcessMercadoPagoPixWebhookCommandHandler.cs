@@ -14,6 +14,7 @@ namespace Vls.Shopflow.PaymentsPix.Application.CommandHandlers;
 public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
     IOptions<MercadoPagoOptions> mercadoPagoOptions,
     IMercadoPagoWebhookSignatureValidator signatureValidator,
+    IMercadoPagoWebhookRawCapture webhookRawCapture,
     IMercadoPagoOrderClient orderClient,
     IPixPaymentRepository paymentRepository,
     IMercadoPagoWebhookEventRepository webhookEventRepository,
@@ -59,6 +60,28 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandler(
             options.WebhookSecret);
 
         LogWebhookEnvelope(command, dataIdFromQuery, dataIdFromBody, signatureResult.IsValid, signatureResult.FailureReasonCode);
+
+        // TEMPORARY DIAGNOSTIC ONLY — gated inside capture service (never Production).
+        webhookRawCapture.TryCapture(
+            new MercadoPagoWebhookRawCaptureInput(
+                DateTimeOffset.UtcNow,
+                command.RequestMethod ?? "POST",
+                command.RequestPath ?? "/api/payments/pix/webhooks/mercado-pago",
+                command.RawQueryString,
+                command.DataIdFromQuery,
+                command.QueryTypeExact,
+                command.XRequestId,
+                command.XSignature,
+                command.BodyRawJson,
+                command.ApplicationId,
+                command.UserId,
+                command.LiveMode,
+                command.Type,
+                command.Action,
+                command.DataIdFromBody,
+                command.DataStatus,
+                command.DataStatusDetail),
+            signatureResult);
 
         if (!signatureResult.IsValid)
         {

@@ -27,6 +27,21 @@ public sealed class MercadoPagoOptions
     public int WebhookSignatureToleranceMinutes { get; set; } = 10;
 
     /// <summary>
+    /// TEMPORARY DIAGNOSTIC ONLY. When true (and ASPNETCORE_ENVIRONMENT != Production),
+    /// logs a controlled raw webhook capture for SDK signature mismatch investigation.
+    /// Must be removed / left false after diagnosis. Never enable in Production.
+    /// </summary>
+    public bool WebhookRawCaptureEnabled { get; set; }
+
+    /// <summary>
+    /// Optional ProviderOrderId (query data.id) filter for raw capture. Case-insensitive.
+    /// </summary>
+    public string? WebhookRawCaptureOrderId { get; set; }
+
+    /// <summary>Max raw capture log events per process when OrderId filter is empty. Default 5.</summary>
+    public int WebhookRawCaptureMaxEvents { get; set; } = 5;
+
+    /// <summary>
     /// Sandbox-only override (e.g. "APRO") for predefined Pix test orders.
     /// </summary>
     public string? SandboxPayerFirstNameOverride { get; set; }

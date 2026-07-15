@@ -77,7 +77,8 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
             .Returns(new MercadoPagoWebhookSignatureValidationResult(
                 false, "Signature mismatch.", "signature_mismatch", diagnostics));
 
-        var handler = CreateHandler(signatureValidator: signature.Object);
+        var rawCapture = new Mock<IMercadoPagoWebhookRawCapture>();
+        var handler = CreateHandler(signatureValidator: signature.Object, webhookRawCapture: rawCapture.Object);
 
         var result = await handler.Handle(
             new ProcessMercadoPagoPixWebhookCommand("ORD1", null, "sig", "req", "order.updated", "order", false, "1"),
@@ -85,6 +86,11 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
 
         result.StatusCode.Should().Be(401);
         result.Outcome.Should().Be("InvalidSignature");
+        rawCapture.Verify(
+            x => x.TryCapture(
+                It.IsAny<MercadoPagoWebhookRawCaptureInput>(),
+                It.Is<MercadoPagoWebhookSignatureValidationResult>(r => !r.IsValid)),
+            Times.Once);
     }
 
     [Fact]
@@ -797,7 +803,8 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
         ICheckoutReservationIdsReader? reservationIdsReader = null,
         IInventoryReservationConfirmer? reservationConfirmer = null,
         IPaymentsPixUnitOfWork? unitOfWork = null,
-        MercadoPagoOptions? mercadoPagoOptions = null)
+        MercadoPagoOptions? mercadoPagoOptions = null,
+        IMercadoPagoWebhookRawCapture? webhookRawCapture = null)
     {
         var webhookEvents = webhookEventRepository ?? Mock.Of<IMercadoPagoWebhookEventRepository>();
         var uow = unitOfWork ?? Mock.Of<IPaymentsPixUnitOfWork>(x =>
@@ -806,6 +813,7 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
         return new ProcessMercadoPagoPixWebhookCommandHandler(
             Options.Create(mercadoPagoOptions ?? new MercadoPagoOptions { WebhookSecret = "secret" }),
             signatureValidator ?? ValidSignature().Object,
+            webhookRawCapture ?? Mock.Of<IMercadoPagoWebhookRawCapture>(),
             orderClient ?? Mock.Of<IMercadoPagoOrderClient>(),
             paymentRepository ?? Mock.Of<IPixPaymentRepository>(),
             webhookEvents,

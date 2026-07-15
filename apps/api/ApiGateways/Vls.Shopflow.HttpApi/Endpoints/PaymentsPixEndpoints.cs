@@ -32,8 +32,11 @@ public static class PaymentsPixEndpoints
         {
             using var document = await JsonDocument.ParseAsync(request.Body, cancellationToken: ct);
             var root = document.RootElement;
+            // TEMPORARY DIAGNOSTIC ONLY: truncated in capture service (max 8 KB). Never logged in Production.
+            var bodyRawJson = root.GetRawText();
 
             var dataIdFromQuery = request.Query["data.id"].FirstOrDefault();
+            var queryTypeExact = request.Query["type"].FirstOrDefault();
 
             string? dataIdFromBody = null;
             string? dataStatus = null;
@@ -93,7 +96,12 @@ public static class PaymentsPixEndpoints
                     applicationId,
                     userId,
                     dataStatus,
-                    dataStatusDetail),
+                    dataStatusDetail,
+                    request.QueryString.HasValue ? request.QueryString.Value : null,
+                    queryTypeExact,
+                    bodyRawJson,
+                    request.Path.Value,
+                    request.Method),
                 ct);
 
             return Results.Json(
