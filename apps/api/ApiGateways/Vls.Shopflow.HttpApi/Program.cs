@@ -637,6 +637,10 @@ app.MapGroup("/api").MapCheckoutEndpoints();
 
 app.MapGroup("/api").MapOrdersEndpoints();
 
+app.MapGroup("/api").MapAdminOrdersEndpoints();
+
+app.MapGroup("/api").MapCustomerOrdersEndpoints();
+
 app.MapGroup("/api").MapPaymentsPixEndpoints();
 
 

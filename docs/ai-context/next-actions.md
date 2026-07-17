@@ -10,6 +10,8 @@
 - [x] **IdentityAccess Fase 1/2** — admin auth, CSRF, SEC-004 hardening
 - [x] Integração frontend Checkout com `POST /api/checkout/sessions`, Orders e PaymentsPix
 - [x] Módulo **Orders** backend MVP (`PendingPayment`, snapshot da sessão)
+- [x] **Admin Orders backend** — `GET /api/admin/orders` + detalhe (`docs/orders/admin-orders.md`)
+- [x] **Customer Orders backend** — `GET /api/customer/orders` + `CustomerUserId` (`docs/orders/customer-orders.md`)
 - [x] Módulo **PaymentsPix** backend MVP (provider fake, `PixPayment` Pending)
 - [x] **Worker de expiração** — `CheckoutSession`/`Order`/`PixPayment` pendentes + liberação de estoque (`docs/expiration-worker.md`)
 - [x] **Demo catalog seed (roupas)** — 10 produtos, 94 SKUs, 20 imagens, estoque inicial (`docs/catalog-demo-seed.md`)
@@ -40,6 +42,8 @@
 | 3 | **Frontend batch Inventory** | Backend `POST /api/admin/inventory/skus/availability` pronto; reduzir N+1 no Product Edit |
 | 4 | **Gateway Pix real + webhook** | Cobrança real (pausado até HML/domínio se necessário) |
 | 5 | **Frontend guest order status + Account** | Token backend pronto (`SEC-006`); wiring UI Pix |
+| 5b | **Frontend Admin Orders** | Backend `/api/admin/orders` pronto; listagem + detalhe no painel |
+| 5c | **Frontend Customer Orders** | Backend `/api/customer/orders` pronto; “Meus pedidos” |
 | 6 | **Shipping** | Frete real; hoje `ShippingAmount` é null |
 | 7 | **Notifications** | E-mail real (confirm/reset/pedido) |
 

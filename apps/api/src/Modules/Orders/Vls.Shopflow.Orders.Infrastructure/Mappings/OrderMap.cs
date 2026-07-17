@@ -35,6 +35,8 @@ internal sealed class OrderMap : IEntityTypeConfiguration<Order>
             .HasMaxLength(30)
             .IsRequired();
 
+        map.Property(x => x.CustomerUserId);
+
         map.Property(x => x.CreatedAt).IsRequired();
         map.Property(x => x.UpdatedAt);
         map.Property(x => x.PaidAt);
@@ -42,6 +44,8 @@ internal sealed class OrderMap : IEntityTypeConfiguration<Order>
 
         map.HasIndex(x => x.CustomerEmail);
         map.HasIndex(x => x.CreatedAt);
+        map.HasIndex(x => new { x.CustomerUserId, x.CreatedAt })
+            .HasDatabaseName("IX_orders_CustomerUserId_CreatedAt");
 
         map.HasMany(x => x.Items)
             .WithOne()

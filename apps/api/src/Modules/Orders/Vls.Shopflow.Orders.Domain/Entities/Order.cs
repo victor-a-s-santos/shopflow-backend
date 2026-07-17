@@ -22,6 +22,11 @@ public sealed class Order : Entity<Guid>
     public decimal? ShippingAmount { get; private set; }
     public decimal Total { get; private set; }
     public OrderStatus Status { get; private set; }
+    /// <summary>
+    /// Authenticated customer who owned the checkout when the order was created.
+    /// Null for guest checkout — never resolve by email alone for “Meus pedidos”.
+    /// </summary>
+    public Guid? CustomerUserId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public DateTimeOffset? PaidAt { get; private set; }
@@ -46,7 +51,8 @@ public sealed class Order : Entity<Guid>
         decimal subtotal,
         decimal? shippingAmount,
         decimal total,
-        IReadOnlyList<OrderItem> items)
+        IReadOnlyList<OrderItem> items,
+        Guid? customerUserId = null)
     {
         if (checkoutSessionId == Guid.Empty)
             throw new ArgumentException("Checkout session id is required.", nameof(checkoutSessionId));
@@ -62,6 +68,9 @@ public sealed class Order : Entity<Guid>
 
         if (total < 0)
             throw new ArgumentOutOfRangeException(nameof(total), "Order total cannot be negative.");
+
+        if (customerUserId == Guid.Empty)
+            throw new ArgumentException("Customer user id cannot be empty.", nameof(customerUserId));
 
         var now = DateTimeOffset.UtcNow;
         var order = new Order
@@ -82,6 +91,7 @@ public sealed class Order : Entity<Guid>
             ShippingAmount = shippingAmount,
             Total = total,
             Status = OrderStatus.PendingPayment,
+            CustomerUserId = customerUserId,
             CreatedAt = now,
             UpdatedAt = null,
             PaidAt = null,

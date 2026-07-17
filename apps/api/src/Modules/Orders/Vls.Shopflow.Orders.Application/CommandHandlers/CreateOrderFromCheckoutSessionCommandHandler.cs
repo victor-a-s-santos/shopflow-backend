@@ -57,7 +57,8 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
             session.Subtotal,
             session.ShippingAmount,
             session.Total,
-            items);
+            items,
+            command.CustomerUserId);
 
         await orderRepository.AddAsync(order, cancellationToken);
 
@@ -78,10 +79,12 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Created order {OrderId} from checkout session {CheckoutSessionId} with status PendingPayment. GuestAccessTokenIssued={TokenIssued}",
+            "Created order {OrderId} from checkout session {CheckoutSessionId} with status PendingPayment. " +
+            "GuestAccessTokenIssued={TokenIssued} CustomerUserIdBound={CustomerBound}",
             order.Id,
             session.Id,
-            rawToken is not null);
+            rawToken is not null,
+            order.CustomerUserId is not null);
 
         return OrderMapper.ToDto(order, rawToken, tokenExpiresAt);
     }

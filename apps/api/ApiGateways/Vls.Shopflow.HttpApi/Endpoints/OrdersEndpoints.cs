@@ -1,4 +1,5 @@
 using MediatR;
+using Vls.Shopflow.IdentityAccess.Application.Interfaces;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Infrastructure;
 using Vls.Shopflow.Orders.Application.Commands;
@@ -16,11 +17,17 @@ public static class OrdersEndpoints
 
         orders.MapPost("/from-checkout-session", async (
             ISender sender,
+            ICurrentCustomerAccessor currentCustomer,
             CreateOrderFromCheckoutSessionRequest request,
             CancellationToken ct) =>
         {
+            // Optional CustomerCookie only — never use Backoffice cookie as customer.
+            var customer = await currentCustomer.GetCurrentCustomerAsync(ct);
+
             var result = await sender.Send(
-                new CreateOrderFromCheckoutSessionCommand(request.CheckoutSessionId),
+                new CreateOrderFromCheckoutSessionCommand(
+                    request.CheckoutSessionId,
+                    customer?.CustomerId),
                 ct);
 
             return Results.Created($"/api/orders/{result.OrderId}", result);

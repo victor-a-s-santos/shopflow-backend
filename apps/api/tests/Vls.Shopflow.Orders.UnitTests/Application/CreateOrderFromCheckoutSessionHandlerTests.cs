@@ -113,11 +113,39 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
 
         captured.Should().NotBeNull();
         captured!.Status.Should().Be(OrderStatus.PendingPayment);
+        captured.CustomerUserId.Should().BeNull();
 
         capturedToken.Should().NotBeNull();
         capturedToken!.TokenHash.Should().Be("hashed-guest-token");
         capturedToken.TokenHash.Should().NotBe(result.GuestAccessToken);
         capturedToken.OrderId.Should().Be(captured.Id);
+    }
+
+    [Fact]
+    public async Task Handle_WithCustomerUserId_BindsOrderToCustomer()
+    {
+        var sessionId = Guid.NewGuid();
+        var customerUserId = Guid.NewGuid();
+        var reader = new Mock<ICheckoutSessionReader>();
+        reader.Setup(x => x.GetByIdAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PendingSession(sessionId));
+
+        Order? captured = null;
+        var repository = new Mock<IOrderRepository>();
+        repository.Setup(x => x.GetByCheckoutSessionIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order?)null);
+        repository.Setup(x => x.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Callback<Order, CancellationToken>((order, _) => captured = order)
+            .Returns(Task.CompletedTask);
+
+        var handler = CreateHandler(reader.Object, repository.Object);
+
+        await handler.Handle(
+            new CreateOrderFromCheckoutSessionCommand(sessionId, customerUserId),
+            CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.CustomerUserId.Should().Be(customerUserId);
     }
 
     [Fact]

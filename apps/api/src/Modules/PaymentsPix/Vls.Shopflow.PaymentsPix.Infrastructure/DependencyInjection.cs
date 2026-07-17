@@ -67,6 +67,8 @@ public static class DependencyInjection
         services.AddScoped<IMercadoPagoPixPaidTransitionService, MercadoPagoPixPaidTransitionService>();
         services.AddScoped<IMercadoPagoPixReconciliationProcessor, MercadoPagoPixReconciliationProcessor>();
         services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.IOrderPixPaymentStatusReader, OrderPixPaymentStatusReader>();
+        services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.IAdminOrderPixPaymentReader, AdminOrderPixPaymentReader>();
+        services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.ICustomerOrderPixPaymentReader, CustomerOrderPixPaymentReader>();
         services.AddSingleton<IMercadoPagoOfficialWebhookSignatureClient, MercadoPagoOfficialWebhookSignatureClient>();
         services.AddSingleton<ManualMercadoPagoWebhookSignatureValidator>();
         services.AddSingleton<IMercadoPagoWebhookSignatureValidator, CompositeMercadoPagoWebhookSignatureValidator>();

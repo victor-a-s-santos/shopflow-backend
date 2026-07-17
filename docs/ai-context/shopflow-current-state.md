@@ -70,7 +70,7 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 |--------|--------------|-------------|
 | **CartCheckout (backend)** | `POST/GET /api/checkout/sessions`, cancelamento, reserva de estoque na criação, compensação em falha parcial, **worker de expiração** | Confirmar sessão (pagamento real), shipping |
 | **CartCheckout (frontend)** | UI 4 etapas, `POST /api/checkout/sessions`, reserva real, cria pedido + Pix Pending | Shipping |
-| **Orders (backend)** | `POST` create + **guest status** com token; `PendingPayment` → **Paid** via webhook Pix; GETs completos Backoffice | Admin/conta UI |
+| **Orders (backend)** | create + guest status; Admin `/api/admin/orders`; **Customer** `/api/customer/orders` (`CustomerUserId`); Paid via Pix | Frontend customer “Meus pedidos” |
 | **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API**; webhook via **mercadopago-sdk** + oráculo manual; `SendNotificationUrlInOrderCreate` (painel vs payload); reconciliação Worker `GET /v1/orders` (fallback); Paid só `processed`/`accredited` | Frontend QR, e-mail |
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |

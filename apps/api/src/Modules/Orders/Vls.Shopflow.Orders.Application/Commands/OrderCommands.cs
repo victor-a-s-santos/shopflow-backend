@@ -3,7 +3,9 @@ using Vls.Shopflow.Orders.Application.DataTransferObjects;
 
 namespace Vls.Shopflow.Orders.Application.Commands;
 
-public sealed record CreateOrderFromCheckoutSessionCommand(Guid CheckoutSessionId)
+public sealed record CreateOrderFromCheckoutSessionCommand(
+    Guid CheckoutSessionId,
+    Guid? CustomerUserId = null)
     : ICommand<OrderDto>;
 
 public sealed record GetOrderByIdQuery(Guid OrderId)

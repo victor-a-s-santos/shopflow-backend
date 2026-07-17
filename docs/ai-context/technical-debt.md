@@ -45,7 +45,7 @@
 | Item | Nota |
 |------|------|
 | Checkout frontend desconectado | Integrado com `POST /api/checkout/sessions` |
-| Módulo Orders scaffold | MVP backend implementado (`PendingPayment`) |
+| Módulo Orders scaffold | MVP + Admin + Customer orders (`CustomerUserId`); falta UI customer + claim guest |
 | PaymentsPix scaffold | MVP backend com provider fake (`PixPayment` Pending) |
 | Worker expiração checkout | `Vls.Shopflow.Worker` + `ExpirationProcessor` |
 | IdentityAccess admin (Fase 1/2) | Cookie admin, CSRF, policy Backoffice |

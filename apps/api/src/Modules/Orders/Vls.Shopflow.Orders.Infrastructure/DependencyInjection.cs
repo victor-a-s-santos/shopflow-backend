@@ -53,9 +53,13 @@ public static class DependencyInjection
     {
         services.AddScoped<IOrdersUnitOfWork, OrdersUnitOfWork>();
         services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IAdminOrderReadModel, AdminOrderReadModel>();
+        services.AddScoped<ICustomerOrderReadModel, CustomerOrderReadModel>();
         services.AddScoped<IGuestOrderAccessTokenRepository, GuestOrderAccessTokenRepository>();
         services.AddScoped<ICheckoutSessionReader, CheckoutSessionReader>();
         services.AddScoped<IOrderPixPaymentStatusReader, NullOrderPixPaymentStatusReader>();
+        services.AddScoped<IAdminOrderPixPaymentReader, NullAdminOrderPixPaymentReader>();
+        services.AddScoped<ICustomerOrderPixPaymentReader, NullCustomerOrderPixPaymentReader>();
         services.AddSingleton<IGuestOrderAccessTokenHasher, GuestOrderAccessTokenHasher>();
     }
 }
