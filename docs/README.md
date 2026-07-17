@@ -22,6 +22,7 @@ Shopflow é um e-commerce modular em monorepo. Nesta fase, **dois módulos estã
 | Arquivo | Conteúdo |
 |---------|----------|
 | [architecture.md](./architecture.md) | Arquitetura, bounded contexts, banco, padrões |
+| [architecture/WHOLESALE-SALES-RULES-DESIGN.md](./architecture/WHOLESALE-SALES-RULES-DESIGN.md) | Design regras de venda atacado/pacotes/múltiplos |
 | [catalog.md](./catalog.md) | Produtos, SKUs, atributos, endpoints, admin |
 | [inventory.md](./inventory.md) | Estoque, reservas, concorrência, admin |
 | [testing.md](./testing.md) | Como rodar, testar e validar manualmente |

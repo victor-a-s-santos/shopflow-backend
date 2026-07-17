@@ -139,4 +139,25 @@ public sealed class Order : Entity<Guid>
         Status = OrderStatus.Expired;
         UpdatedAt = DateTimeOffset.UtcNow;
     }
+
+    /// <summary>
+    /// Links a guest order to an authenticated customer. Idempotent when already linked to the same user.
+    /// </summary>
+    public void LinkToCustomerUser(Guid customerUserId)
+    {
+        if (customerUserId == Guid.Empty)
+            throw new ArgumentException("Customer user id cannot be empty.", nameof(customerUserId));
+
+        if (CustomerUserId is null)
+        {
+            CustomerUserId = customerUserId;
+            UpdatedAt = DateTimeOffset.UtcNow;
+            return;
+        }
+
+        if (CustomerUserId == customerUserId)
+            return;
+
+        throw new Exceptions.OrderAlreadyLinkedToAnotherCustomerException(Id);
+    }
 }

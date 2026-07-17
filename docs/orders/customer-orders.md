@@ -8,10 +8,12 @@
 |--------|------|------|
 | GET | `/api/customer/orders` | `Customer` (CustomerCookie) |
 | GET | `/api/customer/orders/{orderId}` | `Customer` |
+| POST | `/api/customer/orders/guest/{orderId}/create-account` | Anônimo + GuestOrderAccessToken (body) |
+| POST | `/api/customer/orders/guest/{orderId}/claim` | `Customer` + GuestOrderAccessToken (body) |
 
-- Sem login → 401  
-- Admin Backoffice cookie **não** autoriza  
-- GuestOrderAccessToken **não** autoriza  
+- Sem login nas GETs → 401  
+- Admin Backoffice cookie **não** autoriza GETs  
+- GuestOrderAccessToken **sozinho** não autoriza listagem — só claim/create-account  
 
 ## Guest vs logado
 
@@ -19,13 +21,13 @@
 |----------|------------------|-------------------------------------|
 | Checkout guest | `null` | Não |
 | Checkout com CustomerCookie válido | Guid do customer | Sim |
+| Guest após claim/create-account | Guid do customer | Sim |
 | Pedido de outro customer | outro Guid | Não |
 
 **Não** buscar pedido por e-mail — evita vazar pedido guest/outro usuário com o mesmo e-mail.
 
-Associação ocorre em `POST /api/orders/from-checkout-session` (continua público): se houver CustomerCookie, grava `CustomerUserId`; caso contrário permanece guest + GuestOrderAccessToken.
-
-Claim/importação de pedido guest = pós-MVP.
+Associação no create: `POST /api/orders/from-checkout-session` grava `CustomerUserId` se houver CustomerCookie.  
+Associação pós-Pix (guest): ver `docs/orders/guest-order-claim.md`.
 
 ## Listagem — query params
 
@@ -52,7 +54,7 @@ Ver `docs/orders/admin-orders.md` — admin vê PII + IDs Mercado Pago; customer
 
 ## Pós-MVP
 
-- Frontend customer orders  
-- Claim de pedido guest  
+- Frontend customer orders + wiring do claim  
 - Segunda via Pix / reabrir pagamento  
-- Cancelamento / rastreio / timeline / e-mail  
+- Cancelamento / rastreio / timeline / e-mail transacional  
+

@@ -70,7 +70,7 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 |--------|--------------|-------------|
 | **CartCheckout (backend)** | `POST/GET /api/checkout/sessions`, cancelamento, reserva de estoque na criação, compensação em falha parcial, **worker de expiração** | Confirmar sessão (pagamento real), shipping |
 | **CartCheckout (frontend)** | UI 4 etapas, `POST /api/checkout/sessions`, reserva real, cria pedido + Pix Pending | Shipping |
-| **Orders (backend)** | create + guest status; Admin `/api/admin/orders`; **Customer** `/api/customer/orders` (`CustomerUserId`); Paid via Pix | Frontend customer “Meus pedidos” |
+| **Orders (backend)** | create + guest status; Admin `/api/admin/orders`; **Customer** `/api/customer/orders`; **guest claim** create-account/claim (`CustomerUserId`); Paid via Pix | Frontend customer “Meus pedidos” + claim UI |
 | **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API**; webhook via **mercadopago-sdk** + oráculo manual; `SendNotificationUrlInOrderCreate` (painel vs payload); reconciliação Worker `GET /v1/orders` (fallback); Paid só `processed`/`accredited` | Frontend QR, e-mail |
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |
@@ -280,6 +280,7 @@ Detalhes: `docs/testing.md`.
 | Arquivo | Conteúdo |
 |---------|----------|
 | `docs/architecture.md` | Arquitetura modular, módulos, integrações |
+| `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md` | Design atacado/pacotes/múltiplos (sem código ainda) |
 | `docs/catalog.md` | API Catalog |
 | `docs/catalog-demo-seed.md` | Carga demo loja de roupas |
 | `docs/inventory.md` | API Inventory |
@@ -290,8 +291,16 @@ Detalhes: `docs/testing.md`.
 | `docs/next-steps.md` | Roadmap (pode estar desatualizado — ver `docs/ai-context/next-actions.md`) |
 | `docs/ai-context/*` | Contexto para IA (este arquivo) |
 | `docs/security/*` | Identity admin + customer (SEC-004, SEC-005) |
-
 | `docs/prompts/*` | Templates GPT / Lovable / Cursor |
+
+### Design pendente de implementação — wholesale sales rules
+
+Design técnico pronto em `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md`:
+
+- Regra de venda no **SKU** (`SalesMode`: Unit / MinimumQuantity / MultipleQuantity / FixedPackage / AssortedPackage).
+- Pacote MVP = **SKU próprio** (estoque em pacotes); composição multi-SKU = pós-MVP.
+- `quantity` sempre = unidades do SKU vendido; enforcement no `CreateCheckoutSession`.
+- Nenhuma feature implementada ainda (Fase 0 = docs).
 
 ---
 

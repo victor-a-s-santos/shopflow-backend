@@ -26,6 +26,7 @@ public static class DependencyInjection
     public const string CustomerForgotPasswordRateLimitPolicy = "customer-forgot-password";
     public const string CustomerResetPasswordRateLimitPolicy = "customer-reset-password";
     public const string GuestOrderStatusRateLimitPolicy = "guest-order-status";
+    public const string GuestOrderClaimRateLimitPolicy = "guest-order-claim";
     public const string CorsPolicyName = "AllowFrontend";
 
     public static IServiceCollection AddIdentityAccessModule(
@@ -279,6 +280,16 @@ public static class DependencyInjection
                 guestOrderRateLimit = Math.Max(guestOrderRateLimit, 100);
 
             options.AddPolicy(GuestOrderStatusRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = guestOrderRateLimit,
+                        QueueLimit = 0
+                    }));
+
+            options.AddPolicy(GuestOrderClaimRateLimitPolicy, httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                     _ => new FixedWindowRateLimiterOptions

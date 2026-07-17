@@ -119,12 +119,13 @@ public sealed class CreateOrderFromCheckoutSessionIntegrationTests
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance),
             new GetOrderByIdQueryHandler(orderRepository),
             new GetGuestOrderStatusQueryHandler(
-                orderRepository,
-                guestTokenRepository,
-                hasher,
+                new Vls.Shopflow.Orders.Application.Services.GuestOrderAccessGate(
+                    guestTokenRepository,
+                    hasher,
+                    orderRepository,
+                    options),
                 new NullOrderPixPaymentStatusReader(),
                 unitOfWork,
-                options,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<GetGuestOrderStatusQueryHandler>.Instance),
             hasher);
     }

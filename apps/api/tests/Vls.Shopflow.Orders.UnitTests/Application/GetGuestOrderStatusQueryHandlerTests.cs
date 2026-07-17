@@ -1,15 +1,12 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Moq;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
-using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.QueryHandlers;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Entities;
-using Vls.Shopflow.Orders.Domain.Enums;
 using Vls.Shopflow.Orders.Domain.Exceptions;
 
 namespace Vls.Shopflow.Orders.UnitTests.Application;
@@ -38,24 +35,15 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
         => GuestOrderAccessToken.Create(orderId, hash, DateTimeOffset.UtcNow.AddDays(30));
 
     private static GetGuestOrderStatusQueryHandler CreateHandler(
-        IOrderRepository? orderRepo = null,
-        IGuestOrderAccessTokenRepository? tokenRepo = null,
-        IGuestOrderAccessTokenHasher? hasher = null,
+        IGuestOrderAccessGate? gate = null,
         IOrderPixPaymentStatusReader? paymentReader = null,
-        IOrdersUnitOfWork? uow = null,
-        GuestOrderAccessOptions? options = null)
+        IOrdersUnitOfWork? uow = null)
     {
-        var hasherMock = new Mock<IGuestOrderAccessTokenHasher>();
-        hasherMock.Setup(x => x.Hash(It.IsAny<string>())).Returns("hash-abc");
-
         return new GetGuestOrderStatusQueryHandler(
-            orderRepo ?? Mock.Of<IOrderRepository>(),
-            tokenRepo ?? Mock.Of<IGuestOrderAccessTokenRepository>(),
-            hasher ?? hasherMock.Object,
+            gate ?? Mock.Of<IGuestOrderAccessGate>(),
             paymentReader ?? Mock.Of<IOrderPixPaymentStatusReader>(),
             uow ?? Mock.Of<IOrdersUnitOfWork>(x =>
                 x.SaveChangesAsync(It.IsAny<CancellationToken>()) == Task.FromResult(1)),
-            Options.Create(options ?? new GuestOrderAccessOptions { Enabled = true, TokenHashSecret = "secret" }),
             NullLogger<GetGuestOrderStatusQueryHandler>.Instance);
     }
 
@@ -65,14 +53,9 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
         var order = CreateOrder();
         var token = CreateToken(order.Id);
 
-        var orderRepo = new Mock<IOrderRepository>();
-        orderRepo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(order);
-
-        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
-        tokenRepo.Setup(x => x.FindActiveByOrderIdAndHashAsync(
-                order.Id, "hash-abc", It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(token);
+        var gate = new Mock<IGuestOrderAccessGate>();
+        gate.Setup(x => x.ValidateAsync(order.Id, "raw-token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((token, order));
 
         var paymentReader = new Mock<IOrderPixPaymentStatusReader>();
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
@@ -84,7 +67,7 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
                 null,
                 DateTimeOffset.UtcNow));
 
-        var handler = CreateHandler(orderRepo.Object, tokenRepo.Object, paymentReader: paymentReader.Object);
+        var handler = CreateHandler(gate.Object, paymentReader.Object);
 
         var result = await handler.Handle(
             new GetGuestOrderStatusQuery(order.Id, "raw-token"),
@@ -114,7 +97,11 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
     [Fact]
     public async Task Handle_WhenTokenMissing_ThrowsAccessDenied()
     {
-        var handler = CreateHandler();
+        var gate = new Mock<IGuestOrderAccessGate>();
+        gate.Setup(x => x.ValidateAsync(It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new GuestOrderAccessDeniedException());
+
+        var handler = CreateHandler(gate.Object);
         var act = () => handler.Handle(new GetGuestOrderStatusQuery(Guid.NewGuid(), null), CancellationToken.None);
         await act.Should().ThrowAsync<GuestOrderAccessDeniedException>();
     }
@@ -123,33 +110,13 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
     public async Task Handle_WhenTokenInvalid_ThrowsAccessDenied()
     {
         var orderId = Guid.NewGuid();
-        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
-        tokenRepo.Setup(x => x.FindActiveByOrderIdAndHashAsync(
-                orderId, "hash-abc", It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((GuestOrderAccessToken?)null);
+        var gate = new Mock<IGuestOrderAccessGate>();
+        gate.Setup(x => x.ValidateAsync(orderId, "bad", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new GuestOrderAccessDeniedException());
 
-        var handler = CreateHandler(tokenRepo: tokenRepo.Object);
+        var handler = CreateHandler(gate.Object);
         var act = () => handler.Handle(new GetGuestOrderStatusQuery(orderId, "bad"), CancellationToken.None);
         await act.Should().ThrowAsync<GuestOrderAccessDeniedException>();
-    }
-
-    [Fact]
-    public async Task Handle_WhenTokenForOtherOrder_ThrowsAccessDenied()
-    {
-        var orderA = CreateOrder();
-        var orderB = CreateOrder();
-        var tokenForB = CreateToken(orderB.Id);
-
-        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
-        // Lookup is by orderA id + hash — repository returns null (token belongs to B).
-        tokenRepo.Setup(x => x.FindActiveByOrderIdAndHashAsync(
-                orderA.Id, "hash-abc", It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((GuestOrderAccessToken?)null);
-
-        var handler = CreateHandler(tokenRepo: tokenRepo.Object);
-        var act = () => handler.Handle(new GetGuestOrderStatusQuery(orderA.Id, "token-for-b"), CancellationToken.None);
-        await act.Should().ThrowAsync<GuestOrderAccessDeniedException>();
-        tokenForB.OrderId.Should().Be(orderB.Id);
     }
 
     [Fact]
@@ -159,21 +126,16 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
         order.MarkAsPaid(DateTimeOffset.UtcNow);
         var token = CreateToken(order.Id);
 
-        var orderRepo = new Mock<IOrderRepository>();
-        orderRepo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(order);
-
-        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
-        tokenRepo.Setup(x => x.FindActiveByOrderIdAndHashAsync(
-                order.Id, "hash-abc", It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(token);
+        var gate = new Mock<IGuestOrderAccessGate>();
+        gate.Setup(x => x.ValidateAsync(order.Id, "raw", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((token, order));
 
         var paymentReader = new Mock<IOrderPixPaymentStatusReader>();
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new OrderPixPaymentStatusSnapshot(
                 "Paid", "MercadoPago", 159.90m, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
 
-        var handler = CreateHandler(orderRepo.Object, tokenRepo.Object, paymentReader: paymentReader.Object);
+        var handler = CreateHandler(gate.Object, paymentReader.Object);
         var result = await handler.Handle(new GetGuestOrderStatusQuery(order.Id, "raw"), CancellationToken.None);
 
         result.OrderStatus.Should().Be("Paid");
@@ -188,16 +150,11 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
         order.Expire();
         var token = CreateToken(order.Id);
 
-        var orderRepo = new Mock<IOrderRepository>();
-        orderRepo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(order);
+        var gate = new Mock<IGuestOrderAccessGate>();
+        gate.Setup(x => x.ValidateAsync(order.Id, "raw", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((token, order));
 
-        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
-        tokenRepo.Setup(x => x.FindActiveByOrderIdAndHashAsync(
-                order.Id, "hash-abc", It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(token);
-
-        var handler = CreateHandler(orderRepo.Object, tokenRepo.Object);
+        var handler = CreateHandler(gate.Object);
         var result = await handler.Handle(new GetGuestOrderStatusQuery(order.Id, "raw"), CancellationToken.None);
         result.OrderStatus.Should().Be("Expired");
     }

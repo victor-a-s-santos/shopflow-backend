@@ -90,6 +90,8 @@ builder.Services.AddPaymentsPixModuleFromConfig(builder.Configuration, enableSen
 
 builder.Services.AddIdentityAccessModuleFromConfig(builder.Configuration, builder.Environment, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
 
+builder.Services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.ICustomerAccountPort, Vls.Shopflow.HttpApi.Services.CustomerAccountPort>();
+
 // API runs HTTP inside Docker behind Caddy/Cloudflare TLS termination.
 // Forwarded headers restore Request.Scheme=https so Secure cookies (antiforgery) work.
 // Only trust X-Forwarded-* from private Docker/loopback peers (Caddy), never from any client.
@@ -558,6 +560,68 @@ app.Use(async (ctx, next) =>
         ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
 
         await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccountAlreadyExistsException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Conflict(
+
+            ctx,
+
+            ex.Message,
+
+            field: null,
+
+            errorCode: Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccountAlreadyExistsException.ErrorCode);
+
+        problem.Extensions["code"] = Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccountAlreadyExistsException.ErrorCode;
+
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderClaimForbiddenException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+
+            ctx,
+
+            StatusCodes.Status403Forbidden,
+
+            "Forbidden",
+
+            ex.Message);
+
+        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderAlreadyLinkedToAnotherCustomerException)
+
+    {
+
+        var problem = HttpProblemDetails.Conflict(
+
+            ctx,
+
+            "This order cannot be linked.",
+
+            errorCode: "ORDER_ALREADY_LINKED");
+
+        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 

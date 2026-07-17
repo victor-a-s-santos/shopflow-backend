@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Infrastructure.Repositories;
 using Vls.Shopflow.Orders.Infrastructure.Services;
 using Vls.Shopflow.Orders.Infrastructure.UnitOfWork;
@@ -56,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminOrderReadModel, AdminOrderReadModel>();
         services.AddScoped<ICustomerOrderReadModel, CustomerOrderReadModel>();
         services.AddScoped<IGuestOrderAccessTokenRepository, GuestOrderAccessTokenRepository>();
+        services.AddScoped<IGuestOrderAccessGate, GuestOrderAccessGate>();
         services.AddScoped<ICheckoutSessionReader, CheckoutSessionReader>();
         services.AddScoped<IOrderPixPaymentStatusReader, NullOrderPixPaymentStatusReader>();
         services.AddScoped<IAdminOrderPixPaymentReader, NullAdminOrderPixPaymentReader>();

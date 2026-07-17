@@ -61,6 +61,13 @@ public sealed class CsrfProtectionMiddleware(RequestDelegate next)
             return false;
         }
 
+        // Anonymous guest create-account (token proves possession); claim stays CSRF-protected.
+        if (path.Contains("/customer/orders/guest/", StringComparison.OrdinalIgnoreCase)
+            && path.EndsWith("/create-account", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (await HasAuthenticatedCookieAsync(context, AuthSchemes.AdminCookie))
             return true;
 

@@ -32,6 +32,7 @@
 
 | Dívida | Evidência | Impacto |
 |--------|-----------|---------|
+| **Guest claim sem e-mail / magic link** | Claim exige token no browser | Recuperação de pedido se o cliente perder o token |
 | **Salvar produto admin multi-endpoint** | Create shell → variants → images separados; sem transação global | Persistência parcial se o FE falhar no meio; ver `docs/catalog/admin-product-contract.md` |
 | **Arquivos de imagem órfãos no disco** | DELETE imagem remove só o registro DB | Lixo em `uploads/` |
 | **Sem testes HttpApi** | Nenhum teste E2E na API | Contratos não validados automaticamente |
@@ -64,6 +65,7 @@
 | Cypress bloqueia `/api/payments` no checkout | Correto até frontend integrar PaymentsPix |
 | Pedido ≠ pagamento aprovado | `PendingPayment` até webhook Orders `processed`/`accredited` |
 | Simulação webhook painel MP | `data.id` tipo `123456` ≠ Order real; não confirma Paid — usar checkout que cria `ORD`/`ORDTST` |
+| Atacado / pacotes / múltiplos | Design only — `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md`; sem sales rules no código ainda; pacote composto e B2B ficam pós-MVP |
 
 ---
 

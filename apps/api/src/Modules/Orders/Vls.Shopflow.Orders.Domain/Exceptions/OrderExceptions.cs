@@ -67,3 +67,36 @@ public sealed class GuestOrderAccessMisconfiguredException : Exception
     {
     }
 }
+
+/// <summary>
+/// Guest tried to create an account but the order email already has a customer account.
+/// </summary>
+public sealed class GuestOrderAccountAlreadyExistsException : Exception
+{
+    public const string ErrorCode = "AccountAlreadyExists";
+
+    public GuestOrderAccountAlreadyExistsException()
+        : base("Já existe uma conta com este e-mail. Faça login para vincular o pedido.")
+    {
+    }
+}
+
+/// <summary>
+/// Claim denied for a logged-in customer (e.g. email mismatch) without leaking order details.
+/// </summary>
+public sealed class GuestOrderClaimForbiddenException : Exception
+{
+    public GuestOrderClaimForbiddenException()
+        : base("Unable to claim this order.")
+    {
+    }
+}
+
+public sealed class OrderAlreadyLinkedToAnotherCustomerException : Exception
+{
+    public Guid OrderId { get; }
+
+    public OrderAlreadyLinkedToAnotherCustomerException(Guid orderId)
+        : base("This order cannot be linked.")
+        => OrderId = orderId;
+}

@@ -1,24 +1,18 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
-using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Enums;
-using Vls.Shopflow.Orders.Domain.Exceptions;
 
 namespace Vls.Shopflow.Orders.Application.QueryHandlers;
 
 public sealed class GetGuestOrderStatusQueryHandler(
-    IOrderRepository orderRepository,
-    IGuestOrderAccessTokenRepository guestTokenRepository,
-    IGuestOrderAccessTokenHasher tokenHasher,
+    IGuestOrderAccessGate guestOrderAccessGate,
     IOrderPixPaymentStatusReader paymentStatusReader,
     IOrdersUnitOfWork unitOfWork,
-    IOptions<GuestOrderAccessOptions> guestOrderAccessOptions,
     ILogger<GetGuestOrderStatusQueryHandler> logger)
     : IRequestHandler<GetGuestOrderStatusQuery, GuestOrderStatusDto>
 {
@@ -26,39 +20,10 @@ public sealed class GetGuestOrderStatusQueryHandler(
         GetGuestOrderStatusQuery query,
         CancellationToken cancellationToken)
     {
-        if (!guestOrderAccessOptions.Value.Enabled)
-            throw new GuestOrderAccessDeniedException();
-
-        if (string.IsNullOrWhiteSpace(query.AccessToken))
-            throw new GuestOrderAccessDeniedException();
-
-        string tokenHash;
-        try
-        {
-            tokenHash = tokenHasher.Hash(query.AccessToken);
-        }
-        catch (GuestOrderAccessMisconfiguredException)
-        {
-            throw;
-        }
-        catch
-        {
-            throw new GuestOrderAccessDeniedException();
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var accessToken = await guestTokenRepository.FindActiveByOrderIdAndHashAsync(
+        var (accessToken, order) = await guestOrderAccessGate.ValidateAsync(
             query.OrderId,
-            tokenHash,
-            now,
+            query.AccessToken,
             cancellationToken);
-
-        if (accessToken is null)
-            throw new GuestOrderAccessDeniedException();
-
-        var order = await orderRepository.GetByIdWithItemsAsync(query.OrderId, cancellationToken);
-        if (order is null)
-            throw new GuestOrderAccessDeniedException();
 
         var payment = await paymentStatusReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
 
@@ -81,7 +46,7 @@ public sealed class GetGuestOrderStatusQueryHandler(
                 order.Id);
         }
 
-        accessToken.MarkUsed(now);
+        accessToken.MarkUsed(DateTimeOffset.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return OrderMapper.ToGuestStatusDto(order, payment, accessToken);
