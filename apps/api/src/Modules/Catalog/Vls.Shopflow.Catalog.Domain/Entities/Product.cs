@@ -75,10 +75,15 @@ public sealed class Product : Entity<Guid>
 
     public void RemoveSku(Guid skuId) => _skus.RemoveAll(s => s.Id == skuId);
 
+    public const int MaxImages = 10;
+
     public void AddImage(ProductImage image)
     {
         if (image.ProductId != Id)
             throw new InvalidOperationException("Image does not belong to this product.");
+
+        if (_images.Count >= MaxImages)
+            throw new InvalidOperationException($"Product cannot have more than {MaxImages} images.");
 
         var isFirst = _images.Count == 0;
         if (isFirst || image.IsPrimary)
@@ -91,7 +96,21 @@ public sealed class Product : Entity<Guid>
         _images.Add(image);
     }
 
-    public void RemoveImage(Guid imageId) => _images.RemoveAll(i => i.Id == imageId);
+    public void RemoveImage(Guid imageId)
+    {
+        var removed = _images.FirstOrDefault(i => i.Id == imageId);
+        if (removed is null)
+            return;
+
+        var wasPrimary = removed.IsPrimary;
+        _images.Remove(removed);
+
+        if (wasPrimary && _images.Count > 0)
+        {
+            var next = _images.OrderBy(i => i.SortOrder).First();
+            PromoteImageToPrimary(next.Id);
+        }
+    }
 
     public void PromoteImageToPrimary(Guid imageId)
     {

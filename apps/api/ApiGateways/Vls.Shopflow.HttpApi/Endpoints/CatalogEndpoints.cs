@@ -185,14 +185,22 @@ public static class CatalogEndpoints
         });
 
         // -------------------------------------------------------
-        // PRODUCT IMAGES (multipart)
+        // PRODUCT IMAGES (multipart upload + manage)
         // -------------------------------------------------------
 
         cat.MapPost("/products/{id:guid}/images",
                 async (ISender sender, Guid id, IFormFile file, CancellationToken ct) =>
                 {
-                    if (file.Length == 0)
-                        return Results.BadRequest(new { message = "No file uploaded." });
+                    if (file is null || file.Length == 0)
+                    {
+                        return Results.ValidationProblem(
+                            new Dictionary<string, string[]>
+                            {
+                                ["file"] = ["Nenhum arquivo enviado."]
+                            },
+                            title: "Validation failed",
+                            statusCode: StatusCodes.Status400BadRequest);
+                    }
 
                     await using var stream = file.OpenReadStream();
                     var dto = await sender.Send(new UploadProductImageCommand(
@@ -206,6 +214,22 @@ public static class CatalogEndpoints
             .RequireAuthorization(AuthPolicies.Backoffice)
             .DisableAntiforgery()
             .Accepts<IFormFile>("multipart/form-data");
+
+        cat.MapDelete("/products/{productId:guid}/images/{imageId:guid}",
+                async (ISender sender, Guid productId, Guid imageId, CancellationToken ct) =>
+                {
+                    await sender.Send(new DeleteProductImageCommand(productId, imageId), ct);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization(AuthPolicies.Backoffice);
+
+        cat.MapPost("/products/{productId:guid}/images/{imageId:guid}/primary",
+                async (ISender sender, Guid productId, Guid imageId, CancellationToken ct) =>
+                {
+                    await sender.Send(new SetPrimaryProductImageCommand(productId, imageId), ct);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization(AuthPolicies.Backoffice);
 
         return group;
     }

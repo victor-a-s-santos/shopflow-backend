@@ -24,8 +24,9 @@ public sealed class Sku : Entity<Guid>
         Id = Guid.NewGuid();
         ProductId = productId;
 
+        // Prefer caller-supplied unique code. Fallback keeps entity constructible in tests/seeds.
         Code = string.IsNullOrWhiteSpace(code)
-            ? $"SKU-{Id.ToString()[..8]}"
+            ? $"SKU-{Id.ToString("N")[..8].ToUpperInvariant()}"
             : code.Trim();
 
         Price = price.Normalize();
@@ -54,11 +55,10 @@ public sealed class Sku : Entity<Guid>
     public void Deactivate()
         => IsActive = false;
 
-    public void ChangeCode(string? code)
+    public void ChangeCode(string code)
     {
-        Code = string.IsNullOrWhiteSpace(code)
-            ? $"SKU-{Id.ToString()[..8]}"
-            : code.Trim();
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        Code = code.Trim();
     }
 
     /// <summary>

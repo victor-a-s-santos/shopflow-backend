@@ -36,6 +36,8 @@ using Vls.Shopflow.PaymentsPix.Infrastructure;
 
 using Vls.Shopflow.HttpApi.Endpoints;
 
+using Vls.Shopflow.HttpApi;
+
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -293,15 +295,43 @@ app.Use(async (ctx, next) =>
 
     {
 
-        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+        var problem = HttpProblemDetails.Validation(ctx, ex);
 
-        await ctx.Response.WriteAsJsonAsync(new {
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status400BadRequest;
 
-            message = "Validation failed",
+        await ctx.Response.WriteAsJsonAsync(problem);
 
-            errors  = ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage })
+    }
 
-        });
+    catch (Vls.Shopflow.Catalog.Domain.Exceptions.CatalogConflictException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Conflict(ctx, ex.Message, ex.Field, ex.ErrorCode);
+
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+
+    {
+
+        var problem = HttpProblemDetails.Conflict(
+
+            ctx,
+
+            "A unique constraint was violated. Check codes and identifiers for duplicates.",
+
+            field: "code",
+
+            errorCode: Vls.Shopflow.Catalog.Domain.Exceptions.CatalogErrorCodes.SkuCodeDuplicate);
+
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -309,9 +339,19 @@ app.Use(async (ctx, next) =>
 
     {
 
-        ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+        var problem = HttpProblemDetails.Problem(
 
-        await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });
+            ctx,
+
+            StatusCodes.Status404NotFound,
+
+            "Not found",
+
+            ex.Message);
+
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status404NotFound;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -369,21 +409,25 @@ app.Use(async (ctx, next) =>
 
     {
 
-        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+        var problem = HttpProblemDetails.Conflict(
 
-        await ctx.Response.WriteAsJsonAsync(new
+            ctx,
 
-        {
+            ex.Message,
 
-            message = ex.Message,
+            field: "quantity",
 
-            skuId = ex.SkuId,
+            errorCode: "INSUFFICIENT_AVAILABLE_STOCK");
 
-            requested = ex.Requested,
+        problem.Extensions["skuId"] = ex.SkuId;
 
-            available = ex.Available
+        problem.Extensions["requested"] = ex.Requested;
 
-        });
+        problem.Extensions["available"] = ex.Available;
+
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -609,7 +653,62 @@ app.Use(async (ctx, next) =>
 
     }
 
+    catch (Exception ex) when (ex is not OperationCanceledException)
+
+    {
+
+        var logger = ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("HttpApi");
+
+        logger.LogError(ex, "Unhandled exception. TraceId={TraceId}", HttpProblemDetails.GetTraceId(ctx));
+
+        var problem = HttpProblemDetails.Unexpected(ctx);
+
+        ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
 });
+
+static bool IsUniqueViolation(DbUpdateException ex)
+
+{
+
+    // Postgres unique_violation = 23505 (avoid hard dependency on Npgsql types in the gateway).
+    for (Exception? current = ex; current is not null; current = current.InnerException)
+
+    {
+
+        var typeName = current.GetType().FullName ?? string.Empty;
+
+        if (typeName.Contains("PostgresException", StringComparison.Ordinal))
+
+        {
+
+            var sqlState = current.GetType().GetProperty("SqlState")?.GetValue(current) as string;
+
+            if (sqlState == "23505")
+
+                return true;
+
+        }
+
+        var message = current.Message;
+
+        if (message.Contains("23505", StringComparison.Ordinal)
+
+            || message.Contains("unique constraint", StringComparison.OrdinalIgnoreCase)
+
+            || message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase))
+
+            return true;
+
+    }
+
+    return false;
+
+}
 
 
 

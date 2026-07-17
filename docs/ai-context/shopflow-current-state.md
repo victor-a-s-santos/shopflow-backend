@@ -61,7 +61,7 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 
 | Módulo | Backend | Frontend | Testes |
 |--------|---------|----------|--------|
-| **Catalog** | CRUD produtos/SKUs, categorias, atributos, imagens, by-slug; **demo seed** 10 produtos / 94 SKUs | Admin produtos + vitrine + detalhe | Unit + integration (cobertura parcial) |
+| **Catalog** | CRUD produtos/SKUs, categorias, atributos, imagens, by-slug; **demo seed** 10 produtos / 94 SKUs; **contratos admin** (ProblemDetails, SKU code, preços, attrs, imagens, proteção delete) — ver `docs/catalog/` | Admin produtos + vitrine + detalhe | Unit + integration (cobertura parcial) |
 | **Inventory** | Estoque, movimentações, reserva/confirm/cancel, constraints atômicos; **batch availability** Backoffice | Admin estoque completo; Product Edit ainda pode usar GET N+1 até wiring | Unit + integration (incl. concorrência) |
 
 ### Parcial

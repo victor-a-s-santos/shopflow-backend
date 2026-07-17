@@ -71,8 +71,10 @@ public static class DependencyInjection
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductReadModel, ProductReadModel>();
         services.AddScoped<IAttributeDefinitionReadModel, AttributeDefinitionReadModel>();
+        services.AddScoped<IAttributeDefinitionLookup, AttributeDefinitionLookup>();
         services.AddScoped<ICategoryReadModel, CategoryReadModel>();
-        
+        services.AddScoped<ISkuLifecycleGuard, SkuLifecycleGuard>();
+
         services.AddScoped<ISlugService, SlugService>();
 
         services.AddHttpContextAccessor();

@@ -32,7 +32,8 @@
 
 | Dívida | Evidência | Impacto |
 |--------|-----------|---------|
-| **Catalog — cobertura de testes incompleta** | Upload/activate sem teste | Regressão possível |
+| **Salvar produto admin multi-endpoint** | Create shell → variants → images separados; sem transação global | Persistência parcial se o FE falhar no meio; ver `docs/catalog/admin-product-contract.md` |
+| **Arquivos de imagem órfãos no disco** | DELETE imagem remove só o registro DB | Lixo em `uploads/` |
 | **Sem testes HttpApi** | Nenhum teste E2E na API | Contratos não validados automaticamente |
 | **AuthContext `signInVisualOnly` não wired** | Login não chama helper | Preview de UI logada indisponível |
 | **Integração tests skip sem Postgres** | `SHOPFLOW_TEST_DB` opcional | CI local inconsistente |

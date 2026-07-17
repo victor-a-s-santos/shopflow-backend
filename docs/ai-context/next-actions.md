@@ -6,6 +6,7 @@
 
 ## Concluído recentemente
 
+- [x] **Catalog product validation contracts** — ProblemDetails, SKU code, preços, attrs, imagens, proteção SKU, baixa por disponível (`docs/catalog/`, `docs/inventory/stock-movements.md`)
 - [x] **Customer Identity backend** — cookie `shopflow_customer_dev`, endpoints register/login/logout/me, forgot/reset/confirm (`docs/security/SEC-005-customer-identity-backend.md`)
 - [x] **IdentityAccess Fase 1/2** — admin auth, CSRF, SEC-004 hardening
 - [x] Integração frontend Checkout com `POST /api/checkout/sessions`, Orders e PaymentsPix

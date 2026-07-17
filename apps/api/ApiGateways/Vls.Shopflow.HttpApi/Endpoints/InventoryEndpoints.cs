@@ -75,8 +75,8 @@ public static class InventoryEndpoints
             StockChangeRequest req,
             CancellationToken ct) =>
         {
-            await sender.Send(new RemoveStockCommand(skuId, req.Quantity, req.Reason), ct);
-            return Results.NoContent();
+            var result = await sender.Send(new RemoveStockCommand(skuId, req.Quantity, req.Reason), ct);
+            return Results.Ok(result);
         })
         .RequireAuthorization(AuthPolicies.Backoffice);
 
