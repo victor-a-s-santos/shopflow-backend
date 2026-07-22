@@ -17,7 +17,8 @@ public sealed record OrderItemDto(
     string SkuCode,
     int Quantity,
     decimal UnitPrice,
-    decimal Subtotal);
+    decimal Subtotal,
+    OrderItemSalesDisplayDto? SalesDisplay = null);
 
 public sealed record OrderDto(
     Guid OrderId,
@@ -53,7 +54,8 @@ public sealed record GuestOrderItemStatusDto(
     decimal UnitPrice,
     decimal Total,
     IReadOnlyDictionary<string, string>? Attributes,
-    string? ImageUrl);
+    string? ImageUrl,
+    OrderItemSalesDisplayDto? SalesDisplay = null);
 
 public sealed record GuestOrderTotalsDto(
     decimal Subtotal,

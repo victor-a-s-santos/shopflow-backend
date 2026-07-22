@@ -61,7 +61,7 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 
 | Módulo | Backend | Frontend | Testes |
 |--------|---------|----------|--------|
-| **Catalog** | CRUD produtos/SKUs, categorias, atributos, imagens, by-slug; **salesRule** (Unit/min/múltiplos/pacote; update omite = preserva); demo seed; contratos admin — ver `docs/catalog/` | Admin produtos + vitrine + detalhe (salesRule UI Fase 2) | Unit + integration (cobertura parcial) |
+| **Orders** | Create from checkout, guest status+token, admin/customer lists, **guest claim**, **salesDisplay snapshot** em itens (`docs/orders/order-item-sales-snapshot.md`) | Checkout→pedido, status guest, Meus pedidos, claim pós-Pix; FE pedidos ainda sem salesDisplay | Unit + integration |
 | **Inventory** | Estoque, movimentações, reserva/confirm/cancel, constraints atômicos; **batch availability** Backoffice | Admin estoque completo; Product Edit ainda pode usar GET N+1 até wiring | Unit + integration (incl. concorrência) |
 
 ### Parcial

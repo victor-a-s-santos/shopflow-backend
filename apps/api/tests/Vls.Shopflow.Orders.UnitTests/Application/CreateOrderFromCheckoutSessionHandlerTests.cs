@@ -40,7 +40,16 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
                     "SKU-001",
                     2,
                     100m,
-                    200m)
+                    200m,
+                    SalesMode: "Unit",
+                    PackageSize: null,
+                    PackageLabel: null,
+                    PackageDescription: null,
+                    QuantityUnitLabel: "peça(s)",
+                    ShowTotalPieces: false,
+                    TotalPieces: null,
+                    EquivalentUnitPrice: null,
+                    SalesDisplaySummary: null)
             });
 
     private static CreateOrderFromCheckoutSessionCommandHandler CreateHandler(
@@ -259,5 +268,61 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
 
         await act.Should().ThrowAsync<OrderAlreadyExistsForCheckoutSessionException>()
             .Where(ex => ex.ExistingOrderId == existing.Id);
+    }
+
+    [Fact]
+    public async Task Handle_CopiesLoteSalesSnapshotToOrderItem()
+    {
+        var sessionId = Guid.NewGuid();
+        var skuId = Guid.NewGuid();
+        var session = PendingSession(sessionId) with
+        {
+            Subtotal = 482m,
+            Total = 482m,
+            Items =
+            [
+                new CheckoutSessionItemSnapshot(
+                    skuId,
+                    "Corslet",
+                    "LOTE",
+                    2,
+                    241m,
+                    482m,
+                    "FixedPackage",
+                    3,
+                    "Lote com 3 peças",
+                    null,
+                    "lote(s)",
+                    true,
+                    6,
+                    80.33m,
+                    "2 lote(s) = 6 peças")
+            ]
+        };
+
+        var reader = new Mock<ICheckoutSessionReader>();
+        reader.Setup(x => x.GetByIdAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+
+        Order? captured = null;
+        var repository = new Mock<IOrderRepository>();
+        repository.Setup(x => x.GetByCheckoutSessionIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order?)null);
+        repository.Setup(x => x.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Callback<Order, CancellationToken>((order, _) => captured = order)
+            .Returns(Task.CompletedTask);
+
+        var handler = CreateHandler(reader.Object, repository.Object);
+        var result = await handler.Handle(
+            new CreateOrderFromCheckoutSessionCommand(sessionId),
+            CancellationToken.None);
+
+        var item = captured!.Items.Single();
+        item.PackageSize.Should().Be(3);
+        item.TotalPieces.Should().Be(6);
+        item.EquivalentUnitPrice.Should().Be(80.33m);
+        item.Subtotal.Should().Be(482m);
+        result.Items.Single().SalesDisplay.Should().NotBeNull();
+        result.Items.Single().SalesDisplay!.TotalPieces.Should().Be(6);
     }
 }

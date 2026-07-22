@@ -11,6 +11,8 @@ Backend mínimo para o lojista listar e abrir pedidos no Backoffice.
 
 GET não exige CSRF (padrão do projeto).
 
+Detalhe inclui `items[].salesDisplay` (snapshot de lote/pacote; null em Unit/pedidos antigos). Ver `docs/orders/order-item-sales-snapshot.md`.
+
 ## Listagem — query params
 
 | Param | Default | Notas |

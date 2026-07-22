@@ -1,6 +1,7 @@
 using Vls.Shopflow.BuildingBlocks.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
+using Vls.Shopflow.Orders.Application.Mappers;
 using Vls.Shopflow.Orders.Application.Queries;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Enums;
@@ -115,7 +116,8 @@ public sealed class GetCustomerOrderByIdQueryHandler(
                     i.ProductName,
                     i.Quantity,
                     i.UnitPrice,
-                    i.Subtotal))
+                    i.Subtotal,
+                    OrderItemSalesDisplayMapper.ToDto(i)))
                 .ToList(),
             payment);
     }

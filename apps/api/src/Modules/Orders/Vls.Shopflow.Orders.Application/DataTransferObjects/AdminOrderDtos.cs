@@ -68,7 +68,8 @@ public sealed record AdminOrderItemDto(
     string ProductName,
     int Quantity,
     decimal UnitPrice,
-    decimal Subtotal);
+    decimal Subtotal,
+    OrderItemSalesDisplayDto? SalesDisplay = null);
 
 public sealed record AdminOrderDetailDto(
     Guid Id,

@@ -26,6 +26,10 @@ public sealed class CatalogSkuPricingService(CartCheckoutDbContext db) : ICatalo
         public int MinimumQuantity { get; init; }
         public int QuantityStep { get; init; }
         public int? PackageSize { get; init; }
+        public string? PackageLabel { get; init; }
+        public string? PackageDescription { get; init; }
+        public string? QuantityUnitLabel { get; init; }
+        public bool ShowTotalPieces { get; init; }
     }
 
     public async Task<SkuPricingSnapshot?> GetBySkuIdAsync(Guid skuId, CancellationToken cancellationToken)
@@ -47,7 +51,11 @@ public sealed class CatalogSkuPricingService(CartCheckoutDbContext db) : ICatalo
                     COALESCE(s.sales_mode, 0) AS "SalesMode",
                     COALESCE(s.minimum_quantity, 1) AS "MinimumQuantity",
                     COALESCE(s.quantity_step, 1) AS "QuantityStep",
-                    s.package_size AS "PackageSize"
+                    s.package_size AS "PackageSize",
+                    s.package_label AS "PackageLabel",
+                    s.package_description AS "PackageDescription",
+                    s.quantity_unit_label AS "QuantityUnitLabel",
+                    COALESCE(s.show_total_pieces, FALSE) AS "ShowTotalPieces"
                 FROM catalog.product_skus s
                 INNER JOIN catalog.products p ON p."Id" = s."ProductId"
                 WHERE s."Id" = {skuId}
@@ -88,6 +96,10 @@ public sealed class CatalogSkuPricingService(CartCheckoutDbContext db) : ICatalo
                 row.MinimumQuantity <= 0 ? 1 : row.MinimumQuantity,
                 row.QuantityStep <= 0 ? 1 : row.QuantityStep,
                 row.PackageSize,
-                isPackage));
+                isPackage,
+                row.PackageLabel,
+                row.PackageDescription,
+                row.QuantityUnitLabel,
+                row.ShowTotalPieces));
     }
 }

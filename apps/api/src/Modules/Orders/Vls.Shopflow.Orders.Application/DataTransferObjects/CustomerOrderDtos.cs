@@ -50,7 +50,8 @@ public sealed record CustomerOrderItemDto(
     string ProductName,
     int Quantity,
     decimal UnitPrice,
-    decimal Subtotal);
+    decimal Subtotal,
+    OrderItemSalesDisplayDto? SalesDisplay = null);
 
 public sealed record CustomerOrderDetailDto(
     Guid Id,

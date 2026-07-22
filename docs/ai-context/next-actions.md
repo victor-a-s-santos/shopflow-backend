@@ -6,6 +6,7 @@
 
 ## Concluído recentemente
 
+- [x] **Wholesale sales rules Fase 4 (OrderItem snapshot)** — `salesDisplay` em Admin/Customer/Guest (`docs/orders/order-item-sales-snapshot.md`)
 - [x] **Wholesale sales rules Fase 1 (backend)** — SalesMode/SkuSalesRule no SKU, checkout enforcement, migration (`docs/catalog/sales-rules-contract.md`)
 - [x] **Wholesale sales rules — design (Fase 0)** — `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md`
 - [x] **Guest order claim pós-Pix** — create-account + claim com GuestOrderAccessToken (`docs/orders/guest-order-claim.md`)

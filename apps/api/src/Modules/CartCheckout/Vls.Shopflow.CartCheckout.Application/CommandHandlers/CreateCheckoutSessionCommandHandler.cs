@@ -54,6 +54,11 @@ public sealed class CreateCheckoutSessionCommandHandler(
 
                 reservationIds.Add(reservationId);
 
+                var salesSnapshot = LineSalesSnapshotFactory.Capture(
+                    pricing.SalesRule,
+                    line.Quantity,
+                    pricing.UnitPrice);
+
                 sessionItems.Add(CheckoutSessionItem.Create(
                     pricing.ProductId,
                     pricing.ProductName,
@@ -62,7 +67,8 @@ public sealed class CreateCheckoutSessionCommandHandler(
                     pricing.SkuCode,
                     line.Quantity,
                     pricing.UnitPrice,
-                    reservationId));
+                    reservationId,
+                    salesSnapshot));
             }
 
             var session = CheckoutSession.CreatePending(

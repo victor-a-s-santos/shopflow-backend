@@ -40,6 +40,15 @@ public sealed class CheckoutSessionReader(CartCheckoutDbContext cartCheckoutDb) 
                 i.SkuCode,
                 i.Quantity,
                 i.UnitPrice,
-                i.Subtotal)).ToList());
+                i.Subtotal,
+                i.SalesMode,
+                i.PackageSize,
+                i.PackageLabel,
+                i.PackageDescription,
+                i.QuantityUnitLabel,
+                i.ShowTotalPieces,
+                i.TotalPieces,
+                i.EquivalentUnitPrice,
+                i.SalesDisplaySummary)).ToList());
     }
 }

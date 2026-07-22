@@ -40,7 +40,13 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
         OrderMapper.EnsureCheckoutSessionCanCreateOrder(session.Status, session.Id);
 
         var items = session.Items
-            .Select(i => OrderItem.Create(i.SkuId, i.ProductName, i.SkuCode, i.Quantity, i.UnitPrice))
+            .Select(i => OrderItem.Create(
+                i.SkuId,
+                i.ProductName,
+                i.SkuCode,
+                i.Quantity,
+                i.UnitPrice,
+                ToOrderItemSalesSnapshot(i)))
             .ToList();
 
         var order = Order.CreatePendingPayment(
@@ -93,4 +99,20 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
 
         return OrderMapper.ToDto(order, rawToken, tokenExpiresAt);
     }
+
+    /// <summary>
+    /// Copies snapshot from checkout. Pre-migration sessions without SalesMode fall back to Unit
+    /// (do not re-read live catalog — avoids rewriting historical display).
+    /// </summary>
+    private static OrderItemSalesSnapshot ToOrderItemSalesSnapshot(CheckoutSessionItemSnapshot i)
+        => new(
+            SalesMode: string.IsNullOrWhiteSpace(i.SalesMode) ? "Unit" : i.SalesMode,
+            PackageSize: i.PackageSize,
+            PackageLabel: i.PackageLabel,
+            PackageDescription: i.PackageDescription,
+            QuantityUnitLabel: i.QuantityUnitLabel,
+            ShowTotalPieces: i.ShowTotalPieces,
+            TotalPieces: i.TotalPieces,
+            EquivalentUnitPrice: i.EquivalentUnitPrice,
+            SalesDisplaySummary: i.SalesDisplaySummary);
 }

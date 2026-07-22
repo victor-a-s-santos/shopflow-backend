@@ -6,7 +6,16 @@ public sealed record CheckoutSessionItemSnapshot(
     string SkuCode,
     int Quantity,
     decimal UnitPrice,
-    decimal Subtotal);
+    decimal Subtotal,
+    string? SalesMode,
+    int? PackageSize,
+    string? PackageLabel,
+    string? PackageDescription,
+    string? QuantityUnitLabel,
+    bool? ShowTotalPieces,
+    int? TotalPieces,
+    decimal? EquivalentUnitPrice,
+    string? SalesDisplaySummary);
 
 public sealed record CheckoutSessionSnapshot(
     Guid Id,

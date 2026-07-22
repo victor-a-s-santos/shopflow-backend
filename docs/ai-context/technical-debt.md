@@ -32,7 +32,7 @@
 
 | Dívida | Evidência | Impacto |
 |--------|-----------|---------|
-| **Sales rules Fase 2–4** | Backend Fase 1 pronto; falta UI admin/PDP/cart + OrderItem snapshot | UX atacado incompleta (`docs/catalog/sales-rules-contract.md`) |
+| **Sales rules — FE pedidos** | Backend Fase 4 snapshot pronto (`salesDisplay` em OrderItem); FE ainda não consome | Pedidos sem copy de lote |
 | **Guest claim sem e-mail / magic link** | Claim exige token no browser; sem e-mail transacional pós-Pix | Recuperação de pedido se o cliente perder o token (`docs/orders/post-pix-guest-flow.md`) |
 | **Salvar produto admin multi-endpoint** | Create shell → variants → images separados; sem transação global | Persistência parcial se o FE falhar no meio; ver `docs/catalog/admin-product-contract.md` |
 | **Arquivos de imagem órfãos no disco** | DELETE imagem remove só o registro DB | Lixo em `uploads/` |

@@ -528,8 +528,8 @@ Seed demo: permanece Unit até alguém configurar atacado nos produtos demo.
 ### Fase 4 — Checkout UX + Orders snapshot
 
 - Mensagens no checkout se 400.
-- Snapshot em CheckoutSessionItem → OrderItem.
-- Admin/Customer/Guest order display.
+- ~~Snapshot em CheckoutSessionItem → OrderItem.~~ **Feito** — `docs/orders/order-item-sales-snapshot.md`
+- ~~Admin/Customer/Guest order display (API).~~ **Feito** (`salesDisplay`); FE pendente.
 
 ### Fase 5 — Pós-MVP
 
@@ -660,6 +660,6 @@ Escopo sugerido do próximo prompt (= **Fase 1**):
 | Cart FE | `shopflow.cart.v1` — `skuId`, `quantity` |
 | Checkout | `Quantity > 0` apenas |
 | Inventory | Reserve por `skuId` + quantity |
-| OrderItem | Sem sales display snapshot |
+| OrderItem | Snapshot sales display (`SalesMode`, `PackageSize`, `TotalPieces`, …) + DTO `salesDisplay` |
 
 Qualquer implementação deve preservar esse baseline para `SalesMode = Unit`.

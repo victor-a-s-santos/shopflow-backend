@@ -128,6 +128,8 @@ Sortido (quando aplicável):
 - `salesRule` — regra normalizada (`packageSize`, `quantityUnitLabel`, `packageLabel`, `showTotalPieces`, …)
 - `salesRuleDisplay` — **somente** em `FixedPackage` / `AssortedPackage` (null em Unit/Min/Multiple)
 
+Pedidos (Admin/Customer/Guest detail): ver `docs/orders/order-item-sales-snapshot.md` — `salesDisplay` é snapshot histórico do checkout, independente do SKU atual.
+
 ### `salesRuleDisplay` (evita divergência de arredondamento no FE)
 
 ```json

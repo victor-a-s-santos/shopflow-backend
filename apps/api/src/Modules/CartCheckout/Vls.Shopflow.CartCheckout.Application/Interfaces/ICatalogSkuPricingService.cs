@@ -5,7 +5,11 @@ public sealed record SkuSalesRuleSnapshot(
     int MinimumQuantity,
     int QuantityStep,
     int? PackageSize,
-    bool IsPackageMode);
+    bool IsPackageMode,
+    string? PackageLabel = null,
+    string? PackageDescription = null,
+    string? QuantityUnitLabel = null,
+    bool ShowTotalPieces = false);
 
 public sealed record SkuPricingSnapshot(
     Guid ProductId,
