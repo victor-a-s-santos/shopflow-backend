@@ -4,7 +4,7 @@ Módulo responsável por criar e consultar sessões de checkout, reservar estoqu
 
 ## Escopo atual
 
-- `POST /api/checkout/sessions` — cria `CheckoutSession` `Pending` com reserva de estoque por item
+- `POST /api/checkout/sessions` — cria `CheckoutSession` `Pending` com reserva de estoque por item; valida `salesRule` do SKU (`quantity` = unidades do SKU; pacote não multiplica `packageSize` na reserva — ver `docs/catalog/sales-rules-contract.md`)
 - `GET /api/checkout/sessions/{id}` — consulta sessão
 - `POST /api/checkout/sessions/{id}/cancel` — cancela sessão `Pending` e libera reservas
 - TTL de reserva: **15 minutos** (`ReservationExpiresAt` na criação)

@@ -42,7 +42,8 @@ Produto criado via shell fica `isActive: true`. Inativar: `PUT` com `isActive: f
   "regularPrice": 199.90,
   "promotionalPrice": 149.90,
   "attributes": [ /* ver product-attributes-contract.md */ ],
-  "active": true
+  "active": true,
+  "salesRule": { /* opcional — ver sales-rules-contract.md; ausente = Unit */ }
 }
 ```
 
@@ -51,6 +52,8 @@ Produto criado via shell fica `isActive: true`. Inativar: `PUT` com `isActive: f
 - `code` vazio/null/whitespace → backend gera código único (ver `sku-code-rules.md`).
 - `code` informado → normalizado (maiúsculas, hífens) + unicidade **por produto**.
 - Preços: decimal invariável, máx. 2 casas; promo **estritamente menor** que regular se informada.
+- `salesRule` ausente → `Unit` (min=1, step=1) **no create**. No **update**, ausente **preserva** a regra existente; para resetar, envie `salesMode: Unit` explicitamente (`docs/catalog/sales-rules-contract.md`).
+- Leitura sempre devolve `salesRule` normalizada; `salesRuleDisplay` só em Fixed/Assorted.
 
 ## Erros (ProblemDetails)
 

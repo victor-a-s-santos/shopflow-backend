@@ -6,6 +6,7 @@ using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Domain.Constants;
 using Vls.Shopflow.Orders.Domain.Exceptions;
 
 namespace Vls.Shopflow.Orders.Application.CommandHandlers;
@@ -44,9 +45,26 @@ public sealed class CreateAccountFromGuestOrderCommandHandler(
 
         if (!register.Succeeded || register.CustomerUserId is null)
         {
-            var failures = register.Errors.Count > 0
-                ? register.Errors.Select(e => new ValidationFailure(e.Field, e.Message)).ToList()
-                : [new ValidationFailure("password", "Unable to complete registration.")];
+            if (register.Errors.Count == 0)
+            {
+                throw new PasswordRequirementsNotMetException(
+                [
+                    ("password", "A senha não atende aos requisitos.")
+                ]);
+            }
+
+            var passwordOnly = register.Errors.All(e =>
+                string.Equals(e.Field, "password", StringComparison.OrdinalIgnoreCase));
+
+            if (passwordOnly)
+            {
+                throw new PasswordRequirementsNotMetException(
+                    register.Errors.Select(e => (e.Field, e.Message)).ToList());
+            }
+
+            var failures = register.Errors
+                .Select(e => new ValidationFailure(e.Field, e.Message))
+                .ToList();
             throw new ValidationException(failures);
         }
 
@@ -57,12 +75,15 @@ public sealed class CreateAccountFromGuestOrderCommandHandler(
         await customerAccountPort.SignInAsync(register.CustomerUserId.Value, cancellationToken);
 
         logger.LogInformation(
-            "Guest order {OrderId} linked to new customer {CustomerUserId}.",
+            "Guest order {OrderId} (#{OrderNumber}) linked to new customer {CustomerUserId}.",
             order.Id,
+            order.OrderNumber,
             register.CustomerUserId.Value);
 
         return new CreateAccountFromGuestOrderResult(
+            GuestOrderErrorCodes.AccountCreatedAndOrderLinked,
             order.Id,
+            order.FormatOrderNumber(),
             CustomerCreated: true,
             OrderLinked: true,
             RedirectTo: $"/account/orders/{order.Id}");
@@ -99,13 +120,16 @@ public sealed class ClaimGuestOrderCommandHandler(
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
             logger.LogInformation(
-                "Guest order {OrderId} claimed by customer {CustomerUserId}.",
+                "Guest order {OrderId} (#{OrderNumber}) claimed by customer {CustomerUserId}.",
                 order.Id,
+                order.OrderNumber,
                 request.CustomerUserId);
         }
 
         return new ClaimGuestOrderResult(
+            GuestOrderErrorCodes.OrderLinked,
             order.Id,
+            order.FormatOrderNumber(),
             OrderLinked: true,
             RedirectTo: $"/account/orders/{order.Id}");
     }

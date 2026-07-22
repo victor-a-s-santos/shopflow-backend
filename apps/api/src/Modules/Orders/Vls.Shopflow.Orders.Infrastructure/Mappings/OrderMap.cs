@@ -37,6 +37,11 @@ internal sealed class OrderMap : IEntityTypeConfiguration<Order>
 
         map.Property(x => x.CustomerUserId);
 
+        map.Property(x => x.OrderNumber).IsRequired();
+        map.HasIndex(x => x.OrderNumber)
+            .IsUnique()
+            .HasDatabaseName("IX_orders_OrderNumber");
+
         map.Property(x => x.CreatedAt).IsRequired();
         map.Property(x => x.UpdatedAt);
         map.Property(x => x.PaidAt);

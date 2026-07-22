@@ -53,6 +53,7 @@ public sealed class GetCustomerOrdersQueryHandler(
 
         var items = page.Items.Select(row => new CustomerOrderListItemDto(
             row.Id,
+            row.OrderNumber.ToString(),
             row.Status.ToString(),
             row.CreatedAt,
             row.PaidAt,
@@ -90,6 +91,7 @@ public sealed class GetCustomerOrderByIdQueryHandler(
 
         return new CustomerOrderDetailDto(
             order.Id,
+            order.FormatOrderNumber(),
             order.Status.ToString(),
             order.CreatedAt,
             order.UpdatedAt,

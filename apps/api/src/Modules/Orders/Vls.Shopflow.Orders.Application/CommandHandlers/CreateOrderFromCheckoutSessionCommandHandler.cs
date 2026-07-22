@@ -15,6 +15,7 @@ namespace Vls.Shopflow.Orders.Application.CommandHandlers;
 public sealed class CreateOrderFromCheckoutSessionCommandHandler(
     ICheckoutSessionReader checkoutSessionReader,
     IOrderRepository orderRepository,
+    IOrderNumberGenerator orderNumberGenerator,
     IGuestOrderAccessTokenRepository guestTokenRepository,
     IGuestOrderAccessTokenHasher tokenHasher,
     IOrdersUnitOfWork unitOfWork,
@@ -60,6 +61,9 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
             items,
             command.CustomerUserId);
 
+        var orderNumber = await orderNumberGenerator.NextAsync(cancellationToken);
+        order.AssignOrderNumber(orderNumber);
+
         await orderRepository.AddAsync(order, cancellationToken);
 
         string? rawToken = null;
@@ -79,9 +83,10 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Created order {OrderId} from checkout session {CheckoutSessionId} with status PendingPayment. " +
+            "Created order {OrderId} (#{OrderNumber}) from checkout session {CheckoutSessionId} with status PendingPayment. " +
             "GuestAccessTokenIssued={TokenIssued} CustomerUserIdBound={CustomerBound}",
             order.Id,
+            order.OrderNumber,
             session.Id,
             rawToken is not null,
             order.CustomerUserId is not null);

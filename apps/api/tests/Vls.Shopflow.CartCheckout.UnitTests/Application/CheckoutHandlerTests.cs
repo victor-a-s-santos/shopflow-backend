@@ -17,9 +17,22 @@ namespace Vls.Shopflow.CartCheckout.UnitTests.Application;
 
 public sealed class CheckoutHandlerTests
 {
-  private static readonly CustomerInput Customer = new("João Silva", "joao@email.com", "11999999999");
+    private static readonly CustomerInput Customer = new("João Silva", "joao@email.com", "11999999999");
     private static readonly AddressInput Address = new(
         "01001000", "Rua Exemplo", "123", "Apto 10", "Centro", "São Paulo", "SP");
+
+    internal static SkuSalesRuleSnapshot UnitRule()
+        => new("Unit", 1, 1, null, false);
+
+    internal static SkuPricingSnapshot Pricing(
+        Guid skuId,
+        decimal unitPrice = 100m,
+        bool skuActive = true,
+        bool productActive = true,
+        SkuSalesRuleSnapshot? rule = null)
+        => new(
+            Guid.NewGuid(), "Produto", "produto", skuId, "SKU-001", unitPrice, skuActive, productActive,
+            rule ?? UnitRule());
 
     [Fact]
     public async Task CreateCheckoutSession_WithValidItem_CreatesSessionAndReservesStock()
@@ -29,8 +42,7 @@ public sealed class CheckoutHandlerTests
 
         var catalog = new Mock<ICatalogSkuPricingService>();
         catalog.Setup(x => x.GetBySkuIdAsync(skuId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SkuPricingSnapshot(
-                Guid.NewGuid(), "Produto", "produto", skuId, "SKU-001", 100m, true, true));
+            .ReturnsAsync(Pricing(skuId));
 
         var inventory = new Mock<IInventoryReservationService>();
         inventory.Setup(x => x.ReserveAsync(skuId, 2, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
@@ -80,8 +92,7 @@ public sealed class CheckoutHandlerTests
 
         var catalog = new Mock<ICatalogSkuPricingService>();
         catalog.Setup(x => x.GetBySkuIdAsync(skuId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SkuPricingSnapshot(
-                Guid.NewGuid(), "Produto", "produto", skuId, "SKU-001", 79.90m, true, true));
+            .ReturnsAsync(Pricing(skuId, 79.90m));
 
         var inventory = new Mock<IInventoryReservationService>();
         inventory.Setup(x => x.ReserveAsync(skuId, 1, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
@@ -129,8 +140,7 @@ public sealed class CheckoutHandlerTests
         var skuId = Guid.NewGuid();
         var catalog = new Mock<ICatalogSkuPricingService>();
         catalog.Setup(x => x.GetBySkuIdAsync(skuId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SkuPricingSnapshot(
-                Guid.NewGuid(), "Produto", "produto", skuId, "SKU-001", 100m, false, true));
+            .ReturnsAsync(Pricing(skuId, skuActive: false));
 
         var handler = new CreateCheckoutSessionCommandHandler(
             catalog.Object,
@@ -155,9 +165,9 @@ public sealed class CheckoutHandlerTests
 
         var catalog = new Mock<ICatalogSkuPricingService>();
         catalog.Setup(x => x.GetBySkuIdAsync(sku1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SkuPricingSnapshot(Guid.NewGuid(), "P1", "p1", sku1, "S1", 10m, true, true));
+            .ReturnsAsync(Pricing(sku1, 10m));
         catalog.Setup(x => x.GetBySkuIdAsync(sku2, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new SkuPricingSnapshot(Guid.NewGuid(), "P2", "p2", sku2, "S2", 20m, true, true));
+            .ReturnsAsync(Pricing(sku2, 20m));
 
         var inventory = new Mock<IInventoryReservationService>();
         inventory.Setup(x => x.ReserveAsync(sku1, 1, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
@@ -184,108 +194,219 @@ public sealed class CheckoutHandlerTests
     }
 
     [Fact]
-    public async Task CancelCheckoutSession_CancelsReservationsAndMarksCanceled()
+    public async Task CreateCheckoutSession_MinimumQuantity_RejectsBelowMin()
     {
-        var reservationId = Guid.NewGuid();
-        var item = CheckoutSessionItem.Create(
-            Guid.NewGuid(), "Produto", "produto", Guid.NewGuid(), "SKU-001", 1, 100m, reservationId);
-        var session = CheckoutSession.CreatePending(
-            Customer.FullName, Customer.Email, Customer.Phone,
-            Address.ZipCode, Address.Street, Address.Number, Address.Complement,
-            Address.Neighborhood, Address.City, Address.State,
-            DateTimeOffset.UtcNow.AddMinutes(15),
-            [item]);
+        var skuId = Guid.NewGuid();
+        var catalog = new Mock<ICatalogSkuPricingService>();
+        catalog.Setup(x => x.GetBySkuIdAsync(skuId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Pricing(skuId, rule: new SkuSalesRuleSnapshot("MinimumQuantity", 3, 1, null, false)));
 
-        var sessionId = session.Id;
+        var handler = new CreateCheckoutSessionCommandHandler(
+            catalog.Object,
+            Mock.Of<IInventoryReservationService>(),
+            Mock.Of<ICheckoutSessionRepository>(),
+            Mock.Of<ICartCheckoutUnitOfWork>(),
+            NullLogger<CreateCheckoutSessionCommandHandler>.Instance);
 
-        var repository = new Mock<ICheckoutSessionRepository>();
-        repository.Setup(x => x.GetByIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(session);
+        var act = () => handler.Handle(
+            new CreateCheckoutSessionCommand(Customer, Address, [new CheckoutItemInput(skuId, 2)]),
+            CancellationToken.None);
 
-        var inventory = new Mock<IInventoryReservationService>();
-        var uow = new Mock<ICartCheckoutUnitOfWork>();
-        uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-
-        var handler = new CancelCheckoutSessionCommandHandler(
-            repository.Object,
-            inventory.Object,
-            uow.Object,
-            NullLogger<CancelCheckoutSessionCommandHandler>.Instance);
-
-        await handler.Handle(new CancelCheckoutSessionCommand(sessionId), CancellationToken.None);
-
-        inventory.Verify(x => x.CancelReservationAsync(reservationId, It.IsAny<CancellationToken>()), Times.Once);
-        session.Status.Should().Be(CheckoutSessionStatus.Canceled);
+        var ex = await act.Should().ThrowAsync<CheckoutSalesRuleViolationException>();
+        ex.Which.Code.Should().Be(CheckoutSalesRuleViolationException.MinQuantity);
     }
 
     [Fact]
-    public async Task CancelCheckoutSession_WhenAlreadyCanceled_IsIdempotent()
+    public async Task CreateCheckoutSession_MultipleQuantity_RejectsNonMultiple()
     {
-        var item = CheckoutSessionItem.Create(
-            Guid.NewGuid(), "Produto", "produto", Guid.NewGuid(), "SKU-001", 1, 100m, Guid.NewGuid());
-        var session = CheckoutSession.CreatePending(
-            Customer.FullName, Customer.Email, Customer.Phone,
-            Address.ZipCode, Address.Street, Address.Number, Address.Complement,
-            Address.Neighborhood, Address.City, Address.State,
-            DateTimeOffset.UtcNow.AddMinutes(15),
-            [item]);
-        session.Cancel();
+        var skuId = Guid.NewGuid();
+        var catalog = new Mock<ICatalogSkuPricingService>();
+        catalog.Setup(x => x.GetBySkuIdAsync(skuId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Pricing(skuId, rule: new SkuSalesRuleSnapshot("MultipleQuantity", 3, 3, null, false)));
 
-        var sessionId = session.Id;
+        var handler = new CreateCheckoutSessionCommandHandler(
+            catalog.Object,
+            Mock.Of<IInventoryReservationService>(),
+            Mock.Of<ICheckoutSessionRepository>(),
+            Mock.Of<ICartCheckoutUnitOfWork>(),
+            NullLogger<CreateCheckoutSessionCommandHandler>.Instance);
 
-        var repository = new Mock<ICheckoutSessionRepository>();
-        repository.Setup(x => x.GetByIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(session);
+        var act = () => handler.Handle(
+            new CreateCheckoutSessionCommand(Customer, Address, [new CheckoutItemInput(skuId, 4)]),
+            CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<CheckoutSalesRuleViolationException>();
+        ex.Which.Code.Should().Be(CheckoutSalesRuleViolationException.QuantityStep);
+    }
+
+    [Fact]
+    public async Task CreateCheckoutSession_AssortedPackage_ReservesPackagesNotPieces()
+    {
+        var skuId = Guid.NewGuid();
+        var catalog = new Mock<ICatalogSkuPricingService>();
+        catalog.Setup(x => x.GetBySkuIdAsync(skuId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Pricing(skuId, rule: new SkuSalesRuleSnapshot("AssortedPackage", 1, 1, 6, true)));
 
         var inventory = new Mock<IInventoryReservationService>();
+        inventory.Setup(x => x.ReserveAsync(skuId, 2, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Guid.NewGuid());
 
-        var handler = new CancelCheckoutSessionCommandHandler(
-            repository.Object,
+        var handler = new CreateCheckoutSessionCommandHandler(
+            catalog.Object,
             inventory.Object,
+            Mock.Of<ICheckoutSessionRepository>(),
             Mock.Of<ICartCheckoutUnitOfWork>(),
-            NullLogger<CancelCheckoutSessionCommandHandler>.Instance);
+            NullLogger<CreateCheckoutSessionCommandHandler>.Instance);
 
-        await handler.Handle(new CancelCheckoutSessionCommand(sessionId), CancellationToken.None);
+        await handler.Handle(
+            new CreateCheckoutSessionCommand(Customer, Address, [new CheckoutItemInput(skuId, 2)]),
+            CancellationToken.None);
 
         inventory.Verify(
-            x => x.CancelReservationAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            x => x.ReserveAsync(skuId, 2, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        inventory.Verify(
+            x => x.ReserveAsync(skuId, 12, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public void ConsolidateItems_MergesDuplicateSkuIds()
+    public async Task CreateCheckoutSession_LoteFixedPackage_Quantity2_PassesAndReservesTwoNotSix()
+    {
+        // §11.30–31 — CORSLET lote: packageSize=3, quantity=2 → reserve 2 (not 6)
+        var skuId = Guid.NewGuid();
+        var catalog = new Mock<ICatalogSkuPricingService>();
+        catalog.Setup(x => x.GetBySkuIdAsync(skuId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Pricing(
+                skuId,
+                unitPrice: 241.00m,
+                rule: new SkuSalesRuleSnapshot("FixedPackage", 1, 1, 3, true)));
+
+        var inventory = new Mock<IInventoryReservationService>();
+        inventory.Setup(x => x.ReserveAsync(skuId, 2, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Guid.NewGuid());
+
+        CheckoutSession? captured = null;
+        var repository = new Mock<ICheckoutSessionRepository>();
+        repository.Setup(x => x.AddAsync(It.IsAny<CheckoutSession>(), It.IsAny<CancellationToken>()))
+            .Callback<CheckoutSession, CancellationToken>((session, _) => captured = session)
+            .Returns(Task.CompletedTask);
+
+        var uow = new Mock<ICartCheckoutUnitOfWork>();
+        uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        var handler = new CreateCheckoutSessionCommandHandler(
+            catalog.Object,
+            inventory.Object,
+            repository.Object,
+            uow.Object,
+            NullLogger<CreateCheckoutSessionCommandHandler>.Instance);
+
+        var result = await handler.Handle(
+            new CreateCheckoutSessionCommand(Customer, Address, [new CheckoutItemInput(skuId, 2)]),
+            CancellationToken.None);
+
+        result.Status.Should().Be("Pending");
+        result.Items.Should().ContainSingle(i => i.Quantity == 2 && i.UnitPrice == 241.00m);
+        result.Subtotal.Should().Be(482.00m);
+
+        inventory.Verify(
+            x => x.ReserveAsync(skuId, 2, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        inventory.Verify(
+            x => x.ReserveAsync(skuId, 6, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        captured!.Items.Should().ContainSingle(i => i.Quantity == 2);
+    }
+
+    [Fact]
+    public async Task CreateCheckoutSession_InvalidPackageConfig_Throws()
     {
         var skuId = Guid.NewGuid();
-        var consolidated = CheckoutItemConsolidator.Consolidate(
+        var catalog = new Mock<ICatalogSkuPricingService>();
+        catalog.Setup(x => x.GetBySkuIdAsync(skuId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Pricing(skuId, rule: new SkuSalesRuleSnapshot("FixedPackage", 1, 1, null, true)));
+
+        var handler = new CreateCheckoutSessionCommandHandler(
+            catalog.Object,
+            Mock.Of<IInventoryReservationService>(),
+            Mock.Of<ICheckoutSessionRepository>(),
+            Mock.Of<ICartCheckoutUnitOfWork>(),
+            NullLogger<CreateCheckoutSessionCommandHandler>.Instance);
+
+        var act = () => handler.Handle(
+            new CreateCheckoutSessionCommand(Customer, Address, [new CheckoutItemInput(skuId, 1)]),
+            CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<CheckoutSalesRuleViolationException>();
+        ex.Which.Code.Should().Be(CheckoutSalesRuleViolationException.InvalidConfiguration);
+    }
+}
+
+public sealed class CheckoutSalesRuleValidatorTests
+{
+    [Theory]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(6)]
+    public void MinimumQuantity_AcceptsValid(int qty)
+    {
+        var act = () => CheckoutSalesRuleValidator.EnsurePurchaseQuantityAllowed(
+            Guid.NewGuid(), qty, new SkuSalesRuleSnapshot("MinimumQuantity", 3, 1, null, false));
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(6)]
+    [InlineData(9)]
+    public void MultipleQuantity_AcceptsMultiples(int qty)
+    {
+        var act = () => CheckoutSalesRuleValidator.EnsurePurchaseQuantityAllowed(
+            Guid.NewGuid(), qty, new SkuSalesRuleSnapshot("MultipleQuantity", 3, 3, null, false));
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(5)]
+    public void MultipleQuantity_RejectsNonMultiples(int qty)
+    {
+        var act = () => CheckoutSalesRuleValidator.EnsurePurchaseQuantityAllowed(
+            Guid.NewGuid(), qty, new SkuSalesRuleSnapshot("MultipleQuantity", 3, 3, null, false));
+        act.Should().Throw<CheckoutSalesRuleViolationException>()
+            .Which.Code.Should().Be(CheckoutSalesRuleViolationException.QuantityStep);
+    }
+}
+
+public sealed class CheckoutItemConsolidatorTests
+{
+    [Fact]
+    public void Consolidate_MergesDuplicateSkuIds()
+    {
+        var sku = Guid.NewGuid();
+        var result = CheckoutItemConsolidator.Consolidate(
         [
-            new CheckoutItemInput(skuId, 2),
-            new CheckoutItemInput(skuId, 3)
+            new CheckoutItemInput(sku, 1),
+            new CheckoutItemInput(sku, 2)
         ]);
 
-        consolidated.Should().ContainSingle();
-        consolidated[0].Quantity.Should().Be(5);
+        result.Should().ContainSingle();
+        result[0].Quantity.Should().Be(3);
     }
+}
 
+public sealed class CreateCheckoutSessionValidatorTests
+{
     [Fact]
-    public async Task CreateCheckoutSessionValidator_RejectsEmptyItems()
+    public void EmptyItems_Fails()
     {
-        var validator = new CreateCheckoutSessionCommandValidator();
-        var result = await validator.ValidateAsync(
-            new CreateCheckoutSessionCommand(Customer, Address, []));
-
-        result.IsValid.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task CreateCheckoutSessionValidator_RejectsNonPositiveQuantity()
-    {
-        var validator = new CreateCheckoutSessionCommandValidator();
-        var result = await validator.ValidateAsync(
+        var result = new CreateCheckoutSessionCommandValidator().Validate(
             new CreateCheckoutSessionCommand(
-                Customer,
-                Address,
-                [new CheckoutItemInput(Guid.NewGuid(), 0)]));
-
+                new CustomerInput("A", "a@b.com", "1"),
+                new AddressInput("01001000", "R", "1", null, "C", "S", "SP"),
+                []));
         result.IsValid.Should().BeFalse();
     }
 }

@@ -11,6 +11,8 @@
 | POST | `/api/customer/orders/guest/{orderId}/create-account` | Anônimo + GuestOrderAccessToken (body) |
 | POST | `/api/customer/orders/guest/{orderId}/claim` | `Customer` + GuestOrderAccessToken (body) |
 
+List/detail incluem `orderNumber` (string amigável). Ver fluxo guest: [`post-pix-guest-flow.md`](./post-pix-guest-flow.md), [`guest-order-claim.md`](./guest-order-claim.md).
+
 - Sem login nas GETs → 401  
 - Admin Backoffice cookie **não** autoriza GETs  
 - GuestOrderAccessToken **sozinho** não autoriza listagem — só claim/create-account  

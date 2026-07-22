@@ -73,4 +73,6 @@ public sealed record GuestOrderStatusDto(
     IReadOnlyList<GuestOrderItemStatusDto> Items,
     GuestOrderTotalsDto Totals,
     GuestOrderMaskedCustomerDto Customer,
-    GuestOrderAccessMetaDto Access);
+    GuestOrderAccessMetaDto Access,
+    bool CanCreateAccount,
+    bool AccountExistsForEmail);

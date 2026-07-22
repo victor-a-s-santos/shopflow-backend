@@ -252,7 +252,7 @@ public sealed class AdminOrderQueryHandlerTests
         string email,
         string phone,
         DateTimeOffset createdAt)
-        => new(id, OrderStatus.PendingPayment, name, email, phone, 100m, null, 100m, createdAt, null, 1);
+        => new(id, 10582, OrderStatus.PendingPayment, name, email, phone, 100m, null, 100m, createdAt, null, 1);
 
     private static AdminOrderPaymentSummaryDto SamplePayment(Guid orderId)
         => new(
@@ -274,7 +274,7 @@ public sealed class AdminOrderQueryHandlerTests
     private static Order CreateOrder(string name, string email, string phone)
     {
         var item = OrderItem.Create(Guid.NewGuid(), "Produto", "SKU-1", 1, 100m);
-        return Order.CreatePendingPayment(
+        var order = Order.CreatePendingPayment(
             Guid.NewGuid(),
             name,
             email,
@@ -290,5 +290,7 @@ public sealed class AdminOrderQueryHandlerTests
             null,
             100m,
             [item]);
+        order.AssignOrderNumber(10582);
+        return order;
     }
 }

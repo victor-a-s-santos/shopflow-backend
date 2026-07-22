@@ -20,4 +20,14 @@ public sealed class GuestOrderAccessTokenRepository(OrdersDbContext db) : IGuest
                  && t.RevokedAt == null
                  && t.ExpiresAt > asOfUtc,
             cancellationToken);
+
+    public Task<GuestOrderAccessToken?> FindByOrderIdAndHashAsync(
+        Guid orderId,
+        string tokenHash,
+        CancellationToken cancellationToken)
+        => db.GuestOrderAccessTokens.FirstOrDefaultAsync(
+            t => t.OrderId == orderId
+                 && t.TokenHash == tokenHash
+                 && t.RevokedAt == null,
+            cancellationToken);
 }

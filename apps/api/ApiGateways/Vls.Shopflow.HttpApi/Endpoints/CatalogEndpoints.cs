@@ -57,8 +57,9 @@ public static class CatalogEndpoints
                 req.Code,
                 req.RegularPrice,
                 req.PromotionalPrice,
-                req.Attributes, // agora é List<SkuAttributeCreateDto>
-                req.Active
+                req.Attributes,
+                req.Active,
+                req.SalesRule
             ), ct);
 
             return Results.Created($"/api/catalog/products/{productId}/variants/{skuId}", new { skuId });
@@ -133,7 +134,8 @@ public static class CatalogEndpoints
                     req.RegularPrice,
                     req.PromotionalPrice,
                     req.Attributes,
-                    req.Active
+                    req.Active,
+                    req.SalesRule
                 ), ct);
                 return Results.NoContent();
             })
@@ -247,7 +249,8 @@ public sealed record AddVariantRequest(
     decimal RegularPrice,
     decimal? PromotionalPrice,
     IReadOnlyList<SkuAttributeCreateDto>? Attributes,
-    bool Active = true);
+    bool Active = true,
+    SkuSalesRuleWriteDto? SalesRule = null);
 
 public sealed record UpdateProductRequest(
     string Name,
@@ -260,4 +263,5 @@ public sealed record UpdateVariantRequest(
     decimal RegularPrice,
     decimal? PromotionalPrice,
     IReadOnlyList<SkuAttributeCreateDto>? Attributes,
-    bool Active = true);
+    bool Active = true,
+    SkuSalesRuleWriteDto? SalesRule = null);

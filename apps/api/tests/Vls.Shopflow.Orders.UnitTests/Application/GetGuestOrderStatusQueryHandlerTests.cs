@@ -14,7 +14,8 @@ namespace Vls.Shopflow.Orders.UnitTests.Application;
 public sealed class GetGuestOrderStatusQueryHandlerTests
 {
     private static Order CreateOrder()
-        => Order.CreatePendingPayment(
+    {
+        var order = Order.CreatePendingPayment(
             Guid.NewGuid(),
             "Victor Araujo",
             "victor@gmail.com",
@@ -30,6 +31,9 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
             0m,
             159.90m,
             new[] { OrderItem.Create(Guid.NewGuid(), "Camiseta Básica", "SKU-M", 1, 159.90m) });
+        order.AssignOrderNumber(10582);
+        return order;
+    }
 
     private static GuestOrderAccessToken CreateToken(Guid orderId, string hash = "hash-abc")
         => GuestOrderAccessToken.Create(orderId, hash, DateTimeOffset.UtcNow.AddDays(30));
@@ -37,11 +41,16 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
     private static GetGuestOrderStatusQueryHandler CreateHandler(
         IGuestOrderAccessGate? gate = null,
         IOrderPixPaymentStatusReader? paymentReader = null,
+        ICustomerAccountPort? accounts = null,
         IOrdersUnitOfWork? uow = null)
     {
+        var accountPort = accounts ?? Mock.Of<ICustomerAccountPort>(x =>
+            x.EmailExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()) == Task.FromResult(false));
+
         return new GetGuestOrderStatusQueryHandler(
             gate ?? Mock.Of<IGuestOrderAccessGate>(),
             paymentReader ?? Mock.Of<IOrderPixPaymentStatusReader>(),
+            accountPort,
             uow ?? Mock.Of<IOrdersUnitOfWork>(x =>
                 x.SaveChangesAsync(It.IsAny<CancellationToken>()) == Task.FromResult(1)),
             NullLogger<GetGuestOrderStatusQueryHandler>.Instance);
@@ -74,10 +83,13 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
             CancellationToken.None);
 
         result.OrderId.Should().Be(order.Id);
+        result.OrderNumber.Should().Be("10582");
         result.OrderStatus.Should().Be("PendingPayment");
         result.Payment!.Status.Should().Be("Pending");
         result.Customer.Name.Should().Be("Vi***");
         result.Customer.Email.Should().Be("v***@gmail.com");
+        result.CanCreateAccount.Should().BeTrue();
+        result.AccountExistsForEmail.Should().BeFalse();
         result.Items.Should().ContainSingle(i => i.ProductName == "Camiseta Básica");
 
         var json = System.Text.Json.JsonSerializer.Serialize(result);

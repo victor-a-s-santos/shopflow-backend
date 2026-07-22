@@ -31,13 +31,16 @@ public sealed class AdminOrderReadModel(OrdersDbContext db) : IAdminOrderReadMod
 
         if (spec.SearchOrderId is { } orderId)
             query = query.Where(o => o.Id == orderId);
+        else if (spec.SearchOrderNumber is { } orderNumber)
+            query = query.Where(o => o.OrderNumber == orderNumber);
         else if (!string.IsNullOrWhiteSpace(spec.SearchText))
         {
             var term = spec.SearchText.Trim().ToLower();
             query = query.Where(o =>
                 o.CustomerEmail.ToLower().Contains(term)
                 || o.CustomerFullName.ToLower().Contains(term)
-                || o.CustomerPhone.ToLower().Contains(term));
+                || o.CustomerPhone.ToLower().Contains(term)
+                || o.OrderNumber.ToString().Contains(term));
         }
 
         var totalItems = await query.CountAsync(cancellationToken);
@@ -51,6 +54,7 @@ public sealed class AdminOrderReadModel(OrdersDbContext db) : IAdminOrderReadMod
             .Take(spec.PageSize)
             .Select(o => new AdminOrderListRow(
                 o.Id,
+                o.OrderNumber,
                 o.Status,
                 o.CustomerFullName,
                 o.CustomerEmail,

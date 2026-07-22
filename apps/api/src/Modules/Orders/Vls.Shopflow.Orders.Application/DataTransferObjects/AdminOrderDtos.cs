@@ -22,6 +22,7 @@ public sealed record AdminOrderPaymentSummaryDto(
 
 public sealed record AdminOrderListItemDto(
     Guid Id,
+    string OrderNumber,
     string Status,
     string CustomerFullName,
     string CustomerEmail,
@@ -71,6 +72,7 @@ public sealed record AdminOrderItemDto(
 
 public sealed record AdminOrderDetailDto(
     Guid Id,
+    string OrderNumber,
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,

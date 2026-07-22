@@ -40,6 +40,12 @@ public sealed class CreateCheckoutSessionCommandHandler(
                 if (!pricing.SkuIsActive || !pricing.ProductIsActive)
                     throw new InactiveSkuException(line.SkuId);
 
+                // quantity = units of the sold SKU (packages or pieces). Never × packageSize.
+                CheckoutSalesRuleValidator.EnsurePurchaseQuantityAllowed(
+                    line.SkuId,
+                    line.Quantity,
+                    pricing.SalesRule);
+
                 var reservationId = await inventoryReservation.ReserveAsync(
                     line.SkuId,
                     line.Quantity,

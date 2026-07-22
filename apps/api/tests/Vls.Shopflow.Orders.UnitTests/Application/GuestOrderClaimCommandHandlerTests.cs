@@ -15,7 +15,8 @@ namespace Vls.Shopflow.Orders.UnitTests.Application;
 public sealed class GuestOrderClaimCommandHandlerTests
 {
     private static Order CreateGuestOrder(string email = "guest@example.com")
-        => Order.CreatePendingPayment(
+    {
+        var order = Order.CreatePendingPayment(
             Guid.NewGuid(),
             "Maria Silva",
             email,
@@ -31,6 +32,9 @@ public sealed class GuestOrderClaimCommandHandlerTests
             null,
             100m,
             [OrderItem.Create(Guid.NewGuid(), "Produto", "SKU-1", 1, 100m)]);
+        order.AssignOrderNumber(10582);
+        return order;
+    }
 
     private static GuestOrderAccessToken CreateToken(Guid orderId)
         => GuestOrderAccessToken.Create(orderId, "hash", DateTimeOffset.UtcNow.AddDays(7));
@@ -67,6 +71,8 @@ public sealed class GuestOrderClaimCommandHandlerTests
             new CreateAccountFromGuestOrderCommand(order.Id, "raw", "Password1", "Password1"),
             CancellationToken.None);
 
+        result.Code.Should().Be("ACCOUNT_CREATED_AND_ORDER_LINKED");
+        result.OrderNumber.Should().Be("10582");
         result.CustomerCreated.Should().BeTrue();
         result.OrderLinked.Should().BeTrue();
         result.RedirectTo.Should().Be($"/account/orders/{order.Id}");
@@ -146,9 +152,46 @@ public sealed class GuestOrderClaimCommandHandlerTests
             new ClaimGuestOrderCommand(order.Id, "raw", customerId, "SAME@example.com"),
             CancellationToken.None);
 
+        result.Code.Should().Be("ORDER_LINKED");
+        result.OrderNumber.Should().Be("10582");
         result.OrderLinked.Should().BeTrue();
         order.CustomerUserId.Should().Be(customerId);
         uow.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAccount_WeakPassword_ThrowsPasswordRequirementsNotMet()
+    {
+        var order = CreateGuestOrder();
+        var token = CreateToken(order.Id);
+
+        var gate = new Mock<IGuestOrderAccessGate>();
+        gate.Setup(x => x.ValidateAsync(order.Id, "raw", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((token, order));
+
+        var accounts = new Mock<ICustomerAccountPort>();
+        accounts.Setup(x => x.EmailExistsAsync(order.CustomerEmail, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        accounts.Setup(x => x.RegisterAsync(
+                order.CustomerEmail, "Password1", order.CustomerFullName, order.CustomerPhone,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CustomerAccountCreateResult(
+                false,
+                null,
+                false,
+                [new CustomerAccountFieldError("password", "Use pelo menos um número.")]));
+
+        var handler = new CreateAccountFromGuestOrderCommandHandler(
+            gate.Object, accounts.Object, Mock.Of<IOrdersUnitOfWork>(),
+            NullLogger<CreateAccountFromGuestOrderCommandHandler>.Instance);
+
+        var act = () => handler.Handle(
+            new CreateAccountFromGuestOrderCommand(order.Id, "raw", "Password1", "Password1"),
+            CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<PasswordRequirementsNotMetException>();
+        ex.Which.Errors.Should().ContainSingle(e => e.Message == "Use pelo menos um número.");
+        ex.Which.Message.Should().NotContain("Unable to complete registration.");
     }
 
     [Fact]
@@ -273,6 +316,9 @@ public sealed class GuestOrderAccessGateTests
         tokenRepo.Setup(x => x.FindActiveByOrderIdAndHashAsync(
                 orderId, "hash", It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((GuestOrderAccessToken?)null);
+        tokenRepo.Setup(x => x.FindByOrderIdAndHashAsync(
+                orderId, "hash", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((GuestOrderAccessToken?)null);
 
         var hasher = new Mock<IGuestOrderAccessTokenHasher>();
         hasher.Setup(x => x.Hash("raw")).Returns("hash");
@@ -288,6 +334,40 @@ public sealed class GuestOrderAccessGateTests
             tokenRepo.Object, hasher.Object, Mock.Of<IOrderRepository>(), options);
 
         var act = () => gate.ValidateAsync(orderId, "raw", CancellationToken.None);
-        await act.Should().ThrowAsync<GuestOrderAccessDeniedException>();
+        var ex = await act.Should().ThrowAsync<GuestOrderAccessDeniedException>();
+        ex.Which.Code.Should().Be("INVALID_GUEST_ORDER_TOKEN");
+    }
+
+    [Fact]
+    public async Task Validate_WhenTokenExpired_ThrowsExpired()
+    {
+        var orderId = Guid.NewGuid();
+        var created = DateTimeOffset.UtcNow.AddDays(-10);
+        var expired = GuestOrderAccessToken.Create(
+            orderId, "hash", DateTimeOffset.UtcNow.AddDays(-1), createdAt: created);
+
+        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
+        tokenRepo.Setup(x => x.FindActiveByOrderIdAndHashAsync(
+                orderId, "hash", It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((GuestOrderAccessToken?)null);
+        tokenRepo.Setup(x => x.FindByOrderIdAndHashAsync(
+                orderId, "hash", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expired);
+
+        var hasher = new Mock<IGuestOrderAccessTokenHasher>();
+        hasher.Setup(x => x.Hash("raw")).Returns("hash");
+
+        var options = Microsoft.Extensions.Options.Options.Create(
+            new Vls.Shopflow.Orders.Application.Options.GuestOrderAccessOptions
+            {
+                Enabled = true,
+                TokenHashSecret = "secret"
+            });
+
+        var gate = new Vls.Shopflow.Orders.Application.Services.GuestOrderAccessGate(
+            tokenRepo.Object, hasher.Object, Mock.Of<IOrderRepository>(), options);
+
+        var act = () => gate.ValidateAsync(orderId, "raw", CancellationToken.None);
+        await act.Should().ThrowAsync<GuestOrderAccessTokenExpiredException>();
     }
 }

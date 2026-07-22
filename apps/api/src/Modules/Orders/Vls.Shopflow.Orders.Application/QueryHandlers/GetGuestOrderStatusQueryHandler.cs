@@ -12,6 +12,7 @@ namespace Vls.Shopflow.Orders.Application.QueryHandlers;
 public sealed class GetGuestOrderStatusQueryHandler(
     IGuestOrderAccessGate guestOrderAccessGate,
     IOrderPixPaymentStatusReader paymentStatusReader,
+    ICustomerAccountPort customerAccountPort,
     IOrdersUnitOfWork unitOfWork,
     ILogger<GetGuestOrderStatusQueryHandler> logger)
     : IRequestHandler<GetGuestOrderStatusQuery, GuestOrderStatusDto>
@@ -49,6 +50,15 @@ public sealed class GetGuestOrderStatusQueryHandler(
         accessToken.MarkUsed(DateTimeOffset.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return OrderMapper.ToGuestStatusDto(order, payment, accessToken);
+        var canCreateAccount = order.CustomerUserId is null;
+        var accountExistsForEmail = canCreateAccount
+            && await customerAccountPort.EmailExistsAsync(order.CustomerEmail, cancellationToken);
+
+        return OrderMapper.ToGuestStatusDto(
+            order,
+            payment,
+            accessToken,
+            canCreateAccount,
+            accountExistsForEmail);
     }
 }

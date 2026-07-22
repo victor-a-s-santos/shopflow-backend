@@ -11,11 +11,13 @@ public sealed record AdminOrderListQuerySpec(
     bool? PaidOnly,
     string? SearchText,
     Guid? SearchOrderId,
+    long? SearchOrderNumber,
     IReadOnlyList<Guid>? RestrictToOrderIds,
     bool SortCreatedAtAscending = false);
 
 public sealed record AdminOrderListRow(
     Guid Id,
+    long OrderNumber,
     OrderStatus Status,
     string CustomerFullName,
     string CustomerEmail,

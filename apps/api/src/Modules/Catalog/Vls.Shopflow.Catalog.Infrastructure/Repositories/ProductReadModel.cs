@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Vls.Shopflow.Catalog.Application.DataTransferObjects;
+using Vls.Shopflow.Catalog.Application.Mappers;
 using Vls.Shopflow.Catalog.Application.Repositories;
 using Vls.Shopflow.Catalog.Domain.Entities;
 
@@ -136,31 +137,7 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
             effectivePrice.Regular,
             effectivePrice.Promotional,
             effectivePrice.Effective,
-            product.Skus.Select(s =>
-            {
-                var regular = s.Price.Regular.Amount;
-                var promo = s.Price.Promotional?.Amount;
-                var effective = promo.HasValue
-                    ? Math.Min(regular, promo.Value)
-                    : regular;
-
-                return new SkuDto(
-                    s.Id,
-                    s.Code,
-                    regular,
-                    promo,
-                    effective,
-                    s.IsActive,
-                    s.Attributes.Select(a => new SkuAttributeDto(
-                        a.AttributeDefinitionId,
-                        a.AttributeValueDefinitionId,
-                        a.CustomName,
-                        a.CustomValue,
-                        a.AttributeDefinition?.Name,
-                        a.AttributeValueDefinition?.Name
-                    )).ToList()
-                );
-            }).ToList(),
+            product.Skus.Select(SkuDtoMapper.FromEntity).ToList(),
             imageDtos
         );
     }

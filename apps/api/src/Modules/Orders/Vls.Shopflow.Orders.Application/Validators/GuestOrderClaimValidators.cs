@@ -16,8 +16,13 @@ public sealed class CreateAccountFromGuestOrderCommandValidator
 
         RuleFor(x => x.Password)
             .NotEmpty()
+            .WithMessage("A senha é obrigatória.")
             .MinimumLength(8)
-            .WithMessage("A senha deve ter no mínimo 8 caracteres.")
+            .WithMessage("Use pelo menos 8 caracteres.")
+            .Must(p => p.Any(char.IsDigit))
+            .WithMessage("Use pelo menos um número.")
+            .Must(p => p.Any(char.IsLower))
+            .WithMessage("Use pelo menos uma letra minúscula.")
             .WithName("password");
 
         RuleFor(x => x.ConfirmPassword)

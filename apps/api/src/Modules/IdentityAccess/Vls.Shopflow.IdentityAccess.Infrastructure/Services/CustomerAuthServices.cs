@@ -33,7 +33,8 @@ public sealed class CustomerRegistrationService(
                 false,
                 null,
                 "Unable to complete registration.",
-                IsDuplicateEmail: true);
+                IsDuplicateEmail: true,
+                []);
         }
 
         if (!await roleManager.RoleExistsAsync(AuthRoles.Customer))
@@ -65,18 +66,27 @@ public sealed class CustomerRegistrationService(
                     false,
                     null,
                     "Unable to complete registration.",
-                    IsDuplicateEmail: true);
+                    IsDuplicateEmail: true,
+                    []);
             }
+
+            var fieldErrors = createResult.Errors
+                .Select(MapIdentityError)
+                .ToList();
 
             logger.LogWarning(
                 "Customer registration failed for {Email}: {Errors}",
                 normalizedEmail,
                 string.Join("; ", createResult.Errors.Select(e => e.Description)));
+
             return new RegisterCustomerResult(
                 false,
                 null,
-                "Unable to complete registration.",
-                IsDuplicateEmail: false);
+                fieldErrors.Count > 0
+                    ? "A senha não atende aos requisitos."
+                    : "Unable to complete registration.",
+                IsDuplicateEmail: false,
+                fieldErrors);
         }
 
         await userManager.AddToRoleAsync(user, AuthRoles.Customer);
@@ -87,7 +97,34 @@ public sealed class CustomerRegistrationService(
         logger.LogInformation("Customer registered: {UserId} ({Email})", user.Id, normalizedEmail);
 
         var dto = await MapCustomerDtoAsync(user);
-        return new RegisterCustomerResult(true, dto, null, IsDuplicateEmail: false);
+        return new RegisterCustomerResult(true, dto, null, IsDuplicateEmail: false, []);
+    }
+
+    internal static RegisterCustomerFieldError MapIdentityError(IdentityError error)
+    {
+        var field = error.Code switch
+        {
+            "InvalidEmail" => "email",
+            "DuplicateEmail" or "DuplicateUserName" => "email",
+            "InvalidUserName" => "userName",
+            var code when code.StartsWith("Password", StringComparison.Ordinal) => "password",
+            _ => "password"
+        };
+
+        var message = error.Code switch
+        {
+            "PasswordTooShort" => "Use pelo menos 8 caracteres.",
+            "PasswordRequiresDigit" => "Use pelo menos um número.",
+            "PasswordRequiresLower" => "Use pelo menos uma letra minúscula.",
+            "PasswordRequiresUpper" => "Use pelo menos uma letra maiúscula.",
+            "PasswordRequiresNonAlphanumeric" => "Use pelo menos um caractere especial.",
+            "PasswordRequiresUniqueChars" => "Use mais caracteres distintos na senha.",
+            _ => string.IsNullOrWhiteSpace(error.Description)
+                ? "Não foi possível concluir o cadastro."
+                : error.Description
+        };
+
+        return new RegisterCustomerFieldError(field, error.Code, message);
     }
 
     internal static async Task<CustomerUserDto> MapCustomerDtoAsync(UserManager<ShopflowUser> userManager, ShopflowUser user)

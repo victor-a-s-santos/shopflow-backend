@@ -8,11 +8,14 @@ public sealed record CustomerUserDto(
     bool EmailConfirmed,
     IReadOnlyList<string> Roles);
 
+public sealed record RegisterCustomerFieldError(string Field, string Code, string Message);
+
 public sealed record RegisterCustomerResult(
     bool Succeeded,
     CustomerUserDto? Customer,
     string? ErrorMessage,
-    bool IsDuplicateEmail);
+    bool IsDuplicateEmail,
+    IReadOnlyList<RegisterCustomerFieldError> Errors);
 
 public sealed record CustomerLoginResult(
     bool Succeeded,

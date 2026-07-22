@@ -169,6 +169,7 @@ public sealed class ExpirationProcessorIntegrationTests
         var createOrderHandler = new CreateOrderFromCheckoutSessionCommandHandler(
             new CheckoutSessionReader(cartDb),
             new OrderRepository(ordersDb),
+            new Vls.Shopflow.Orders.Infrastructure.Services.PostgresOrderNumberGenerator(ordersDb),
             new GuestOrderAccessTokenRepository(ordersDb),
             new GuestOrderAccessTokenHasher(Options.Create(new GuestOrderAccessOptions
             {

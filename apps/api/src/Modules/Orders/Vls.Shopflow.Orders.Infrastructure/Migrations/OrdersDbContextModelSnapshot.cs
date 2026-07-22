@@ -107,6 +107,9 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                     b.Property<Guid?>("CustomerUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<long>("OrderNumber")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTimeOffset?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -169,6 +172,10 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("CustomerEmail");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_orders_OrderNumber");
 
                     b.HasIndex("CustomerUserId", "CreatedAt")
                         .HasDatabaseName("IX_orders_CustomerUserId_CreatedAt");

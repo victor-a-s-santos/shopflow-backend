@@ -27,6 +27,13 @@ public sealed class Order : Entity<Guid>
     /// Null for guest checkout — never resolve by email alone for “Meus pedidos”.
     /// </summary>
     public Guid? CustomerUserId { get; private set; }
+
+    /// <summary>
+    /// Friendly unique order number for UI and support (not the internal Guid).
+    /// Assigned at creation via <see cref="AssignOrderNumber"/>.
+    /// </summary>
+    public long OrderNumber { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public DateTimeOffset? PaidAt { get; private set; }
@@ -92,6 +99,7 @@ public sealed class Order : Entity<Guid>
             Total = total,
             Status = OrderStatus.PendingPayment,
             CustomerUserId = customerUserId,
+            OrderNumber = 0,
             CreatedAt = now,
             UpdatedAt = null,
             PaidAt = null,
@@ -106,6 +114,23 @@ public sealed class Order : Entity<Guid>
 
         return order;
     }
+
+    /// <summary>
+    /// Sets the friendly order number once, before persistence.
+    /// </summary>
+    public void AssignOrderNumber(long orderNumber)
+    {
+        if (OrderNumber != 0)
+            throw new InvalidOperationException($"Order {Id} already has order number {OrderNumber}.");
+
+        if (orderNumber <= 0)
+            throw new ArgumentOutOfRangeException(nameof(orderNumber), "Order number must be positive.");
+
+        OrderNumber = orderNumber;
+    }
+
+    public string FormatOrderNumber()
+        => OrderNumber > 0 ? OrderNumber.ToString() : Id.ToString();
 
     public void MarkAsPaid(DateTimeOffset? paidAt = null)
     {

@@ -61,9 +61,13 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
             tokenHasher = hasherMock.Object;
         }
 
+        var orderNumbers = new Mock<IOrderNumberGenerator>();
+        orderNumbers.Setup(x => x.NextAsync(It.IsAny<CancellationToken>())).ReturnsAsync(10582);
+
         return new CreateOrderFromCheckoutSessionCommandHandler(
             reader,
             repository,
+            orderNumbers.Object,
             tokenRepository,
             tokenHasher,
             uow ?? Mock.Of<IOrdersUnitOfWork>(x =>
@@ -106,6 +110,7 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
             CancellationToken.None);
 
         result.OrderId.Should().NotBeEmpty();
+        result.OrderNumber.Should().Be("10582");
         result.CheckoutSessionId.Should().Be(sessionId);
         result.Status.Should().Be("PendingPayment");
         result.GuestAccessToken.Should().Be("raw-guest-token");
@@ -113,6 +118,7 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
 
         captured.Should().NotBeNull();
         captured!.Status.Should().Be(OrderStatus.PendingPayment);
+        captured.OrderNumber.Should().Be(10582);
         captured.CustomerUserId.Should().BeNull();
 
         capturedToken.Should().NotBeNull();

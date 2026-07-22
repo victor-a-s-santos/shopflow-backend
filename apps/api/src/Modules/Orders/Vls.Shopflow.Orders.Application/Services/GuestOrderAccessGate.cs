@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Domain.Constants;
 using Vls.Shopflow.Orders.Domain.Entities;
 using Vls.Shopflow.Orders.Domain.Exceptions;
 
@@ -20,10 +21,10 @@ public sealed class GuestOrderAccessGate(
         CancellationToken cancellationToken)
     {
         if (!guestOrderAccessOptions.Value.Enabled)
-            throw new GuestOrderAccessDeniedException();
+            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.OrderNotFoundOrAccessDenied);
 
         if (string.IsNullOrWhiteSpace(rawAccessToken))
-            throw new GuestOrderAccessDeniedException();
+            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
 
         string tokenHash;
         try
@@ -36,7 +37,7 @@ public sealed class GuestOrderAccessGate(
         }
         catch
         {
-            throw new GuestOrderAccessDeniedException();
+            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -47,11 +48,21 @@ public sealed class GuestOrderAccessGate(
             cancellationToken);
 
         if (accessToken is null)
-            throw new GuestOrderAccessDeniedException();
+        {
+            var anyMatch = await guestTokenRepository.FindByOrderIdAndHashAsync(
+                orderId,
+                tokenHash,
+                cancellationToken);
+
+            if (anyMatch is not null && anyMatch.ExpiresAt <= now)
+                throw new GuestOrderAccessTokenExpiredException();
+
+            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
+        }
 
         var order = await orderRepository.GetByIdWithItemsAsync(orderId, cancellationToken);
         if (order is null)
-            throw new GuestOrderAccessDeniedException();
+            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.OrderNotFoundOrAccessDenied);
 
         return (accessToken, order);
     }

@@ -14,7 +14,9 @@ public static class HttpProblemDetails
         HttpContext ctx,
         IEnumerable<ValidationFailure> failures,
         string title = "Validation failed",
-        string? detail = null)
+        string? detail = null,
+        string? code = null,
+        string? message = null)
     {
         var errors = failures
             .GroupBy(f => ToCamelCasePath(f.PropertyName))
@@ -31,6 +33,10 @@ public static class HttpProblemDetails
         };
 
         problem.Extensions["traceId"] = GetTraceId(ctx);
+        if (!string.IsNullOrWhiteSpace(code))
+            problem.Extensions["code"] = code;
+        if (!string.IsNullOrWhiteSpace(message))
+            problem.Extensions["message"] = message;
         return problem;
     }
 
@@ -39,6 +45,12 @@ public static class HttpProblemDetails
         ValidationException ex,
         string title = "Validation failed")
         => Validation(ctx, ex.Errors, title);
+
+    public static ProblemDetails WithCode(ProblemDetails problem, string code)
+    {
+        problem.Extensions["code"] = code;
+        return problem;
+    }
 
     public static ProblemDetails Conflict(
         HttpContext ctx,

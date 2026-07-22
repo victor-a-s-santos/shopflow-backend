@@ -78,6 +78,12 @@ public sealed class UpdateSkuCommandHandler(
         }
 
         sku.ChangePrice(Price.From(cmd.RegularPrice, cmd.PromotionalPrice));
+
+        // Omit salesRule on update → preserve existing (do not reset to Unit).
+        // Explicit salesMode Unit is required to reset.
+        if (cmd.SalesRule is not null)
+            sku.ChangeSalesRule(SkuSalesRuleFactory.FromWriteDto(cmd.SalesRule));
+
         sku.ReplaceAttributes(newAttributes);
 
         if (cmd.Active)

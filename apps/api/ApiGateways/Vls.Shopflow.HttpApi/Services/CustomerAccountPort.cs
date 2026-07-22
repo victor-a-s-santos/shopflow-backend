@@ -41,14 +41,19 @@ public sealed class CustomerAccountPort(
 
         if (!result.Succeeded || result.Customer is null)
         {
-            // Identity password rule failures surface as opaque register errors; map to password field.
+            var errors = result.Errors.Count > 0
+                ? result.Errors
+                    .Select(e => new CustomerAccountFieldError(e.Field, e.Message))
+                    .ToList()
+                : [new CustomerAccountFieldError(
+                    "password",
+                    result.ErrorMessage ?? "A senha não atende aos requisitos.")];
+
             return new CustomerAccountCreateResult(
                 false,
                 null,
                 IsDuplicateEmail: false,
-                [new CustomerAccountFieldError(
-                    "password",
-                    result.ErrorMessage ?? "A senha não atende aos requisitos de segurança.")]);
+                errors);
         }
 
         return new CustomerAccountCreateResult(

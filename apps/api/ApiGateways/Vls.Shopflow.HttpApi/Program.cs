@@ -483,6 +483,42 @@ app.Use(async (ctx, next) =>
 
     }
 
+    catch (Vls.Shopflow.CartCheckout.Domain.Exceptions.CheckoutSalesRuleViolationException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Validation(
+
+            ctx,
+
+            [
+
+                new FluentValidation.Results.ValidationFailure(ex.Field, ex.Message)
+
+                {
+
+                    ErrorCode = ex.Code
+
+                }
+
+            ],
+
+            title: "Validation failed",
+
+            detail: ex.Message,
+
+            code: ex.Code,
+
+            message: ex.Message);
+
+        problem.Extensions["skuId"] = ex.SkuId;
+
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
     catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderNotFoundException ex)
 
     {
@@ -543,13 +579,51 @@ app.Use(async (ctx, next) =>
 
     }
 
-    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessDeniedException)
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessTokenExpiredException)
 
     {
 
+        var problem = HttpProblemDetails.Problem(
+
+            ctx,
+
+            StatusCodes.Status401Unauthorized,
+
+            "Unauthorized",
+
+            "Order access denied.");
+
+        problem.Extensions["code"] = Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessTokenExpiredException.ErrorCode;
+
+        problem.Extensions["message"] = "Order access denied.";
+
         ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
 
-        await ctx.Response.WriteAsJsonAsync(new { message = "Order access denied." });
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessDeniedException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+
+            ctx,
+
+            StatusCodes.Status401Unauthorized,
+
+            "Unauthorized",
+
+            "Order access denied.");
+
+        problem.Extensions["code"] = ex.Code;
+
+        problem.Extensions["message"] = "Order access denied.";
+
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -581,7 +655,36 @@ app.Use(async (ctx, next) =>
 
         problem.Extensions["message"] = ex.Message;
 
+        problem.Extensions["redirectTo"] = Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccountAlreadyExistsException.RedirectTo;
+
         ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.PasswordRequirementsNotMetException ex)
+
+    {
+
+        var failures = ex.Errors
+            .Select(e => new FluentValidation.Results.ValidationFailure(e.Field, e.Message));
+
+        var problem = HttpProblemDetails.Validation(
+
+            ctx,
+
+            failures,
+
+            title: "Validation failed",
+
+            detail: ex.Message,
+
+            code: Vls.Shopflow.Orders.Domain.Exceptions.PasswordRequirementsNotMetException.ErrorCode,
+
+            message: ex.Message);
+
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
 
         await ctx.Response.WriteAsJsonAsync(problem);
 
@@ -601,6 +704,10 @@ app.Use(async (ctx, next) =>
 
             ex.Message);
 
+        problem.Extensions["code"] = Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderClaimForbiddenException.ErrorCode;
+
+        problem.Extensions["message"] = ex.Message;
+
         ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
 
         await ctx.Response.WriteAsJsonAsync(problem);
@@ -617,7 +724,11 @@ app.Use(async (ctx, next) =>
 
             "This order cannot be linked.",
 
-            errorCode: "ORDER_ALREADY_LINKED");
+            errorCode: Vls.Shopflow.Orders.Domain.Exceptions.OrderAlreadyLinkedToAnotherCustomerException.ErrorCode);
+
+        problem.Extensions["code"] = Vls.Shopflow.Orders.Domain.Exceptions.OrderAlreadyLinkedToAnotherCustomerException.ErrorCode;
+
+        problem.Extensions["message"] = "This order cannot be linked.";
 
         ctx.Response.StatusCode = StatusCodes.Status409Conflict;
 

@@ -19,7 +19,9 @@ GET não exige CSRF (padrão do projeto).
 | `pageSize` | 20 | 1–100 |
 | `status` | — | `PendingPayment` \| `Paid` \| `Canceled` \| `Expired` |
 | `paymentStatus` | — | Pix: `Pending` \| `Paid` \| `Canceled` \| `Expired` \| `Failed` (último Pix por order) |
-| `q` | — | e-mail, nome, telefone (contains) ou Guid do pedido |
+| `q` | — | e-mail, nome, telefone (contains), Guid do pedido ou `orderNumber` (ex. `10582` / `#10582`) |
+
+List/detail incluem `orderNumber` (string amigável gerada na criação do pedido).
 | `createdFrom` / `createdTo` | — | `DateTimeOffset`; `from ≤ to` |
 | `paidOnly` | — | bool |
 | `sort` | `createdAt_desc` | também `createdAt_asc` |

@@ -59,7 +59,8 @@ public sealed class AddSkuCommandHandler(
         }
 
         var price = Price.From(cmd.RegularPrice, cmd.PromotionalPrice);
-        var sku = Sku.Create(product.Id, code, price, attributes, cmd.Active);
+        var salesRule = SkuSalesRuleFactory.FromWriteDto(cmd.SalesRule);
+        var sku = Sku.Create(product.Id, code, price, attributes, cmd.Active, salesRule);
         product.AddSku(sku);
 
         await catalogUnitOfWork.SaveChangesAsync(cancellationToken);

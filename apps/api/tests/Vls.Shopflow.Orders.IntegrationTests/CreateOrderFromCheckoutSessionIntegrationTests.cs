@@ -5,6 +5,7 @@ using Vls.Shopflow.CartCheckout.Domain.Entities;
 using Vls.Shopflow.CartCheckout.Infrastructure;
 using Vls.Shopflow.Orders.Application.CommandHandlers;
 using Vls.Shopflow.Orders.Application.Commands;
+using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.QueryHandlers;
 using Vls.Shopflow.Orders.Domain.Exceptions;
@@ -112,6 +113,7 @@ public sealed class CreateOrderFromCheckoutSessionIntegrationTests
             new CreateOrderFromCheckoutSessionCommandHandler(
                 reader,
                 orderRepository,
+                new PostgresOrderNumberGenerator(ordersDb),
                 guestTokenRepository,
                 hasher,
                 unitOfWork,
@@ -125,9 +127,27 @@ public sealed class CreateOrderFromCheckoutSessionIntegrationTests
                     orderRepository,
                     options),
                 new NullOrderPixPaymentStatusReader(),
+                new StubCustomerAccountPort(),
                 unitOfWork,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<GetGuestOrderStatusQueryHandler>.Instance),
             hasher);
+    }
+
+    private sealed class StubCustomerAccountPort : ICustomerAccountPort
+    {
+        public Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken)
+            => Task.FromResult(false);
+
+        public Task<CustomerAccountCreateResult> RegisterAsync(
+            string email,
+            string password,
+            string fullName,
+            string? phone,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task SignInAsync(Guid customerUserId, CancellationToken cancellationToken)
+            => Task.CompletedTask;
     }
 
     [Fact]

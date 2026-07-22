@@ -35,3 +35,26 @@ public sealed class InactiveSkuException : Exception
         : base($"SKU {skuId} is inactive and cannot be purchased.")
         => SkuId = skuId;
 }
+
+/// <summary>
+/// Purchase quantity violates the SKU sales rule (min/step/package configuration).
+/// </summary>
+public sealed class CheckoutSalesRuleViolationException : Exception
+{
+    public const string MinQuantity = "SALES_MIN_QUANTITY";
+    public const string QuantityStep = "SALES_QUANTITY_STEP";
+    public const string InvalidConfiguration = "SALES_RULE_INVALID_CONFIGURATION";
+    public const string PackageInvalid = "SALES_PACKAGE_INVALID";
+
+    public string Code { get; }
+    public Guid SkuId { get; }
+    public string Field { get; }
+
+    public CheckoutSalesRuleViolationException(string code, Guid skuId, string message, string field = "quantity")
+        : base(message)
+    {
+        Code = code;
+        SkuId = skuId;
+        Field = field;
+    }
+}

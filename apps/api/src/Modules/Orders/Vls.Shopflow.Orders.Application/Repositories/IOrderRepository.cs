@@ -27,6 +27,14 @@ public interface IGuestOrderAccessTokenRepository
         string tokenHash,
         DateTimeOffset asOfUtc,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Finds a non-revoked token by order + hash regardless of expiry (for expired vs invalid distinction).
+    /// </summary>
+    Task<GuestOrderAccessToken?> FindByOrderIdAndHashAsync(
+        Guid orderId,
+        string tokenHash,
+        CancellationToken cancellationToken);
 }
 
 public interface IOrdersUnitOfWork : IUnitOfWork;

@@ -6,8 +6,10 @@
 
 ## Concluído recentemente
 
-- [x] **Wholesale sales rules — design (Fase 0)** — `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md` (sem código)
+- [x] **Wholesale sales rules Fase 1 (backend)** — SalesMode/SkuSalesRule no SKU, checkout enforcement, migration (`docs/catalog/sales-rules-contract.md`)
+- [x] **Wholesale sales rules — design (Fase 0)** — `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md`
 - [x] **Guest order claim pós-Pix** — create-account + claim com GuestOrderAccessToken (`docs/orders/guest-order-claim.md`)
+- [x] **Post-Pix guest flow backend** — `orderNumber`, codes oficiais, Identity password errors, guest status flags (`docs/orders/post-pix-guest-flow.md`)
 - [x] **Catalog product validation contracts** — ProblemDetails, SKU code, preços, attrs, imagens, proteção SKU, baixa por disponível (`docs/catalog/`, `docs/inventory/stock-movements.md`)
 - [x] **Customer Identity backend** — cookie `shopflow_customer_dev`, endpoints register/login/logout/me, forgot/reset/confirm (`docs/security/SEC-005-customer-identity-backend.md`)
 - [x] **IdentityAccess Fase 1/2** — admin auth, CSRF, SEC-004 hardening
@@ -44,9 +46,9 @@
 | 2 | **Frontend customer auth** | Backend pronto; conectar UI com cookies + CSRF |
 | 3 | **Frontend batch Inventory** | Backend `POST /api/admin/inventory/skus/availability` pronto; reduzir N+1 no Product Edit |
 | 4 | **Gateway Pix real + webhook** | Cobrança real (pausado até HML/domínio se necessário) |
-| 5 | **Frontend guest order status + Account** | Token backend pronto (`SEC-006`); wiring UI Pix |
-| 5b | **Frontend Admin Orders** | Backend `/api/admin/orders` pronto; listagem + detalhe no painel |
-| 5c | **Frontend Customer Orders** | Backend `/api/customer/orders` pronto; “Meus pedidos” |
+| 5 | **Frontend guest order status + Account** | Backend: status + `orderNumber` + claim codes; wiring UI pós-Pix (conta opcional) |
+| 5b | **Frontend Admin Orders** | Backend `/api/admin/orders` + `orderNumber`; listagem + detalhe no painel |
+| 5c | **Frontend Customer Orders** | Backend `/api/customer/orders` + claim/`orderNumber`; “Meus pedidos” |
 | 5d | **Wholesale sales rules (Fase 1 backend)** | Design pronto (`docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md`); domínio + checkout enforce; sem UI ainda |
 | 6 | **Shipping** | Frete real; hoje `ShippingAmount` é null |
 | 7 | **Notifications** | E-mail real (confirm/reset/pedido) |

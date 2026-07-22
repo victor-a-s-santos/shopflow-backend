@@ -110,6 +110,7 @@ public sealed class CreatePixPaymentIntegrationTests
         var createOrderHandler = new CreateOrderFromCheckoutSessionCommandHandler(
             new CheckoutSessionReader(cartCheckoutDb),
             new OrderRepository(ordersDb),
+            new Vls.Shopflow.Orders.Infrastructure.Services.PostgresOrderNumberGenerator(ordersDb),
             new GuestOrderAccessTokenRepository(ordersDb),
             new GuestOrderAccessTokenHasher(Options.Create(new GuestOrderAccessOptions
             {

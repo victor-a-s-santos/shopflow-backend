@@ -25,12 +25,31 @@ public static class CustomerAuthEndpoints
 
             if (!result.Succeeded || result.Customer is null)
             {
-                var status = result.IsDuplicateEmail
-                    ? StatusCodes.Status409Conflict
-                    : StatusCodes.Status400BadRequest;
+                if (result.IsDuplicateEmail)
+                {
+                    return Results.Json(
+                        new
+                        {
+                            code = "ACCOUNT_ALREADY_EXISTS",
+                            message = result.ErrorMessage ?? "Já existe uma conta com este e-mail."
+                        },
+                        statusCode: StatusCodes.Status409Conflict);
+                }
+
+                var errors = result.Errors
+                    .GroupBy(e => e.Field)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(e => e.Message).Distinct().ToArray());
+
                 return Results.Json(
-                    new { message = result.ErrorMessage ?? "Unable to complete registration." },
-                    statusCode: status);
+                    new
+                    {
+                        code = "PASSWORD_REQUIREMENTS_NOT_MET",
+                        message = result.ErrorMessage ?? "A senha não atende aos requisitos.",
+                        errors
+                    },
+                    statusCode: StatusCodes.Status400BadRequest);
             }
 
             return Results.Created("/api/auth/customer/me", new

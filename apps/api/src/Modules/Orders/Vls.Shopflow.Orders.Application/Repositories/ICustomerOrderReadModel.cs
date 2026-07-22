@@ -14,6 +14,7 @@ public sealed record CustomerOrderListQuerySpec(
 
 public sealed record CustomerOrderListRow(
     Guid Id,
+    long OrderNumber,
     OrderStatus Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,

@@ -37,6 +37,7 @@ public sealed class CustomerOrderReadModel(OrdersDbContext db) : ICustomerOrderR
             .Take(spec.PageSize)
             .Select(o => new CustomerOrderListRow(
                 o.Id,
+                o.OrderNumber,
                 o.Status,
                 o.CreatedAt,
                 o.PaidAt,

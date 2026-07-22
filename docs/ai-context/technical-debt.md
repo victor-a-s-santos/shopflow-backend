@@ -32,7 +32,8 @@
 
 | Dívida | Evidência | Impacto |
 |--------|-----------|---------|
-| **Guest claim sem e-mail / magic link** | Claim exige token no browser | Recuperação de pedido se o cliente perder o token |
+| **Sales rules Fase 2–4** | Backend Fase 1 pronto; falta UI admin/PDP/cart + OrderItem snapshot | UX atacado incompleta (`docs/catalog/sales-rules-contract.md`) |
+| **Guest claim sem e-mail / magic link** | Claim exige token no browser; sem e-mail transacional pós-Pix | Recuperação de pedido se o cliente perder o token (`docs/orders/post-pix-guest-flow.md`) |
 | **Salvar produto admin multi-endpoint** | Create shell → variants → images separados; sem transação global | Persistência parcial se o FE falhar no meio; ver `docs/catalog/admin-product-contract.md` |
 | **Arquivos de imagem órfãos no disco** | DELETE imagem remove só o registro DB | Lixo em `uploads/` |
 | **Sem testes HttpApi** | Nenhum teste E2E na API | Contratos não validados automaticamente |

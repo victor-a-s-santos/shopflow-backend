@@ -35,14 +35,23 @@ public sealed class GetAdminOrdersQueryHandler(
         }
 
         Guid? searchOrderId = null;
+        long? searchOrderNumber = null;
         string? searchText = null;
         if (!string.IsNullOrWhiteSpace(query.Q))
         {
-            var q = query.Q.Trim();
+            var raw = query.Q.Trim();
+            var forceOrderNumber = raw.StartsWith('#');
+            var q = forceOrderNumber ? raw.TrimStart('#') : raw;
+
             if (Guid.TryParse(q, out var orderId))
                 searchOrderId = orderId;
+            // Avoid treating phone numbers (10–11 digits) as order numbers.
+            else if (long.TryParse(q, out var orderNumber)
+                     && orderNumber > 0
+                     && (forceOrderNumber || q.Length <= 9))
+                searchOrderNumber = orderNumber;
             else
-                searchText = q;
+                searchText = raw.TrimStart('#');
         }
 
         var sortAsc = string.Equals(query.Sort?.Trim(), "createdAt_asc", StringComparison.OrdinalIgnoreCase);
@@ -57,6 +66,7 @@ public sealed class GetAdminOrdersQueryHandler(
                 query.PaidOnly,
                 searchText,
                 searchOrderId,
+                searchOrderNumber,
                 restrictToOrderIds,
                 sortAsc),
             cancellationToken);
@@ -68,6 +78,7 @@ public sealed class GetAdminOrdersQueryHandler(
 
         var items = page.Items.Select(row => new AdminOrderListItemDto(
             row.Id,
+            row.OrderNumber.ToString(),
             row.Status.ToString(),
             row.CustomerFullName,
             row.CustomerEmail,
@@ -104,6 +115,7 @@ public sealed class GetAdminOrderByIdQueryHandler(
 
         return new AdminOrderDetailDto(
             order.Id,
+            order.FormatOrderNumber(),
             order.Status.ToString(),
             order.CreatedAt,
             order.UpdatedAt,

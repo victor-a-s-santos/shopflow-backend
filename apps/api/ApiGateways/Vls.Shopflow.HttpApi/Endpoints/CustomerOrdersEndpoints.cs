@@ -31,7 +31,9 @@ public static class CustomerOrdersEndpoints
 
             return Results.Ok(new
             {
+                code = result.Code,
                 orderId = result.OrderId,
+                orderNumber = result.OrderNumber,
                 customerCreated = result.CustomerCreated,
                 orderLinked = result.OrderLinked,
                 redirectTo = result.RedirectTo
@@ -63,7 +65,9 @@ public static class CustomerOrdersEndpoints
 
             return Results.Ok(new
             {
+                code = result.Code,
                 orderId = result.OrderId,
+                orderNumber = result.OrderNumber,
                 orderLinked = result.OrderLinked,
                 redirectTo = result.RedirectTo
             });

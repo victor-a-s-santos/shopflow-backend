@@ -10,7 +10,7 @@ internal static class OrderMapper
         DateTimeOffset? guestAccessTokenExpiresAt = null)
         => new(
             order.Id,
-            order.Id.ToString(),
+            order.FormatOrderNumber(),
             order.CheckoutSessionId,
             order.Status.ToString(),
             new DataTransferObjects.OrderCustomerDto(
@@ -42,10 +42,12 @@ internal static class OrderMapper
     public static DataTransferObjects.GuestOrderStatusDto ToGuestStatusDto(
         Order order,
         Interfaces.OrderPixPaymentStatusSnapshot? payment,
-        GuestOrderAccessToken accessToken)
+        GuestOrderAccessToken accessToken,
+        bool canCreateAccount,
+        bool accountExistsForEmail)
         => new(
             order.Id,
-            order.Id.ToString(),
+            order.FormatOrderNumber(),
             order.Status.ToString(),
             payment is null
                 ? null
@@ -74,7 +76,9 @@ internal static class OrderMapper
                 MaskEmail(order.CustomerEmail)),
             new DataTransferObjects.GuestOrderAccessMetaDto(
                 accessToken.ExpiresAt,
-                accessToken.LastUsedAt));
+                accessToken.LastUsedAt),
+            canCreateAccount,
+            accountExistsForEmail);
 
     public static void EnsureCheckoutSessionCanCreateOrder(string status, Guid checkoutSessionId)
     {

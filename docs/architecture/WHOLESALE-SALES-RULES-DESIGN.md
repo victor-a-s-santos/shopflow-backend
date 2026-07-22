@@ -158,9 +158,9 @@ Campos canônicos:
 | `MinimumQuantity` | int | Mínimo comprável (`>= 1`) |
 | `QuantityStep` | int | Incremento (`>= 1`) |
 | `PackageSize` | int? | Peças por unidade de venda (null se não pacote) |
-| `PackageLabel` | string? | Ex.: “Pacote com 6 peças” |
+| `PackageLabel` | string? | Ex.: “Lote com 3 peças” (ou pacote/kit/caixa) |
 | `PackageDescription` | string? | Ex.: “Cores sortidas conforme disponibilidade.” |
-| `QuantityUnitLabel` | string? | Ex.: “peça(s)” / “pacote(s)” — default por modo |
+| `QuantityUnitLabel` | string? | Ex.: “lote(s)” / “pacote(s)” / “kit(s)” / “peça(s)” — default por modo |
 | `AllowCustomerToChooseVariants` | bool | Se false, PDP não exige seletor de variação “unitária” para aquele SKU |
 | `ShowTotalPieces` | bool | Exibir “2 pacotes = 12 peças” |
 | `IsWholesaleOnly` | bool | Reservado; **ignorado na vitrine MVP** (sem gating B2B ainda) |
@@ -182,9 +182,11 @@ Defaults por modo (aplicação + validação admin):
 | Modo | quantity=2 significa | Reserva Inventory | Peças físicas (info) |
 |------|----------------------|-------------------|----------------------|
 | Unit / Min / Multiple | 2 peças daquele SKU | 2 | 2 |
-| FixedPackage / AssortedPackage | 2 pacotes daquele SKU | 2 | `2 * packageSize` (só display) |
+| FixedPackage / AssortedPackage | 2 lotes (unidades do SKU pacote) | 2 | `2 * packageSize` (só display) |
 
-**Não** enviar 12 no checkout para “2 pacotes de 6” se o SKU for pacote — isso quebraria estoque.
+**Não** enviar 12 no checkout para “2 lotes de 6” se o SKU for pacote — isso quebraria estoque.
+
+> **Terminologia (negócio):** a referência visual do cliente usa **lote** (1 lote = 1 unidade vendável do SKU; preço do SKU = preço por lote; unitário display = preço / `packageSize`). Nomes técnicos `Package*` permanecem. Labels de exibição via `QuantityUnitLabel` / `PackageLabel` (lote, pacote, kit, caixa…). `FixedPackage` ≠ sortido; `AssortedPackage` = sortido.
 
 ### 6.5 Fórmula de quantidade válida
 
@@ -224,7 +226,7 @@ Constraints sugeridos (check ou validação de domínio):
 - `minimum_quantity >= 1`
 - `quantity_step >= 1`
 - `package_size IS NULL OR package_size > 1`
-- modos pacote exigem `package_size` e `package_label` (label pode ser gerado: `"Pacote com {n} peças"`)
+- modos pacote exigem `package_size` e `package_label` (label pode ser gerado: `"Lote com {n} peças"`)
 
 **Não criar tabela `sales_rules` no MVP.**
 
@@ -237,7 +239,7 @@ Constraints sugeridos (check ou validação de domínio):
 | `sales_mode` | Histórico |
 | `package_size` | Histórico |
 | `package_label` | Exibição estável |
-| `quantity_unit_label` | “pacote(s)” vs “peça(s)” |
+| `quantity_unit_label` | “lote(s)” / “pacote(s)” vs “peça(s)” |
 | `total_pieces` | `quantity * package_size` ou `quantity` |
 
 Mínimo aceitável MVP orders: `package_label` + `total_pieces` (ou um único `sale_display_label`).  
@@ -270,7 +272,7 @@ Estender payloads de `POST/PUT .../variants` e respostas `SkuDto`:
 }
 ```
 
-Pacote:
+Lote / pacote (exemplo sortido):
 
 ```json
 {
@@ -281,9 +283,9 @@ Pacote:
     "minimumQuantity": 1,
     "quantityStep": 1,
     "packageSize": 6,
-    "packageLabel": "Pacote sortido com 6 peças",
+    "packageLabel": "Lote sortido com 6 peças",
     "packageDescription": "Cores sortidas conforme disponibilidade.",
-    "quantityUnitLabel": "pacote(s)",
+    "quantityUnitLabel": "lote(s)",
     "allowCustomerToChooseVariants": false,
     "showTotalPieces": true,
     "isWholesaleOnly": false
@@ -291,11 +293,16 @@ Pacote:
 }
 ```
 
-Preço do pacote = **preço do SKU pacote** (por pacote), já alinhado ao modelo atual de preço por SKU.
+Preço do SKU em modo lote/pacote = **preço por lote** (unidade vendável). Valor unitário de display = `preçoEfetivo / packageSize`.
 
 ### 8.2 Storefront — `GET /catalog/products/by-slug/{slug}`
 
-Incluir `salesRule` em cada `SkuDto` (mesmo shape). PDP usa isso para selector e copy.
+Incluir em cada `SkuDto`:
+
+- `salesRule` (mesmo shape do admin read);
+- `salesRuleDisplay` quando `FixedPackage` / `AssortedPackage` (null caso contrário), com labels e `equivalentRegularUnitPrice` / `equivalentPromotionalUnitPrice` arredondados a 2 casas no backend (`AwayFromZero`), para a UI montar “Unidades no lote”, “Preço por lote”, “Valor unitário” sem divergência de arredondamento.
+
+Ver `docs/catalog/sales-rules-contract.md`.
 
 ### 8.3 Checkout — erros (ProblemDetails)
 
@@ -326,8 +333,8 @@ Se snapshot existir:
   "subtotal": 399.8,
   "salesDisplay": {
     "salesMode": "AssortedPackage",
-    "packageLabel": "Pacote sortido com 6 peças",
-    "quantityUnitLabel": "pacote(s)",
+    "packageLabel": "Lote sortido com 6 peças",
+    "quantityUnitLabel": "lote(s)",
     "totalPieces": 12
   }
 }
@@ -339,10 +346,10 @@ Se snapshot existir:
 
 Seção **“Configuração de venda”** no Product Form / Edit (por variante ou apply-all):
 
-1. Select: Unidade | Quantidade mínima | Múltiplos | Pacote fechado | Pacote sortido.
+1. Select: Unidade | Quantidade mínima | Múltiplos | Lote/pacote fechado | Lote/pacote sortido.
 2. Campos condicionais (min, step, packageSize, labels, showTotalPieces, descrição).
 3. Validação FE espelhando regras de domínio (UX).
-4. Inventory admin: label de unidade = `quantityUnitLabel` (“pacotes” vs “unidades”) quando modo pacote — melhora operacional, não muda API Inventory.
+4. Inventory admin: label de unidade = `quantityUnitLabel` (“lotes” / “pacotes” vs “unidades”) quando modo pacote — melhora operacional, não muda API Inventory.
 
 **Não** exigir `IsWholesaleOnly` gating no MVP.
 

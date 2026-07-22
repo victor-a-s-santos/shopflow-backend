@@ -11,6 +11,7 @@ public sealed record CustomerOrderPaymentSummaryDto(
 
 public sealed record CustomerOrderListItemDto(
     Guid Id,
+    string OrderNumber,
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
@@ -53,6 +54,7 @@ public sealed record CustomerOrderItemDto(
 
 public sealed record CustomerOrderDetailDto(
     Guid Id,
+    string OrderNumber,
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,

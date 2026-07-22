@@ -25,7 +25,7 @@ public sealed class CustomerOrderQueryHandlerTests
             .ReturnsAsync(new CustomerOrderListPage(
             [
                 new CustomerOrderListRow(
-                    Guid.NewGuid(), OrderStatus.Paid, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
+                    Guid.NewGuid(), 10582, OrderStatus.Paid, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
                     100m, null, 100m, 1, "Camiseta")
             ], 1));
 
@@ -76,7 +76,7 @@ public sealed class CustomerOrderQueryHandlerTests
             .ReturnsAsync(new CustomerOrderListPage(
             [
                 new CustomerOrderListRow(
-                    orderId, OrderStatus.PendingPayment, DateTimeOffset.UtcNow, null,
+                    orderId, 10583, OrderStatus.PendingPayment, DateTimeOffset.UtcNow, null,
                     50m, null, 50m, 1, "Item")
             ], 1));
 
@@ -165,7 +165,7 @@ public sealed class CustomerOrderQueryHandlerTests
     private static Order CreateBoundOrder(Guid? customerUserId)
     {
         var item = OrderItem.Create(Guid.NewGuid(), "Produto", "SKU-1", 1, 40m);
-        return Order.CreatePendingPayment(
+        var order = Order.CreatePendingPayment(
             Guid.NewGuid(),
             "Cliente",
             "c@test.com",
@@ -182,5 +182,7 @@ public sealed class CustomerOrderQueryHandlerTests
             40m,
             [item],
             customerUserId);
+        order.AssignOrderNumber(10590);
+        return order;
     }
 }

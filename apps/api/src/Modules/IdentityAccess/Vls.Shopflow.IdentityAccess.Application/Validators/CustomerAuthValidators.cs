@@ -8,7 +8,15 @@ public sealed class RegisterCustomerCommandValidator : AbstractValidator<Registe
     public RegisterCustomerCommandValidator()
     {
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
-        RuleFor(x => x.Password).NotEmpty().MinimumLength(8);
+        RuleFor(x => x.Password)
+            .NotEmpty()
+            .WithMessage("A senha é obrigatória.")
+            .MinimumLength(8)
+            .WithMessage("Use pelo menos 8 caracteres.")
+            .Must(p => p.Any(char.IsDigit))
+            .WithMessage("Use pelo menos um número.")
+            .Must(p => p.Any(char.IsLower))
+            .WithMessage("Use pelo menos uma letra minúscula.");
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(256);
         RuleFor(x => x.Phone).MaximumLength(32).When(x => x.Phone is not null);
     }
