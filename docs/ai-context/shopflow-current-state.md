@@ -111,6 +111,8 @@ Base: `http://localhost:5127/api`
 
 ### Catalog (14 endpoints)
 
+`GET /catalog/products` inclui `salesSummary` compacto (agregado de SKUs ativos) para ProductCard — ver `docs/catalog/product-list-sales-summary.md`. Detalhe/`by-slug` continua com `salesRule` + `salesRuleDisplay` por SKU.
+
 ```
 GET    /catalog/attributes
 GET    /catalog/categories

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Vls.Shopflow.Catalog.Application.DataTransferObjects;
 using Vls.Shopflow.Catalog.Application.Mappers;
 using Vls.Shopflow.Catalog.Application.Repositories;
+using Vls.Shopflow.Catalog.Application.Services;
 using Vls.Shopflow.Catalog.Domain.Entities;
 
 namespace Vls.Shopflow.Catalog.Infrastructure.Repositories;
@@ -52,7 +53,15 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
                 {
                     s.IsActive,
                     Regular = s.Price.Regular.Amount,
-                    Promo = s.Price.Promotional != null ? s.Price.Promotional.Amount : (decimal?)null
+                    Promo = s.Price.Promotional != null ? s.Price.Promotional.Amount : (decimal?)null,
+                    SalesMode = s.SalesRule.SalesMode,
+                    MinimumQuantity = s.SalesRule.MinimumQuantity,
+                    QuantityStep = s.SalesRule.QuantityStep,
+                    PackageSize = s.SalesRule.PackageSize,
+                    PackageLabel = s.SalesRule.PackageLabel,
+                    PackageDescription = s.SalesRule.PackageDescription,
+                    QuantityUnitLabel = s.SalesRule.QuantityUnitLabel,
+                    ShowTotalPieces = s.SalesRule.ShowTotalPieces
                 }).ToList(),
                 PrimaryImageUrl = p.Images.Where(i => i.IsPrimary).Select(i => i.Url).FirstOrDefault()
                     ?? p.Images.OrderBy(i => i.SortOrder).Select(i => i.Url).FirstOrDefault()
@@ -63,6 +72,8 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
         {
             decimal? promo = null;
             decimal effective = 0;
+            decimal regularPrice = p.BaseRegular;
+            ProductSalesSummaryDto? salesSummary = null;
 
             if (!p.HasSkus)
             {
@@ -74,31 +85,45 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
                 var actives = p.Skus.Where(s => s.IsActive).ToList();
                 if (actives.Count != 0)
                 {
-                    var regular = actives.Min(s => s.Regular);
+                    regularPrice = actives.Min(s => s.Regular);
                     var promos = actives.Where(s => s.Promo.HasValue).Select(s => s.Promo!.Value);
-
                     promo = promos.Any() ? promos.Min() : null;
-                    effective = promo.HasValue ? Math.Min(regular, promo.Value) : regular;
+                    effective = promo.HasValue ? Math.Min(regularPrice, promo.Value) : regularPrice;
 
-                    return new ProductDto(p.Id, p.Name, p.Slug, p.IsActive, p.HasSkus,
-                        regular,
-                        promo,
-                        effective,
-                        p.CategoryId,
-                        p.CategoryName,
-                        p.PrimaryImageUrl
-                    );
+                    var skuInputs = actives.Select(s =>
+                    {
+                        var skuEffective = s.Promo.HasValue
+                            ? Math.Min(s.Regular, s.Promo.Value)
+                            : s.Regular;
+                        return new ProductSalesSummaryFactory.SkuInput(
+                            s.SalesMode,
+                            s.MinimumQuantity,
+                            s.QuantityStep,
+                            s.PackageSize,
+                            s.PackageLabel,
+                            s.PackageDescription,
+                            s.QuantityUnitLabel,
+                            s.ShowTotalPieces,
+                            skuEffective);
+                    }).ToList();
+
+                    salesSummary = ProductSalesSummaryFactory.FromActiveSkus(skuInputs);
                 }
             }
 
-            return new ProductDto(p.Id, p.Name, p.Slug, p.IsActive, p.HasSkus,
-                p.BaseRegular,
+            return new ProductDto(
+                p.Id,
+                p.Name,
+                p.Slug,
+                p.IsActive,
+                p.HasSkus,
+                regularPrice,
                 promo,
                 effective,
                 p.CategoryId,
                 p.CategoryName,
-                p.PrimaryImageUrl
-            );
+                p.PrimaryImageUrl,
+                salesSummary);
         });
 
         return new PagedProductsDto(page, pageSize, total, dtos);

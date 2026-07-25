@@ -6,6 +6,7 @@
 
 ## Concluído recentemente
 
+- [x] **Product list `salesSummary`** — listagem pública agrega sales rules para ProductCard sem N+1 by-slug (`docs/catalog/product-list-sales-summary.md`); FE consome no card (`apps/web/docs/product-card.md`)
 - [x] **Wholesale sales rules Fase 4 (OrderItem snapshot)** — `salesDisplay` em Admin/Customer/Guest (`docs/orders/order-item-sales-snapshot.md`)
 - [x] **Wholesale sales rules Fase 1 (backend)** — SalesMode/SkuSalesRule no SKU, checkout enforcement, migration (`docs/catalog/sales-rules-contract.md`)
 - [x] **Wholesale sales rules — design (Fase 0)** — `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md`
@@ -50,7 +51,7 @@
 | 5 | **Frontend guest order status + Account** | Backend: status + `orderNumber` + claim codes; wiring UI pós-Pix (conta opcional) |
 | 5b | **Frontend Admin Orders** | Backend `/api/admin/orders` + `orderNumber`; listagem + detalhe no painel |
 | 5c | **Frontend Customer Orders** | Backend `/api/customer/orders` + claim/`orderNumber`; “Meus pedidos” |
-| 5d | **Wholesale sales rules (Fase 1 backend)** | Design pronto (`docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md`); domínio + checkout enforce; sem UI ainda |
+| 5d | **Frontend ProductCard `salesSummary`** | Feito — card usa listagem; by-slug só PDP (`apps/web/docs/product-card.md`) |
 | 6 | **Shipping** | Frete real; hoje `ShippingAmount` é null |
 | 7 | **Notifications** | E-mail real (confirm/reset/pedido) |
 

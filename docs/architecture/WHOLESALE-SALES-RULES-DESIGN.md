@@ -524,6 +524,7 @@ Seed demo: permanece Unit até alguém configurar atacado nos produtos demo.
 - PDP selector/mensagens.
 - Cart v2 / snapshot + revalidação.
 - Mensagens de erro alinhadas aos codes.
+- ~~Listagem: `salesSummary` no ProductDto (evita N+1 by-slug no card).~~ **Backend + FE** — `docs/catalog/product-list-sales-summary.md`, `apps/web/docs/product-card.md`.
 
 ### Fase 4 — Checkout UX + Orders snapshot
 

@@ -123,6 +123,16 @@ Sortido (quando aplicável):
 
 ## Storefront / admin read
 
+### Listagem pública — `salesSummary`
+
+`GET /api/catalog/products` (e qualquer listagem que use `ProductDto`) inclui `salesSummary` compacto por produto (agregado das SKUs **ativas**).
+
+Detalhe: `docs/catalog/product-list-sales-summary.md`.
+
+Objetivo: ProductCard sem N+1 `by-slug`. Não substitui `salesRule` da PDP.
+
+### Detalhe — `salesRule` / `salesRuleDisplay`
+
 `GET /api/catalog/products/{id}` e `by-slug` — cada SKU inclui:
 
 - `salesRule` — regra normalizada (`packageSize`, `quantityUnitLabel`, `packageLabel`, `showTotalPieces`, …)
@@ -183,4 +193,4 @@ Error codes (400 ProblemDetails `code`):
 
 ## Fora do MVP
 
-ClosedGrid, pacote composto multi-SKU, tier pricing, mínimo global, B2B, snapshot OrderItem (Fase 4).
+ClosedGrid, pacote composto multi-SKU, tier pricing, mínimo global, B2B.
