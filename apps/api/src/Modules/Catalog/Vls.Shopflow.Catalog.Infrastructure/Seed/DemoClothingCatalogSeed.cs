@@ -84,11 +84,15 @@ public static class DemoClothingCatalogSeed
                 continue;
             }
 
+            // Detach previous product work so one failure cannot poison later products.
+            db.ChangeTracker.Clear();
+
             var product = await db.Products
                 .Include(p => p.Skus)
                 .Include(p => p.Images)
                 .FirstOrDefaultAsync(p => p.Slug.Value == definition.Slug, cancellationToken);
 
+            var isNewProduct = product is null;
             if (product is null)
             {
                 product = Product.CreateWithSkus(definition.Name, Slug.From(definition.Slug), categoryId);
@@ -103,6 +107,8 @@ public static class DemoClothingCatalogSeed
             }
 
             var imageSortOrder = product.Images.Count;
+            var productAlreadyHasImages = product.Images.Count > 0;
+
             foreach (var color in definition.Colors)
             {
                 var publicFileName = color.PublicFileName ?? SanitizePublicFileName(color.SourceFileName);
@@ -122,22 +128,44 @@ public static class DemoClothingCatalogSeed
                         imagesCopied++;
                 }
 
-                if (product.Images.Any(i =>
-                        string.Equals(i.Url, publicUrl, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(i.StoragePath, storagePath, StringComparison.OrdinalIgnoreCase)))
+                var existingImage = FindExistingSeedImage(product, publicFileName, publicUrl, storagePath);
+                if (existingImage is not null)
                 {
+                    // Refresh absolute URL when PublicBaseUrl changed — without mutating tracked entities.
+                    if (!string.Equals(existingImage.Url, publicUrl, StringComparison.Ordinal))
+                    {
+                        await db.ProductImages
+                            .Where(i => i.Id == existingImage.Id)
+                            .ExecuteUpdateAsync(
+                                setters => setters.SetProperty(i => i.Url, publicUrl),
+                                cancellationToken);
+                    }
+
                     imagesSkipped++;
                     continue;
                 }
 
-                product.AddImage(ProductImage.Create(
+                // Insert only via DbSet for existing products. Never call Product.AddImage when
+                // images already exist — AddImage flips IsPrimary on persisted rows and can crash
+                // startup with DbUpdateConcurrencyException.
+                var image = ProductImage.Create(
                     product.Id,
                     publicUrl,
                     storagePath,
-                    imageSortOrder,
-                    isPrimary: imageSortOrder == 0));
+                    sortOrder: imageSortOrder,
+                    isPrimary: !productAlreadyHasImages && imageSortOrder == 0);
 
-                imageSortOrder++;
+                if (!productAlreadyHasImages)
+                {
+                    // New product / empty collection: AddImage is safe (no persisted rows to mutate).
+                    product.AddImage(image);
+                    imageSortOrder = product.Images.Count;
+                }
+                else
+                {
+                    db.ProductImages.Add(image);
+                    imageSortOrder++;
+                }
             }
 
             var sizes = definition.LetterSizes ?? definition.NumericSizes
@@ -152,10 +180,16 @@ public static class DemoClothingCatalogSeed
                     var sizeValueId = ResolveAttributeValueId(tamanhoDefinition, size);
                     var skuCode = BuildSkuCode(definition.SkuBase, color.ColorName, size);
 
-                    if (product.Skus.Any(s => string.Equals(s.Code, skuCode, StringComparison.OrdinalIgnoreCase))
-                        || await db.Skus.AnyAsync(
-                            s => s.ProductId == product.Id && s.Code == skuCode,
-                            cancellationToken))
+                    if (product.Skus.Any(s => string.Equals(s.Code, skuCode, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        skusSkipped++;
+                        continue;
+                    }
+
+                    var skuExistsInDb = !isNewProduct && await db.Skus.AnyAsync(
+                        s => s.ProductId == product.Id && s.Code == skuCode,
+                        cancellationToken);
+                    if (skuExistsInDb)
                     {
                         skusSkipped++;
                         continue;
@@ -175,9 +209,31 @@ public static class DemoClothingCatalogSeed
                     skusCreated++;
                 }
             }
+
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                // Never block API startup because of demo seed races / stale image rows.
+                logger.LogWarning(
+                    ex,
+                    "Demo seed: concurrency conflict while seeding product {Slug}; skipping product and continuing.",
+                    definition.Slug);
+                db.ChangeTracker.Clear();
+            }
+            catch (DbUpdateException ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Demo seed: database update failed while seeding product {Slug}; skipping product and continuing.",
+                    definition.Slug);
+                db.ChangeTracker.Clear();
+            }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        db.ChangeTracker.Clear();
 
         logger.LogInformation(
             "Demo clothing catalog seed finished. Products created={ProductsCreated}, skipped={ProductsSkipped}, " +
@@ -210,6 +266,42 @@ public static class DemoClothingCatalogSeed
             .Where(p => DemoClothingCatalogSeedData.DemoProductSlugs.Contains(p.Slug.Value))
             .SelectMany(p => p.Skus.Select(s => s.Id))
             .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Matches an existing seed image by exact URL/storage path or by file name suffix,
+    /// so PublicBaseUrl changes do not create duplicate rows or mutate existing ones incorrectly.
+    /// </summary>
+    internal static ProductImage? FindExistingSeedImage(
+        Product product,
+        string publicFileName,
+        string publicUrl,
+        string storagePath)
+    {
+        return product.Images.FirstOrDefault(i =>
+            string.Equals(i.Url, publicUrl, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(i.StoragePath, storagePath, StringComparison.OrdinalIgnoreCase)
+            || StoragePathEndsWithFileName(i.StoragePath, publicFileName)
+            || UrlContainsFileName(i.Url, publicFileName));
+    }
+
+    internal static bool StoragePathEndsWithFileName(string? storagePath, string publicFileName)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+            return false;
+
+        return storagePath.EndsWith(publicFileName, StringComparison.OrdinalIgnoreCase)
+               || storagePath.EndsWith("/" + publicFileName, StringComparison.OrdinalIgnoreCase)
+               || storagePath.EndsWith("\\" + publicFileName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool UrlContainsFileName(string? url, string publicFileName)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return false;
+
+        return url.Contains("/" + publicFileName, StringComparison.OrdinalIgnoreCase)
+               || url.EndsWith(publicFileName, StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<int> EnsureAttributeValuesAsync(

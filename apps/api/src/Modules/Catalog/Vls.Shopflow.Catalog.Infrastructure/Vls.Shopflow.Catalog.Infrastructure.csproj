@@ -31,4 +31,9 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vls.Shopflow.Catalog.IntegrationTests" />
+    <InternalsVisibleTo Include="Vls.Shopflow.Catalog.UnitTests" />
+  </ItemGroup>
+
 </Project>
