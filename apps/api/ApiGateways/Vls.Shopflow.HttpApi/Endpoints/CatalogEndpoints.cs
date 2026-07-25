@@ -38,7 +38,9 @@ public static class CatalogEndpoints
             var id = await sender.Send(new CreateVariantProductCommand(
                 req.Name,
                 req.Slug,
-                req.CategoryId
+                req.CategoryId,
+                req.IsFeatured,
+                req.DisplayOrder
             ), ct);
 
             return Results.Created($"/api/catalog/products/{id}", new { id });
@@ -97,12 +99,18 @@ public static class CatalogEndpoints
         cat.MapPut("/products/{id:guid}",
             async (ISender sender, Guid id, UpdateProductRequest req, CancellationToken ct) =>
             {
+                // Only touch display settings when the client sends the optional object
+                // (avoids wiping isFeatured/displayOrder on older admin clients).
+                var updateDisplay = req.Display is not null;
                 await sender.Send(new UpdateProductCommand(
                     id,
                     req.Name,
                     req.Slug,
                     req.CategoryId,
-                    req.IsActive
+                    req.IsActive,
+                    req.Display?.IsFeatured,
+                    req.Display?.DisplayOrder,
+                    updateDisplay
                 ), ct);
                 return Results.NoContent();
             })
@@ -180,9 +188,25 @@ public static class CatalogEndpoints
         // -------------------------------------------------------
 
         cat.MapGet("/products",
-            async (ISender sender, int page = 1, int pageSize = 20, CancellationToken ct = default) =>
+            async (
+                ISender sender,
+                int page = 1,
+                int pageSize = 16,
+                string? sort = null,
+                string? categorySlug = null,
+                Guid? categoryId = null,
+                string? q = null,
+                CancellationToken ct = default) =>
         {
-            var dto = await sender.Send(new GetProductsQuery(page, pageSize), ct);
+            var dto = await sender.Send(
+                new GetProductsQuery(
+                    page,
+                    pageSize,
+                    sort ?? ProductListSort.Default,
+                    categorySlug,
+                    categoryId,
+                    q),
+                ct);
             return Results.Ok(dto);
         });
 
@@ -242,7 +266,9 @@ public static class CatalogEndpoints
 public sealed record CreateVariantProductRequest(
     string Name,
     string Slug,
-    Guid? CategoryId);
+    Guid? CategoryId,
+    bool IsFeatured = false,
+    int? DisplayOrder = null);
 
 public sealed record AddVariantRequest(
     string? Code,
@@ -256,7 +282,12 @@ public sealed record UpdateProductRequest(
     string Name,
     string? Slug,
     Guid? CategoryId,
-    bool IsActive);
+    bool IsActive,
+    ProductDisplaySettingsRequest? Display = null);
+
+public sealed record ProductDisplaySettingsRequest(
+    bool IsFeatured = false,
+    int? DisplayOrder = null);
 
 public sealed record UpdateVariantRequest(
     string? Code,

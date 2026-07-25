@@ -17,5 +17,10 @@ public sealed class UpdateProductCommandValidator : AbstractValidator<UpdateProd
         RuleFor(x => x.CategoryId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("CategoryId inválido.");
+
+        RuleFor(x => x.DisplayOrder)
+            .GreaterThanOrEqualTo(0)
+            .When(x => x.UpdateDisplaySettings && x.DisplayOrder.HasValue)
+            .WithMessage("DisplayOrder não pode ser negativo.");
     }
 }

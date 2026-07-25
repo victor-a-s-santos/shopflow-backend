@@ -17,13 +17,29 @@ public sealed class Product : Entity<Guid>
     public bool HasSkus { get; private set; }
     public Price BasePrice { get; private set; } = Price.From(0);
 
+    /// <summary>Storefront highlight — featured products sort first on the public list.</summary>
+    public bool IsFeatured { get; private set; }
+
+    /// <summary>Manual storefront order (lower first). Null = after manually ordered products.</summary>
+    public int? DisplayOrder { get; private set; }
+
+    /// <summary>Creation timestamp used for novelty sort. Never use UpdatedAt for vitrine order.</summary>
+    public DateTimeOffset CreatedAt { get; private set; }
+
     public IReadOnlyCollection<Sku> Skus => _skus.AsReadOnly();
     public IReadOnlyCollection<ProductImage> Images => _images.AsReadOnly();
 
     private Product() { }
 
-    public static Product CreateWithSkus(string name, Slug slug, Guid? categoryId)
+    public static Product CreateWithSkus(
+        string name,
+        Slug slug,
+        Guid? categoryId,
+        bool isFeatured = false,
+        int? displayOrder = null)
     {
+        ValidateDisplayOrder(displayOrder);
+
         return new Product
         {
             Id = Guid.NewGuid(),
@@ -32,7 +48,10 @@ public sealed class Product : Entity<Guid>
             CategoryId = categoryId,
             IsActive = true,
             HasSkus = true,
-            BasePrice = Price.From(0)
+            BasePrice = Price.From(0),
+            IsFeatured = isFeatured,
+            DisplayOrder = displayOrder,
+            CreatedAt = DateTimeOffset.UtcNow
         };
     }
 
@@ -69,6 +88,19 @@ public sealed class Product : Entity<Guid>
         Slug = slug;
         CategoryId = categoryId;
         IsActive = isActive;
+    }
+
+    public void ChangeDisplaySettings(bool isFeatured, int? displayOrder)
+    {
+        ValidateDisplayOrder(displayOrder);
+        IsFeatured = isFeatured;
+        DisplayOrder = displayOrder;
+    }
+
+    private static void ValidateDisplayOrder(int? displayOrder)
+    {
+        if (displayOrder is < 0)
+            throw new ArgumentOutOfRangeException(nameof(displayOrder), "DisplayOrder cannot be negative.");
     }
 
     public Sku? GetSku(Guid skuId) => _skus.FirstOrDefault(s => s.Id == skuId);

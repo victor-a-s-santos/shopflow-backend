@@ -13,6 +13,18 @@ public class CategoryMap : IEntityTypeConfiguration<Category>
 
         builder.Property(x => x.Name).IsRequired().HasMaxLength(150);
 
+        builder.OwnsOne(x => x.Slug, s =>
+        {
+            s.Property(x => x.Value)
+                .HasColumnName("slug")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            s.HasIndex(x => x.Value).IsUnique();
+        });
+
+        builder.Navigation(x => x.Slug).IsRequired();
+
         builder.HasMany(x => x.DefaultAttributes)
             .WithOne(a => a.Category)
             .HasForeignKey(a => a.CategoryId)

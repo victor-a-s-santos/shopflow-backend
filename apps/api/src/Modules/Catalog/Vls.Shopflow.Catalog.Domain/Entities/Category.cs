@@ -1,17 +1,19 @@
 using Vls.Shopflow.BuildingBlocks.Domain.Entities;
+using Vls.Shopflow.Catalog.Domain.ValueObjects;
 
 namespace Vls.Shopflow.Catalog.Domain.Entities;
 
 public sealed class Category : Entity<Guid>
 {
     public string Name { get; private set; } = default!;
+    public Slug Slug { get; private set; } = default!;
 
     private readonly List<AttributeDefinition> _defaultAttributes = new();
     public IReadOnlyCollection<AttributeDefinition> DefaultAttributes => _defaultAttributes;
-    
+
     private readonly List<Guid> _defaultAttributeDefinitionIds = new();
-    
-    public IReadOnlyList<Guid> DefaultAttributeDefinitions 
+
+    public IReadOnlyList<Guid> DefaultAttributeDefinitions
         => _defaultAttributeDefinitionIds.AsReadOnly();
 
     private Category() { }
@@ -19,17 +21,24 @@ public sealed class Category : Entity<Guid>
     public Category(string name)
     {
         Id = Guid.NewGuid();
-        Name = name;
+        Name = name.Trim();
+        Slug = ValueObjects.Slug.CreateFromName(Name);
+    }
+
+    public void Rename(string name)
+    {
+        Name = name.Trim();
+        Slug = ValueObjects.Slug.CreateFromName(Name);
     }
 
     public void AddAttribute(AttributeDefinition attr)
     {
         _defaultAttributes.Add(attr);
     }
-    
+
     public void AddDefaultAttribute(AttributeDefinition definition)
     {
-        if (definition is null) 
+        if (definition is null)
             throw new ArgumentNullException(nameof(definition));
 
         if (!_defaultAttributeDefinitionIds.Contains(definition.Id))

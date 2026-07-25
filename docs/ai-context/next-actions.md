@@ -6,6 +6,8 @@
 
 ## Concluído recentemente
 
+- [x] **Product list categorySlug filter** — filtro server-side antes de count/paginação + `Category.Slug` + `q` básica (`docs/catalog/product-list-pagination-and-ordering.md`); pendência FE usar `categorySlug` (não filtrar client-side)
+- [x] **Product list pagination + display order** — `page`/`pageSize`/`hasNextPage`, sort default featured→displayOrder→createdAt (não UpdatedAt); admin `isFeatured`/`displayOrder` (`docs/catalog/product-list-pagination-and-ordering.md`); pendência FE “Carregar mais” + admin UI
 - [x] **Product list `salesSummary`** — listagem pública agrega sales rules para ProductCard sem N+1 by-slug (`docs/catalog/product-list-sales-summary.md`); FE consome no card (`apps/web/docs/product-card.md`)
 - [x] **Wholesale sales rules Fase 4 (OrderItem snapshot)** — `salesDisplay` em Admin/Customer/Guest (`docs/orders/order-item-sales-snapshot.md`)
 - [x] **Wholesale sales rules Fase 1 (backend)** — SalesMode/SkuSalesRule no SKU, checkout enforcement, migration (`docs/catalog/sales-rules-contract.md`)
@@ -52,6 +54,7 @@
 | 5b | **Frontend Admin Orders** | Backend `/api/admin/orders` + `orderNumber`; listagem + detalhe no painel |
 | 5c | **Frontend Customer Orders** | Backend `/api/customer/orders` + claim/`orderNumber`; “Meus pedidos” |
 | 5d | **Frontend ProductCard `salesSummary`** | Feito — card usa listagem; by-slug só PDP (`apps/web/docs/product-card.md`) |
+| 5e | **Frontend home “Carregar mais” + categorySlug + admin display** | Backend paginação/`hasNextPage`/`categorySlug`/`q` + `display` no PUT; FE não filtrar categoria no client |
 | 6 | **Shipping** | Frete real; hoje `ShippingAmount` é null |
 | 7 | **Notifications** | E-mail real (confirm/reset/pedido) |
 

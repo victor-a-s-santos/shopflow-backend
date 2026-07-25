@@ -18,6 +18,8 @@ A listagem (`GET /api/catalog/products`) precisa de um **resumo compacto** por p
 
 `salesSummary` é **null** quando o produto não tem SKU ativo (ou não tem SKUs).
 
+Calculado apenas para os produtos da **página** após filtro/sort/paginação (`docs/catalog/product-list-pagination-and-ordering.md`).
+
 Não altera checkout, inventory, orders nem admin.
 
 ## Agregação

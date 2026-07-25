@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Vls.Shopflow.Catalog.Infrastructure;
@@ -11,9 +12,11 @@ using Vls.Shopflow.Catalog.Infrastructure;
 namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
 {
     [DbContext(typeof(CatalogDbContext))]
-    partial class CatalogDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260725211353_AddProductStorefrontDisplayOrder")]
+    partial class AddProductStorefrontDisplayOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -259,34 +262,6 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("AttributeDefinition");
-                });
-
-            modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.Category", b =>
-                {
-                    b.OwnsOne("Vls.Shopflow.Catalog.Domain.ValueObjects.Slug", "Slug", b1 =>
-                        {
-                            b1.Property<Guid>("CategoryId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<string>("Value")
-                                .IsRequired()
-                                .HasMaxLength(200)
-                                .HasColumnType("character varying(200)")
-                                .HasColumnName("slug");
-
-                            b1.HasKey("CategoryId");
-
-                            b1.HasIndex("Value")
-                                .IsUnique();
-
-                            b1.ToTable("categories", "catalog");
-
-                            b1.WithOwner()
-                                .HasForeignKey("CategoryId");
-                        });
-
-                    b.Navigation("Slug")
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.Product", b =>

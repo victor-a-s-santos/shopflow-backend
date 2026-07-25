@@ -123,11 +123,12 @@ Sortido (quando aplicável):
 
 ## Storefront / admin read
 
-### Listagem pública — `salesSummary`
+### Listagem pública — `salesSummary` + paginação
 
 `GET /api/catalog/products` (e qualquer listagem que use `ProductDto`) inclui `salesSummary` compacto por produto (agregado das SKUs **ativas**).
 
-Detalhe: `docs/catalog/product-list-sales-summary.md`.
+Detalhe: `docs/catalog/product-list-sales-summary.md`.  
+Paginação/ordem: `docs/catalog/product-list-pagination-and-ordering.md` (`hasNextPage`, sort default sem `UpdatedAt`).
 
 Objetivo: ProductCard sem N+1 `by-slug`. Não substitui `salesRule` da PDP.
 

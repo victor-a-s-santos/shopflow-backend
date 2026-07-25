@@ -18,7 +18,12 @@ public sealed class CreateVariantProductCommandHandler(IProductRepository produc
 
         var slug = await slugService.EnsureUniqueAsync(candidate, cancellationToken);
         
-        var product = Product.CreateWithSkus(cmd.Name, slug, cmd.CategoryId);
+        var product = Product.CreateWithSkus(
+            cmd.Name,
+            slug,
+            cmd.CategoryId,
+            cmd.IsFeatured,
+            cmd.DisplayOrder);
         
         await productRepository.AddAsync(product, cancellationToken);
         await catalogUnitOfWork.SaveChangesAsync(cancellationToken);

@@ -34,6 +34,8 @@
 |--------|-----------|---------|
 | **Sales rules — FE pedidos** | Backend Fase 4 snapshot pronto (`salesDisplay` em OrderItem); FE ainda não consome | Pedidos sem copy de lote |
 | **ProductCard N+1 by-slug** | Resolvido — FE usa `salesSummary` da listagem | ver `docs/catalog/product-list-sales-summary.md` + `apps/web/docs/product-card.md` |
+| **Home sem “Carregar mais” / filtro client-side** | Backend paginação + `categorySlug` pronto; FE deve deixar de filtrar categoria no client | `docs/catalog/product-list-pagination-and-ordering.md` |
+| **Subcategorias na listagem** | Filtro é match exato de categoria | Árvore/filhos não incluídos |
 | **Guest claim sem e-mail / magic link** | Claim exige token no browser; sem e-mail transacional pós-Pix | Recuperação de pedido se o cliente perder o token (`docs/orders/post-pix-guest-flow.md`) |
 | **Salvar produto admin multi-endpoint** | Create shell → variants → images separados; sem transação global | Persistência parcial se o FE falhar no meio; ver `docs/catalog/admin-product-contract.md` |
 | **Arquivos de imagem órfãos no disco** | DELETE imagem remove só o registro DB | Lixo em `uploads/` |

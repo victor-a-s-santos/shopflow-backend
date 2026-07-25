@@ -18,5 +18,10 @@ public sealed class CreateVariantProductValidator : AbstractValidator<CreateVari
         RuleFor(x => x.CategoryId)
             .Must(id => !id.HasValue || id.Value != Guid.Empty)
             .WithMessage("CategoryId inválido.");
+
+        RuleFor(x => x.DisplayOrder)
+            .GreaterThanOrEqualTo(0)
+            .When(x => x.DisplayOrder.HasValue)
+            .WithMessage("DisplayOrder não pode ser negativo.");
     }
 }

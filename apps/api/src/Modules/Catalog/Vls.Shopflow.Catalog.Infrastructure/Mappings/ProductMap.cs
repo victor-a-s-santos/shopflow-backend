@@ -15,6 +15,13 @@ internal sealed class ProductMap : IEntityTypeConfiguration<Product>
 
         map.Property(p => p.IsActive);
         map.Property(p => p.HasSkus);
+        map.Property(p => p.IsFeatured).IsRequired().HasDefaultValue(false);
+        map.Property(p => p.DisplayOrder);
+        map.Property(p => p.CreatedAt).IsRequired();
+
+        // Storefront list default: featured → displayOrder → createdAt → id
+        map.HasIndex(p => new { p.IsActive, p.IsFeatured, p.DisplayOrder, p.CreatedAt, p.Id })
+            .HasDatabaseName("IX_products_storefront_list");
 
         // evitar mapear eventos
         map.Ignore("_events");
