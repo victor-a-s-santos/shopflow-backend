@@ -100,7 +100,12 @@ Nota: sort por preço usa divisão SQL; arredondamento pode diferir levemente do
 
 `salesSummary` continua calculado **só para os itens da página** (após filtro/sort/Skip/Take). Ver `docs/catalog/product-list-sales-summary.md`.
 
+## Listagem admin (separada)
+
+Gestão do catálogo **não** usa este endpoint. Ver `docs/catalog/admin-products-listing.md` → `GET /api/admin/catalog/products` (Backoffice; inclui inativos/sem SKU).
+
 ## Pendências FE / admin UI
 
-1. Home: “Carregar mais” com `page` / `hasNextPage` (default `pageSize=16`).
+1. Home: “Carregar mais” com `page` / `hasNextPage` (default `pageSize=16`) + `categorySlug`.
 2. Admin form: inputs para destaque e ordem de exibição.
+3. Admin Products table: consumir `/api/admin/catalog/products`.

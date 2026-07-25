@@ -113,6 +113,8 @@ Base: `http://localhost:5127/api`
 
 `GET /catalog/products` — paginação (`page`/`pageSize`/`hasNextPage`), `sort`, filtros server-side `categorySlug`/`categoryId`/`q` (antes do count), `salesSummary` por item. `GET /catalog/categories` inclui `slug`. Docs: `product-list-pagination-and-ordering.md`, `product-list-sales-summary.md`.
 
+`GET /admin/catalog/products` — Backoffice; produtos ativos/inativos/sem SKU; filtros `status`/`featured`/`q`/`categorySlug`; DTO resumido para tabela. Doc: `admin-products-listing.md`.
+
 ```
 GET    /catalog/attributes
 GET    /catalog/categories

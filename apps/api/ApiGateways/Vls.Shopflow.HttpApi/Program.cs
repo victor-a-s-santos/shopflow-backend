@@ -905,6 +905,8 @@ app.MapGroup("/api").MapCustomerAuthEndpoints();
 
 app.MapGroup("/api").MapCatalogEndpoints();
 
+app.MapGroup("/api").MapAdminCatalogEndpoints();
+
 app.MapGroup("/api").MapInventoryEndpoints();
 
 app.MapGroup("/api").MapCheckoutEndpoints();

@@ -6,6 +6,7 @@
 
 ## Concluído recentemente
 
+- [x] **Admin products listing** — `GET /api/admin/catalog/products` paginado (status/featured/q/category/sort); separado da vitrine (`docs/catalog/admin-products-listing.md`); pendência FE Admin Products
 - [x] **Product list categorySlug filter** — filtro server-side antes de count/paginação + `Category.Slug` + `q` básica (`docs/catalog/product-list-pagination-and-ordering.md`); pendência FE usar `categorySlug` (não filtrar client-side)
 - [x] **Product list pagination + display order** — `page`/`pageSize`/`hasNextPage`, sort default featured→displayOrder→createdAt (não UpdatedAt); admin `isFeatured`/`displayOrder` (`docs/catalog/product-list-pagination-and-ordering.md`); pendência FE “Carregar mais” + admin UI
 - [x] **Product list `salesSummary`** — listagem pública agrega sales rules para ProductCard sem N+1 by-slug (`docs/catalog/product-list-sales-summary.md`); FE consome no card (`apps/web/docs/product-card.md`)
@@ -55,6 +56,7 @@
 | 5c | **Frontend Customer Orders** | Backend `/api/customer/orders` + claim/`orderNumber`; “Meus pedidos” |
 | 5d | **Frontend ProductCard `salesSummary`** | Feito — card usa listagem; by-slug só PDP (`apps/web/docs/product-card.md`) |
 | 5e | **Frontend home “Carregar mais” + categorySlug + admin display** | Backend paginação/`hasNextPage`/`categorySlug`/`q` + `display` no PUT; FE não filtrar categoria no client |
+| 5f | **Frontend Admin Products table** | Backend `/api/admin/catalog/products` pronto; substituir listagem limitada pela API admin |
 | 6 | **Shipping** | Frete real; hoje `ShippingAmount` é null |
 | 7 | **Notifications** | E-mail real (confirm/reset/pedido) |
 

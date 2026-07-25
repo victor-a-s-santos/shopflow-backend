@@ -70,6 +70,7 @@ public static class DependencyInjection
         // Repositórios / Read models
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductReadModel, ProductReadModel>();
+        services.AddScoped<IAdminProductReadModel, AdminProductReadModel>();
         services.AddScoped<IAttributeDefinitionReadModel, AttributeDefinitionReadModel>();
         services.AddScoped<IAttributeDefinitionLookup, AttributeDefinitionLookup>();
         services.AddScoped<ICategoryReadModel, CategoryReadModel>();
