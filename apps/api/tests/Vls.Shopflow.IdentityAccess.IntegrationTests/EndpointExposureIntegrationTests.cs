@@ -328,6 +328,45 @@ public sealed class EndpointExposureIntegrationTests : IClassFixture<ShopflowWeb
     }
 
     [Fact]
+    public async Task AdminInventorySkusList_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/admin/inventory/skus");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminInventorySkusList_AsCustomer_ReturnsForbiddenOrUnauthorized()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = await _factory.CreateAuthenticatedCustomerClientAsync();
+
+        var response = await client.GetAsync("/api/admin/inventory/skus");
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminInventorySkusList_AsAdmin_Returns200()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+
+        var response = await client.GetAsync("/api/admin/inventory/skus?page=1&pageSize=20");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task CustomerOrdersList_WithoutLogin_Returns401()
     {
         if (!await _factory.CanConnectToDatabaseAsync())

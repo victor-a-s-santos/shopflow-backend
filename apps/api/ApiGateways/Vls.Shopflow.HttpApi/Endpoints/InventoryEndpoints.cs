@@ -94,6 +94,35 @@ public static class InventoryEndpoints
             .WithTags("InventoryAdmin")
             .RequireAuthorization(AuthPolicies.Backoffice);
 
+        adminInv.MapGet("/skus", async (
+            ISender sender,
+            int? page,
+            int? pageSize,
+            string? sort,
+            string? q,
+            Guid? productId,
+            string? categorySlug,
+            Guid? categoryId,
+            string? status,
+            string? stockStatus,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(
+                new GetAdminInventorySkusQuery(
+                    page ?? 1,
+                    pageSize ?? 20,
+                    sort ?? AdminInventorySkuListSort.Default,
+                    q,
+                    productId,
+                    categorySlug,
+                    categoryId,
+                    status ?? AdminInventorySkuListFilters.StatusAll,
+                    stockStatus ?? AdminInventorySkuListFilters.StockAll),
+                ct);
+
+            return Results.Ok(result);
+        });
+
         adminInv.MapPost("/skus/availability", async (
             ISender sender,
             GetSkuAvailabilityBatchRequest req,

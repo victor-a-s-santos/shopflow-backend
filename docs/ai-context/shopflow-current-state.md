@@ -132,7 +132,9 @@ DELETE /catalog/products/{productId}/variants/{skuId}
 POST   /catalog/products/{id}/images
 ```
 
-### Inventory (8 endpoints)
+### Inventory
+
+`GET /admin/inventory/skus` — Backoffice; listagem SKU-cêntrica com estoque, filtros `status`/`stockStatus`/`q`/`categorySlug`, sorts operacionais. Doc: `admin-inventory-skus-listing.md`.
 
 ```
 GET    /inventory/skus/{skuId}
@@ -140,9 +142,11 @@ GET    /inventory/skus/{skuId}/movements
 POST   /inventory/skus/{skuId}
 POST   /inventory/skus/{skuId}/add
 POST   /inventory/skus/{skuId}/remove
-POST   /inventory/skus/{skuId}/reserve
-POST   /inventory/reservations/{reservationId}/confirm
-POST   /inventory/reservations/{reservationId}/cancel
+GET    /admin/inventory/skus
+POST   /admin/inventory/skus/availability
+POST   /admin/inventory/skus/{skuId}/reserve
+POST   /admin/inventory/reservations/{reservationId}/confirm
+POST   /admin/inventory/reservations/{reservationId}/cancel
 ```
 
 ### Checkout (3 endpoints)

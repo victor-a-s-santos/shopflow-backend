@@ -17,7 +17,7 @@
 
 | Dívida | Evidência | Impacto |
 |--------|-----------|---------|
-| **N+1 no Admin Inventory** | Listagem Estoque ainda pode usar GET individual | Melhorar listagem Admin Estoque |
+| **N+1 no Admin Inventory** | ~~Backend sem listagem SKU~~ → `GET /api/admin/inventory/skus` pronto; FE ainda pode indexar via catalog/getProductById | Wiring FE Inventory Admin (`docs/inventory/admin-inventory-skus-listing.md`) |
 | **Batch Product Edit** | ~~ausente~~ → `POST /api/admin/inventory/skus/availability` | Wiring frontend Product Edit |
 | **Lint frontend (erros pré-existentes)** | `npm run lint` — `textarea.tsx`, `api.ts`, `tailwind.config.ts` | CI futuro falhará |
 | **Upload local de imagens** | `Uploads__RootPath` filesystem | Não escala; sem CDN/R2 |

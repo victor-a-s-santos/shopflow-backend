@@ -78,6 +78,10 @@
 
 Detalhe completo continua em `GET /api/catalog/products/{id}` (Backoffice).
 
+## Relação com Inventory Admin
+
+Listagem de **produtos** para gestão de catálogo. Para operação de estoque por SKU, usar `GET /api/admin/inventory/skus` (`docs/inventory/admin-inventory-skus-listing.md`) — não este endpoint nem a listagem pública.
+
 ## Pendência FE
 
 Tela Admin Products deve consumir este endpoint (não a listagem pública com `pageSize=48`).
