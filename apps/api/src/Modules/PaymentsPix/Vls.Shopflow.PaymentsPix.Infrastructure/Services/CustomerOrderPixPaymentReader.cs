@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.PaymentsPix.Domain.Enums;
 
 namespace Vls.Shopflow.PaymentsPix.Infrastructure.Services;
@@ -69,7 +70,7 @@ public sealed class CustomerOrderPixPaymentReader(PaymentsPixDbContext db) : ICu
     private static CustomerOrderPaymentSummaryDto ToSummary(Domain.Entities.PixPayment payment)
         => new(
             payment.Status.ToString(),
-            payment.Provider.ToString(),
+            OrderCustomerStatusProjector.PaymentMethodPix,
             payment.PaidAt,
-            payment.ExpiresAt);
+            OrderCustomerStatusProjector.ActivePaymentExpiresAt(payment.Status.ToString(), payment.ExpiresAt));
 }

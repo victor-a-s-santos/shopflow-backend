@@ -1,3 +1,4 @@
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Domain.Entities;
 
 namespace Vls.Shopflow.Orders.Application.Mappers;
@@ -49,14 +50,15 @@ internal static class OrderMapper
         => new(
             order.Id,
             order.FormatOrderNumber(),
+            OrderCustomerStatusProjector.Project(order.Status, payment?.Status),
             order.Status.ToString(),
             payment is null
                 ? null
                 : new DataTransferObjects.GuestOrderPaymentStatusDto(
                     payment.Status,
-                    payment.Provider,
+                    OrderCustomerStatusProjector.PaymentMethodPix,
                     payment.Amount,
-                    payment.ExpiresAt,
+                    OrderCustomerStatusProjector.ActivePaymentExpiresAt(payment.Status, payment.ExpiresAt),
                     payment.PaidAt,
                     payment.UpdatedAt),
             order.Items.Select(i => new DataTransferObjects.GuestOrderItemStatusDto(

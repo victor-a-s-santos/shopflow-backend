@@ -23,7 +23,9 @@ public sealed class CreateVariantProductCommandHandler(IProductRepository produc
             slug,
             cmd.CategoryId,
             cmd.IsFeatured,
-            cmd.DisplayOrder);
+            cmd.DisplayOrder,
+            cmd.Description,
+            isActive: cmd.IsActive ?? true);
         
         await productRepository.AddAsync(product, cancellationToken);
         await catalogUnitOfWork.SaveChangesAsync(cancellationToken);

@@ -1,6 +1,7 @@
 using FluentValidation;
 using Vls.Shopflow.Catalog.Application.Commands;
 using Vls.Shopflow.Catalog.Application.Validations.Common;
+using Vls.Shopflow.Catalog.Domain.Entities;
 
 namespace Vls.Shopflow.Catalog.Application.Validations;
 
@@ -22,5 +23,10 @@ public sealed class UpdateProductCommandValidator : AbstractValidator<UpdateProd
             .GreaterThanOrEqualTo(0)
             .When(x => x.UpdateDisplaySettings && x.DisplayOrder.HasValue)
             .WithMessage("DisplayOrder não pode ser negativo.");
+
+        RuleFor(x => x.Description)
+            .MaximumLength(Product.MaxDescriptionLength)
+            .WithMessage($"A descrição não pode ter mais de {Product.MaxDescriptionLength} caracteres.")
+            .When(x => x.UpdateDescription && !string.IsNullOrWhiteSpace(x.Description));
     }
 }

@@ -9,10 +9,16 @@ public sealed class Product : Entity<Guid>
     private readonly List<Sku> _skus = new();
     private readonly List<ProductImage> _images = new();
 
+    public const int MaxDescriptionLength = 4000;
+
     public string Name { get; private set; } = default!;
     public Slug Slug { get; private set; } = default!;
     public Guid? CategoryId { get; private set; }
     public Category? Category { get; private set; }
+
+    /// <summary>Optional long-form product description (admin + PDP).</summary>
+    public string? Description { get; private set; }
+
     public bool IsActive { get; private set; }
     public bool HasSkus { get; private set; }
     public Price BasePrice { get; private set; } = Price.From(0);
@@ -36,7 +42,9 @@ public sealed class Product : Entity<Guid>
         Slug slug,
         Guid? categoryId,
         bool isFeatured = false,
-        int? displayOrder = null)
+        int? displayOrder = null,
+        string? description = null,
+        bool isActive = true)
     {
         ValidateDisplayOrder(displayOrder);
 
@@ -46,7 +54,8 @@ public sealed class Product : Entity<Guid>
             Name = name.Trim(),
             Slug = slug,
             CategoryId = categoryId,
-            IsActive = true,
+            Description = NormalizeDescription(description),
+            IsActive = isActive,
             HasSkus = true,
             BasePrice = Price.From(0),
             IsFeatured = isFeatured,
@@ -88,6 +97,29 @@ public sealed class Product : Entity<Guid>
         Slug = slug;
         CategoryId = categoryId;
         IsActive = isActive;
+    }
+
+    /// <summary>
+    /// Sets description after trim; whitespace/empty becomes null.
+    /// Throws if longer than <see cref="MaxDescriptionLength"/>.
+    /// </summary>
+    public void ChangeDescription(string? description)
+        => Description = NormalizeDescription(description);
+
+    public static string? NormalizeDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return null;
+
+        var trimmed = description.Trim();
+        if (trimmed.Length > MaxDescriptionLength)
+        {
+            throw new ArgumentException(
+                $"Description cannot exceed {MaxDescriptionLength} characters.",
+                nameof(description));
+        }
+
+        return trimmed;
     }
 
     public void ChangeDisplaySettings(bool isFeatured, int? displayOrder)

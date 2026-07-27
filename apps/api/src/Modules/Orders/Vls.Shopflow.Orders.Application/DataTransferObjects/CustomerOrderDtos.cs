@@ -1,25 +1,29 @@
 namespace Vls.Shopflow.Orders.Application.DataTransferObjects;
 
 /// <summary>
-/// Customer-facing Pix summary. No provider IDs, QR, copy-paste, or secrets.
+/// Customer-facing Pix summary. No provider tech names, QR, copy-paste, or secrets.
+/// <see cref="ExpiresAt"/> is set only while payment is Pending.
 /// </summary>
 public sealed record CustomerOrderPaymentSummaryDto(
     string Status,
-    string Provider,
+    string Method,
     DateTimeOffset? PaidAt,
     DateTimeOffset? ExpiresAt);
 
 public sealed record CustomerOrderListItemDto(
     Guid Id,
     string OrderNumber,
+    string CustomerStatus,
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
     decimal Subtotal,
     decimal? ShippingAmount,
     decimal Total,
+    string Currency,
     int ItemsCount,
     string? FirstItemName,
+    string? PreviewImageUrl,
     CustomerOrderPaymentSummaryDto? Payment);
 
 public sealed record PagedCustomerOrdersDto(
@@ -56,11 +60,13 @@ public sealed record CustomerOrderItemDto(
 public sealed record CustomerOrderDetailDto(
     Guid Id,
     string OrderNumber,
+    string CustomerStatus,
     string Status,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
     DateTimeOffset? PaidAt,
     CustomerOrderShippingAddressDto ShippingAddress,
     CustomerOrderAmountsDto Amounts,
+    string Currency,
     IReadOnlyList<CustomerOrderItemDto> Items,
     CustomerOrderPaymentSummaryDto? Payment);

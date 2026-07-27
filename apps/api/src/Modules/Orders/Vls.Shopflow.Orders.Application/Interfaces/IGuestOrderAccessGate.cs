@@ -15,4 +15,13 @@ public interface IGuestOrderAccessGate
         Guid orderId,
         string? rawAccessToken,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Resolves the order by public <paramref name="orderNumber"/> then validates the token.
+    /// Invalid number / missing order / wrong token all throw the same access-denied exception.
+    /// </summary>
+    Task<(GuestOrderAccessToken Token, Order Order)> ValidateByOrderNumberAsync(
+        long orderNumber,
+        string? rawAccessToken,
+        CancellationToken cancellationToken);
 }

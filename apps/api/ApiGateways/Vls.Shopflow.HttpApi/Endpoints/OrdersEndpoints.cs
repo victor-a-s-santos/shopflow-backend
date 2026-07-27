@@ -46,6 +46,21 @@ public static class OrdersEndpoints
         .RequireRateLimiting(DependencyInjection.GuestOrderStatusRateLimitPolicy)
         .AllowAnonymous();
 
+        // Preferred guest tracking: orderNumber + token (header preferred; query allowed for email/deep links).
+        orders.MapGet("/public/{orderNumber}", async (
+            ISender sender,
+            HttpRequest request,
+            string orderNumber,
+            CancellationToken ct) =>
+        {
+            var accessToken = request.Headers[OrderAccessTokenHeaderName].FirstOrDefault()
+                              ?? request.Query["token"].FirstOrDefault();
+            var result = await sender.Send(new GetPublicOrderStatusQuery(orderNumber, accessToken), ct);
+            return Results.Ok(result);
+        })
+        .RequireRateLimiting(DependencyInjection.GuestOrderStatusRateLimitPolicy)
+        .AllowAnonymous();
+
         // Full order data (PII) — backoffice only.
         orders.MapGet("/{orderId:guid}", async (
             ISender sender,

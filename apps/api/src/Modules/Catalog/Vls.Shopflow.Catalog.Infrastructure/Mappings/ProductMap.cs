@@ -13,6 +13,10 @@ internal sealed class ProductMap : IEntityTypeConfiguration<Product>
 
         map.Property(p => p.Name).HasMaxLength(200).IsRequired();
 
+        map.Property(p => p.Description)
+            .HasColumnName("description")
+            .HasMaxLength(Product.MaxDescriptionLength);
+
         map.Property(p => p.IsActive);
         map.Property(p => p.HasSkus);
         map.Property(p => p.IsFeatured).IsRequired().HasDefaultValue(false);

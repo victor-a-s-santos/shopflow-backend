@@ -40,7 +40,9 @@ public static class CatalogEndpoints
                 req.Slug,
                 req.CategoryId,
                 req.IsFeatured,
-                req.DisplayOrder
+                req.DisplayOrder,
+                req.Description,
+                req.IsActive
             ), ct);
 
             return Results.Created($"/api/catalog/products/{id}", new { id });
@@ -99,9 +101,11 @@ public static class CatalogEndpoints
         cat.MapPut("/products/{id:guid}",
             async (ISender sender, Guid id, UpdateProductRequest req, CancellationToken ct) =>
             {
-                // Only touch display settings when the client sends the optional object
-                // (avoids wiping isFeatured/displayOrder on older admin clients).
+                // Only touch display / description when the client sends the field
+                // (avoids wiping values on older admin clients that omit them).
                 var updateDisplay = req.Display is not null;
+                // null/omitted → preserve; "" or text → apply (empty clears).
+                var updateDescription = req.Description is not null;
                 await sender.Send(new UpdateProductCommand(
                     id,
                     req.Name,
@@ -110,7 +114,9 @@ public static class CatalogEndpoints
                     req.IsActive,
                     req.Display?.IsFeatured,
                     req.Display?.DisplayOrder,
-                    updateDisplay
+                    updateDisplay,
+                    req.Description,
+                    updateDescription
                 ), ct);
                 return Results.NoContent();
             })
@@ -268,7 +274,10 @@ public sealed record CreateVariantProductRequest(
     string Slug,
     Guid? CategoryId,
     bool IsFeatured = false,
-    int? DisplayOrder = null);
+    int? DisplayOrder = null,
+    string? Description = null,
+    /// <summary>When null/omitted, defaults to true. Explicit false creates inactive product.</summary>
+    bool? IsActive = null);
 
 public sealed record AddVariantRequest(
     string? Code,
@@ -283,7 +292,9 @@ public sealed record UpdateProductRequest(
     string? Slug,
     Guid? CategoryId,
     bool IsActive,
-    ProductDisplaySettingsRequest? Display = null);
+    ProductDisplaySettingsRequest? Display = null,
+    /// <summary>Null/omitted preserves. Empty string clears. Non-empty sets.</summary>
+    string? Description = null);
 
 public sealed record ProductDisplaySettingsRequest(
     bool IsFeatured = false,

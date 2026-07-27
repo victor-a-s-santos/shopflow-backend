@@ -1,12 +1,13 @@
-using System.Text.Json;
 using FluentAssertions;
 using FluentValidation.TestHelper;
 using Moq;
+using System.Text.Json;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Queries;
 using Vls.Shopflow.Orders.Application.QueryHandlers;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Application.Validators;
 using Vls.Shopflow.Orders.Domain.Entities;
 using Vls.Shopflow.Orders.Domain.Enums;
@@ -42,7 +43,7 @@ public sealed class CustomerOrderQueryHandlerTests
     }
 
     [Fact]
-    public async Task GetCustomerOrders_FiltersByStatusAndPaymentStatus()
+    public async Task GetCustomerOrders_FiltersByPublicCustomerStatusAndPaymentStatus()
     {
         var customerId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -57,7 +58,9 @@ public sealed class CustomerOrderQueryHandlerTests
             .ReturnsAsync(new Dictionary<Guid, CustomerOrderPaymentSummaryDto>());
 
         var sut = new GetCustomerOrdersQueryHandler(readModel.Object, paymentReader.Object);
-        await sut.Handle(new GetCustomerOrdersQuery(customerId, Status: "Paid", PaymentStatus: "Pending"), CancellationToken.None);
+        await sut.Handle(
+            new GetCustomerOrdersQuery(customerId, Status: "Confirmed", PaymentStatus: "Pending"),
+            CancellationToken.None);
 
         readModel.Verify(x => x.GetPagedAsync(
             It.Is<CustomerOrderListQuerySpec>(s =>
@@ -67,7 +70,7 @@ public sealed class CustomerOrderQueryHandlerTests
     }
 
     [Fact]
-    public async Task GetCustomerOrders_IncludesPaymentSummary()
+    public async Task GetCustomerOrders_ProjectsCustomerStatusAndPixMethod()
     {
         var customerId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -80,7 +83,11 @@ public sealed class CustomerOrderQueryHandlerTests
                     50m, null, 50m, 1, "Item")
             ], 1));
 
-        var payment = new CustomerOrderPaymentSummaryDto("Paid", "MercadoPago", DateTimeOffset.UtcNow, null);
+        var payment = new CustomerOrderPaymentSummaryDto(
+            "Paid",
+            OrderCustomerStatusProjector.PaymentMethodPix,
+            DateTimeOffset.UtcNow,
+            null);
         var paymentReader = new Mock<ICustomerOrderPixPaymentReader>();
         paymentReader.Setup(x => x.GetLatestByOrderIdsAsync(It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, CustomerOrderPaymentSummaryDto> { [orderId] = payment });
@@ -88,8 +95,12 @@ public sealed class CustomerOrderQueryHandlerTests
         var sut = new GetCustomerOrdersQueryHandler(readModel.Object, paymentReader.Object);
         var result = await sut.Handle(new GetCustomerOrdersQuery(customerId), CancellationToken.None);
 
+        result.Items[0].CustomerStatus.Should().Be(OrderCustomerStatusCodes.Confirmed);
         result.Items[0].Payment!.Status.Should().Be("Paid");
-        result.Items[0].Payment.Provider.Should().Be("MercadoPago");
+        result.Items[0].Payment.Method.Should().Be("Pix");
+        result.Items[0].Payment.ExpiresAt.Should().BeNull();
+        result.Items[0].Currency.Should().Be("BRL");
+        result.Items[0].OrderNumber.Should().Be("10583");
     }
 
     [Fact]
@@ -100,7 +111,12 @@ public sealed class CustomerOrderQueryHandlerTests
         var repo = new Mock<IOrderRepository>();
         repo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>())).ReturnsAsync(order);
 
-        var payment = new CustomerOrderPaymentSummaryDto("Pending", "MercadoPago", null, DateTimeOffset.UtcNow.AddMinutes(30));
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
+        var payment = new CustomerOrderPaymentSummaryDto(
+            "Pending",
+            OrderCustomerStatusProjector.PaymentMethodPix,
+            null,
+            expiresAt);
         var paymentReader = new Mock<ICustomerOrderPixPaymentReader>();
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);
@@ -109,7 +125,9 @@ public sealed class CustomerOrderQueryHandlerTests
         var result = await sut.Handle(new GetCustomerOrderByIdQuery(customerId, order.Id), CancellationToken.None);
 
         result.Id.Should().Be(order.Id);
+        result.CustomerStatus.Should().Be(OrderCustomerStatusCodes.AwaitingPayment);
         result.Payment!.Status.Should().Be("Pending");
+        result.Payment.ExpiresAt.Should().Be(expiresAt);
         result.Items.Should().ContainSingle();
     }
 
@@ -140,11 +158,17 @@ public sealed class CustomerOrderQueryHandlerTests
     }
 
     [Fact]
-    public void CustomerPaymentDto_DoesNotSerializeProviderIdsOrQr()
+    public void CustomerPaymentDto_DoesNotSerializeProviderOrSecrets()
     {
-        var dto = new CustomerOrderPaymentSummaryDto("Paid", "MercadoPago", DateTimeOffset.UtcNow, null);
+        var dto = new CustomerOrderPaymentSummaryDto(
+            "Paid",
+            OrderCustomerStatusProjector.PaymentMethodPix,
+            DateTimeOffset.UtcNow,
+            null);
         var json = JsonSerializer.Serialize(dto);
 
+        json.Should().NotContain("Provider");
+        json.Should().NotContain("MercadoPago");
         json.Should().NotContain("ProviderOrder");
         json.Should().NotContain("CopyPaste");
         json.Should().NotContain("QrCode");
@@ -152,6 +176,7 @@ public sealed class CustomerOrderQueryHandlerTests
         json.Should().NotContain("AccessToken");
         json.Should().NotContain("WebhookSecret");
         json.Should().Contain("Paid");
+        json.Should().Contain("Pix");
     }
 
     [Fact]
@@ -160,6 +185,27 @@ public sealed class CustomerOrderQueryHandlerTests
         var validator = new GetCustomerOrdersQueryValidator();
         var result = validator.TestValidate(new GetCustomerOrdersQuery(Guid.NewGuid(), PageSize: 51));
         result.ShouldHaveValidationErrorFor(x => x.PageSize);
+    }
+
+    [Fact]
+    public void GetCustomerOrdersQueryValidator_AcceptsPublicStatusCodes()
+    {
+        var validator = new GetCustomerOrdersQueryValidator();
+        validator.TestValidate(new GetCustomerOrdersQuery(Guid.NewGuid(), Status: "AwaitingPayment"))
+            .ShouldNotHaveValidationErrorFor(x => x.Status);
+        validator.TestValidate(new GetCustomerOrdersQuery(Guid.NewGuid(), Status: "Confirmed"))
+            .ShouldNotHaveValidationErrorFor(x => x.Status);
+    }
+
+    [Fact]
+    public void GetCustomerOrdersQueryValidator_RejectsInvalidDateRange()
+    {
+        var validator = new GetCustomerOrdersQueryValidator();
+        var from = DateTimeOffset.UtcNow;
+        var to = from.AddDays(-1);
+        var result = validator.TestValidate(
+            new GetCustomerOrdersQuery(Guid.NewGuid(), CreatedFrom: from, CreatedTo: to));
+        result.ShouldHaveValidationErrorFor(x => x);
     }
 
     private static Order CreateBoundOrder(Guid? customerUserId)

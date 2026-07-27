@@ -15,4 +15,5 @@ public sealed record ProductDetailedDto(
     IReadOnlyList<ProductImageDto> Images,
     bool IsFeatured = false,
     int? DisplayOrder = null,
-    DateTimeOffset? CreatedAt = null);
+    DateTimeOffset? CreatedAt = null,
+    string? Description = null);

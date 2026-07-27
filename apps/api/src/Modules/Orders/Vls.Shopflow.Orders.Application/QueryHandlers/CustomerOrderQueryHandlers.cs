@@ -4,6 +4,7 @@ using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
 using Vls.Shopflow.Orders.Application.Queries;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Domain.Enums;
 using Vls.Shopflow.Orders.Domain.Exceptions;
 
@@ -14,13 +15,16 @@ public sealed class GetCustomerOrdersQueryHandler(
     ICustomerOrderPixPaymentReader pixPaymentReader)
     : IQueryHandler<GetCustomerOrdersQuery, PagedCustomerOrdersDto>
 {
+    public const string DefaultCurrency = "BRL";
+
     public async Task<PagedCustomerOrdersDto> Handle(
         GetCustomerOrdersQuery query,
         CancellationToken cancellationToken)
     {
         OrderStatus? status = null;
-        if (!string.IsNullOrWhiteSpace(query.Status))
-            status = Enum.Parse<OrderStatus>(query.Status.Trim(), ignoreCase: true);
+        if (!string.IsNullOrWhiteSpace(query.Status)
+            && OrderCustomerStatusProjector.TryParseListFilter(query.Status, out var parsedStatus))
+            status = parsedStatus;
 
         IReadOnlyList<Guid>? restrictToOrderIds = null;
         if (!string.IsNullOrWhiteSpace(query.PaymentStatus))
@@ -52,18 +56,25 @@ public sealed class GetCustomerOrdersQueryHandler(
             ? new Dictionary<Guid, CustomerOrderPaymentSummaryDto>()
             : await pixPaymentReader.GetLatestByOrderIdsAsync(orderIds, cancellationToken);
 
-        var items = page.Items.Select(row => new CustomerOrderListItemDto(
-            row.Id,
-            row.OrderNumber.ToString(),
-            row.Status.ToString(),
-            row.CreatedAt,
-            row.PaidAt,
-            row.Subtotal,
-            row.ShippingAmount,
-            row.Total,
-            row.ItemsCount,
-            row.FirstItemName,
-            payments.TryGetValue(row.Id, out var payment) ? payment : null)).ToList();
+        var items = page.Items.Select(row =>
+        {
+            payments.TryGetValue(row.Id, out var payment);
+            return new CustomerOrderListItemDto(
+                row.Id,
+                row.OrderNumber.ToString(),
+                OrderCustomerStatusProjector.Project(row.Status, payment?.Status),
+                row.Status.ToString(),
+                row.CreatedAt,
+                row.PaidAt,
+                row.Subtotal,
+                row.ShippingAmount,
+                row.Total,
+                DefaultCurrency,
+                row.ItemsCount,
+                row.FirstItemName,
+                PreviewImageUrl: null,
+                payment);
+        }).ToList();
 
         var totalPages = page.TotalItems == 0
             ? 0
@@ -93,6 +104,7 @@ public sealed class GetCustomerOrderByIdQueryHandler(
         return new CustomerOrderDetailDto(
             order.Id,
             order.FormatOrderNumber(),
+            OrderCustomerStatusProjector.Project(order.Status, payment?.Status),
             order.Status.ToString(),
             order.CreatedAt,
             order.UpdatedAt,
@@ -106,6 +118,7 @@ public sealed class GetCustomerOrderByIdQueryHandler(
                 order.ShippingState,
                 order.ShippingZipCode),
             new CustomerOrderAmountsDto(order.Subtotal, order.ShippingAmount, order.Total),
+            GetCustomerOrdersQueryHandler.DefaultCurrency,
             order.Items
                 .OrderBy(i => i.ProductName)
                 .ThenBy(i => i.SkuCode)

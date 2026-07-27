@@ -268,7 +268,8 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
             imageDtos,
             product.IsFeatured,
             product.DisplayOrder,
-            product.CreatedAt
+            product.CreatedAt,
+            product.Description
         );
     }
 }

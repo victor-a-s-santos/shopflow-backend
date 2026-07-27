@@ -1,6 +1,6 @@
 using FluentValidation;
 using Vls.Shopflow.Orders.Application.Queries;
-using Vls.Shopflow.Orders.Domain.Enums;
+using Vls.Shopflow.Orders.Application.Services;
 
 namespace Vls.Shopflow.Orders.Application.Validators;
 
@@ -21,9 +21,11 @@ public sealed class GetCustomerOrdersQueryValidator : AbstractValidator<GetCusto
         RuleFor(x => x.PageSize).InclusiveBetween(1, MaxPageSize);
 
         RuleFor(x => x.Status)
-            .Must(s => Enum.TryParse<OrderStatus>(s!.Trim(), ignoreCase: true, out _))
+            .Must(s => OrderCustomerStatusProjector.TryParseListFilter(s, out _))
             .When(x => !string.IsNullOrWhiteSpace(x.Status))
-            .WithMessage("status must be a valid OrderStatus (PendingPayment, Paid, Canceled, Expired).");
+            .WithMessage(
+                "status must be a public customerStatus (AwaitingPayment, Confirmed, Canceled, Expired) " +
+                "or OrderStatus (PendingPayment, Paid, Canceled, Expired).");
 
         RuleFor(x => x.PaymentStatus)
             .Must(s => IsValidPaymentStatus(s!))

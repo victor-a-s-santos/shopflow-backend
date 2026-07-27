@@ -14,6 +14,11 @@ public sealed class OrderRepository(OrdersDbContext db) : IOrderRepository
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
+    public Task<Order?> GetByOrderNumberWithItemsAsync(long orderNumber, CancellationToken cancellationToken)
+        => db.Orders
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.OrderNumber == orderNumber, cancellationToken);
+
     public Task<Order?> GetByCheckoutSessionIdWithItemsAsync(
         Guid checkoutSessionId,
         CancellationToken cancellationToken)

@@ -9,6 +9,8 @@ public interface IOrderRepository
 
     Task<Order?> GetByIdWithItemsAsync(Guid orderId, CancellationToken cancellationToken);
 
+    Task<Order?> GetByOrderNumberWithItemsAsync(long orderNumber, CancellationToken cancellationToken);
+
     Task<Order?> GetByCheckoutSessionIdWithItemsAsync(Guid checkoutSessionId, CancellationToken cancellationToken);
 
     Task<bool> ExistsByCheckoutSessionIdAsync(Guid checkoutSessionId, CancellationToken cancellationToken);

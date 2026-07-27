@@ -115,6 +115,8 @@ Base: `http://localhost:5127/api`
 
 `GET /admin/catalog/products` — Backoffice; produtos ativos/inativos/sem SKU; filtros `status`/`featured`/`q`/`categorySlug`; DTO resumido para tabela. Doc: `admin-products-listing.md`.
 
+Product `description` (varchar 4000, opcional) + `isActive` no create/update/detail (`ProductDetailedDto`). Create: `isActive` omitido → true. Update: `description` omitida preserva; `""` limpa. Doc: `admin-product-contract.md`.
+
 ```
 GET    /catalog/attributes
 GET    /catalog/categories

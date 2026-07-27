@@ -41,7 +41,7 @@ public sealed record GuestOrderMaskedCustomerDto(string Name, string Email);
 
 public sealed record GuestOrderPaymentStatusDto(
     string Status,
-    string? Provider,
+    string Method,
     decimal? Amount,
     DateTimeOffset? ExpiresAt,
     DateTimeOffset? PaidAt,
@@ -70,6 +70,7 @@ public sealed record GuestOrderAccessMetaDto(
 public sealed record GuestOrderStatusDto(
     Guid OrderId,
     string? OrderNumber,
+    string CustomerStatus,
     string OrderStatus,
     GuestOrderPaymentStatusDto? Payment,
     IReadOnlyList<GuestOrderItemStatusDto> Items,

@@ -1,7 +1,7 @@
 # Admin Product — contrato oficial (backend)
 
-> Última atualização: 2026-07-17. Código em `apps/api` prevalece se divergir.
-> Frontend alinhado: `apps/web/docs/admin-product-form.md` (atributos, `active`, DELETE/primary imagens).
+> Última atualização: 2026-07-26. Código em `apps/api` prevalece se divergir.
+> Frontend: `apps/web/docs/admin-product-form.md` — pendência enviar/hidratar `description` + `isActive` no create.
 
 ## Modelo de persistência
 
@@ -27,12 +27,14 @@ Cada passo grava na própria transação. Se o passo 3 falhar após o 1, o produ
 
 ## Produto — body
 
-| Endpoint | Campos | Não existem |
-|----------|--------|-------------|
-| `POST .../products/variant` | `name`, `slug?`, `categoryId?` | `description`, `isActive`, `attributes`, `images` |
-| `PUT .../products/{id}` | `name`, `slug?`, `categoryId?`, `isActive` | `description` |
+| Endpoint | Campos | Notas |
+|----------|--------|-------|
+| `POST .../products/variant` | `name`, `slug?`, `categoryId?`, `description?`, `isActive?`, `isFeatured?`, `displayOrder?` | `isActive` omitido → **true**; `false` explícito persiste inativo. `description` vazia → `null` (máx. 4000). |
+| `PUT .../products/{id}` | `name`, `slug?`, `categoryId?`, `isActive`, `description?`, `display?` | `isActive` é obrigatório no PUT (não ignora `false`). `description` omitida/`null` → **preserva**; `""` → limpa; texto → salva. `display` omitido → preserva featured/order. |
 
-Produto criado via shell fica `isActive: true`. Inativar: `PUT` com `isActive: false` ou `POST .../deactivate`.
+Detail (`GET /api/catalog/products/{id}` e by-slug) retorna `description` + `isActive` em `ProductDetailedDto`. Listagens (pública/admin) **não** incluem description no card/tabela.
+
+Produto inativo: some da listagem/by-slug públicos; permanece na listagem admin. Inativar também via `POST .../deactivate`.
 
 ## Variante (SKU) — body
 

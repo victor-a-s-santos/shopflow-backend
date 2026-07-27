@@ -18,12 +18,15 @@ Guest checkout → Order → Pix Paid
 
 ## Acompanhar sem conta
 
-`GET /api/orders/guest/{orderId}/status`  
-Header: `X-ORDER-ACCESS-TOKEN: {guestAccessToken}`
+**Preferido:** `GET /api/orders/public/{orderNumber}`  
+Header `X-ORDER-ACCESS-TOKEN` (ou `?token=` — ver risco em [`customer-orders.md`](./customer-orders.md)).
 
-Mantido como endpoint único (sem `GET /guest/{id}` separado): já cobre tela de sucesso / acompanhamento com `orderNumber`, totais, status, e-mail mascarado, itens e flags `canCreateAccount` / `accountExistsForEmail`.
+**Legado:** `GET /api/orders/guest/{orderId}/status` + mesmo header.
 
-**Não retorna:** token, hash, provider IDs, PII completa.
+Ambos cobrem tela de sucesso / acompanhamento com `orderNumber`, `customerStatus`, totais, status de pagamento (`method: Pix`), e-mail mascarado, itens e flags `canCreateAccount` / `accountExistsForEmail`.
+
+**Não retorna:** token, hash, nome técnico do provider, provider IDs, PII completa. `expiresAt` só enquanto o Pix estiver `Pending`.
+
 
 ## Conta opcional
 

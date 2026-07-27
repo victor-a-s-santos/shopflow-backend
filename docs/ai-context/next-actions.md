@@ -6,6 +6,7 @@
 
 ## Concluído recentemente
 
+- [x] **Product description + isActive contract** — create/update/detail persistem e retornam `description`/`isActive`; migration `description`; (`docs/catalog/admin-product-contract.md`); pendência FE enviar/hidratar no formulário
 - [x] **Admin Inventory SKUs listing** — `GET /api/admin/inventory/skus` paginado (q/status/stockStatus/category/sort + estoque); separado de Catalog Admin (`docs/inventory/admin-inventory-skus-listing.md`); pendência FE Inventory Admin
 - [x] **Admin products listing** — `GET /api/admin/catalog/products` paginado (status/featured/q/category/sort); separado da vitrine (`docs/catalog/admin-products-listing.md`); pendência FE Admin Products
 - [x] **Product list categorySlug filter** — filtro server-side antes de count/paginação + `Category.Slug` + `q` básica (`docs/catalog/product-list-pagination-and-ordering.md`); pendência FE usar `categorySlug` (não filtrar client-side)

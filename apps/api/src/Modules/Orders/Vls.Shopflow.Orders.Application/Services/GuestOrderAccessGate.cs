@@ -20,16 +20,53 @@ public sealed class GuestOrderAccessGate(
         string? rawAccessToken,
         CancellationToken cancellationToken)
     {
-        if (!guestOrderAccessOptions.Value.Enabled)
+        EnsureEnabled();
+        var tokenHash = HashOrDeny(rawAccessToken);
+        var accessToken = await ResolveActiveTokenAsync(orderId, tokenHash, cancellationToken);
+
+        var order = await orderRepository.GetByIdWithItemsAsync(orderId, cancellationToken);
+        if (order is null)
             throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.OrderNotFoundOrAccessDenied);
 
+        return (accessToken, order);
+    }
+
+    public async Task<(GuestOrderAccessToken Token, Order Order)> ValidateByOrderNumberAsync(
+        long orderNumber,
+        string? rawAccessToken,
+        CancellationToken cancellationToken)
+    {
+        EnsureEnabled();
+
+        if (orderNumber <= 0)
+            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
+
+        var tokenHash = HashOrDeny(rawAccessToken);
+
+        // Resolve order before token so wrong number + any token matches wrong-token responses
+        // (no distinct "order missing" signal for public enumeration).
+        var order = await orderRepository.GetByOrderNumberWithItemsAsync(orderNumber, cancellationToken);
+        if (order is null)
+            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
+
+        var accessToken = await ResolveActiveTokenAsync(order.Id, tokenHash, cancellationToken);
+        return (accessToken, order);
+    }
+
+    private void EnsureEnabled()
+    {
+        if (!guestOrderAccessOptions.Value.Enabled)
+            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.OrderNotFoundOrAccessDenied);
+    }
+
+    private string HashOrDeny(string? rawAccessToken)
+    {
         if (string.IsNullOrWhiteSpace(rawAccessToken))
             throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
 
-        string tokenHash;
         try
         {
-            tokenHash = tokenHasher.Hash(rawAccessToken);
+            return tokenHasher.Hash(rawAccessToken);
         }
         catch (GuestOrderAccessMisconfiguredException)
         {
@@ -39,7 +76,13 @@ public sealed class GuestOrderAccessGate(
         {
             throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
         }
+    }
 
+    private async Task<GuestOrderAccessToken> ResolveActiveTokenAsync(
+        Guid orderId,
+        string tokenHash,
+        CancellationToken cancellationToken)
+    {
         var now = DateTimeOffset.UtcNow;
         var accessToken = await guestTokenRepository.FindActiveByOrderIdAndHashAsync(
             orderId,
@@ -47,23 +90,17 @@ public sealed class GuestOrderAccessGate(
             now,
             cancellationToken);
 
-        if (accessToken is null)
-        {
-            var anyMatch = await guestTokenRepository.FindByOrderIdAndHashAsync(
-                orderId,
-                tokenHash,
-                cancellationToken);
+        if (accessToken is not null)
+            return accessToken;
 
-            if (anyMatch is not null && anyMatch.ExpiresAt <= now)
-                throw new GuestOrderAccessTokenExpiredException();
+        var anyMatch = await guestTokenRepository.FindByOrderIdAndHashAsync(
+            orderId,
+            tokenHash,
+            cancellationToken);
 
-            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
-        }
+        if (anyMatch is not null && anyMatch.ExpiresAt <= now)
+            throw new GuestOrderAccessTokenExpiredException();
 
-        var order = await orderRepository.GetByIdWithItemsAsync(orderId, cancellationToken);
-        if (order is null)
-            throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.OrderNotFoundOrAccessDenied);
-
-        return (accessToken, order);
+        throw new GuestOrderAccessDeniedException(GuestOrderErrorCodes.InvalidGuestOrderToken);
     }
 }
