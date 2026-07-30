@@ -88,14 +88,15 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 
 ### Scaffold (solução .NET, sem implementação)
 
-| Módulo | Estado |
-|--------|--------|
-| **Shipping** | Scaffold + **postal code lookup** (`GET /api/integrations/postal-code/br/{cep}`, ViaCEP no backend) | Frete / Delivery-Fulfillment completo |
+| Módulo | Estado | Pendente |
+|--------|--------|----------|
+| **Shipping** | Scaffold + **postal code lookup** (`GET /api/integrations/postal-code/br/{cep}`, ViaCEP no backend) | Frete calculado |
+| **Orders / Fulfillment** | Fase 2: preferência checkout + `FulfillmentStatus` + admin ship/deliver (`docs/orders/delivery-fulfillment-phase-2.md`) | FE + DeliveryBatch (Fase 3) |
 
 
 ### Pendente
 
-- Delivery/Fulfillment (design: `docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`) — Fase 2: status de entrega + admin actions; Fase 3: batch
+- Delivery/Fulfillment Fase 3 (batch) + FE checkout/admin (`docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`)
 - Shipping / frete calculado
 - Frontend integração customer auth (backend pronto) — parcialmente wired
 - Storage externo de imagens (R2/S3)

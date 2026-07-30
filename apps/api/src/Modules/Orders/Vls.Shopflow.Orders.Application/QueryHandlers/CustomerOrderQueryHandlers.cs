@@ -73,7 +73,12 @@ public sealed class GetCustomerOrdersQueryHandler(
                 row.ItemsCount,
                 row.FirstItemName,
                 PreviewImageUrl: null,
-                payment);
+                payment,
+                row.FulfillmentStatus.ToString(),
+                row.PreferredDeliveryMethod?.ToString(),
+                row.PreferredDeliveryDate,
+                row.ShippedAt,
+                row.DeliveredAt);
         }).ToList();
 
         var totalPages = page.TotalItems == 0
@@ -132,6 +137,7 @@ public sealed class GetCustomerOrderByIdQueryHandler(
                     i.Subtotal,
                     OrderItemSalesDisplayMapper.ToDto(i)))
                 .ToList(),
-            payment);
+            payment,
+            AdminOrderMapper.ToSafeDeliveryDto(order));
     }
 }

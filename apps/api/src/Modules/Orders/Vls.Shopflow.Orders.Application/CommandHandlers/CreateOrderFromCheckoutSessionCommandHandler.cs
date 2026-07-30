@@ -8,6 +8,7 @@ using Vls.Shopflow.Orders.Application.Mappers;
 using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Entities;
+using Vls.Shopflow.Orders.Domain.Enums;
 using Vls.Shopflow.Orders.Domain.Exceptions;
 
 namespace Vls.Shopflow.Orders.Application.CommandHandlers;
@@ -66,6 +67,18 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
             session.Total,
             items,
             command.CustomerUserId);
+
+        DeliveryMethod? preferredMethod = null;
+        if (!string.IsNullOrWhiteSpace(session.PreferredDeliveryMethod)
+            && Enum.TryParse<DeliveryMethod>(session.PreferredDeliveryMethod.Trim(), ignoreCase: true, out var parsed))
+        {
+            preferredMethod = parsed;
+        }
+
+        order.SetDeliveryPreference(
+            preferredMethod,
+            session.PreferredDeliveryDate,
+            session.CustomerOrderNote);
 
         var orderNumber = await orderNumberGenerator.NextAsync(cancellationToken);
         order.AssignOrderNumber(orderNumber);

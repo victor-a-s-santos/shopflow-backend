@@ -24,6 +24,11 @@ public sealed class GetAdminOrdersQueryValidator : AbstractValidator<GetAdminOrd
             .When(x => !string.IsNullOrWhiteSpace(x.Status))
             .WithMessage("status must be a valid OrderStatus (PendingPayment, Paid, Canceled, Expired).");
 
+        RuleFor(x => x.FulfillmentStatus)
+            .Must(s => Enum.TryParse<FulfillmentStatus>(s!.Trim(), ignoreCase: true, out _))
+            .When(x => !string.IsNullOrWhiteSpace(x.FulfillmentStatus))
+            .WithMessage("fulfillmentStatus must be AwaitingShipment, Shipped, or Delivered.");
+
         // Payment status names come from PixPaymentStatus; validator references enum names as strings
         // to avoid a hard project reference — keep in sync with PaymentsPix.Domain.Enums.PixPaymentStatus.
         RuleFor(x => x.PaymentStatus)

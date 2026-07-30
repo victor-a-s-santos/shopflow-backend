@@ -42,6 +42,27 @@ internal sealed class OrderMap : IEntityTypeConfiguration<Order>
             .IsUnique()
             .HasDatabaseName("IX_orders_OrderNumber");
 
+        map.Property(x => x.PreferredDeliveryMethod)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        map.Property(x => x.PreferredDeliveryDate);
+        map.Property(x => x.CustomerOrderNote).HasMaxLength(1000);
+        map.Property(x => x.InternalOrderNote).HasMaxLength(2000);
+
+        map.Property(x => x.FulfillmentStatus)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .IsRequired()
+            .HasDefaultValue(Domain.Enums.FulfillmentStatus.AwaitingShipment);
+        map.Property(x => x.FinalDeliveryMethod)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        map.Property(x => x.TrackingCode).HasMaxLength(120);
+        map.Property(x => x.ShippedAt);
+        map.Property(x => x.DeliveredAt);
+        map.Property(x => x.FulfillmentUpdatedAt);
+        map.Property(x => x.FulfillmentUpdatedByAdminId);
+
         map.Property(x => x.CreatedAt).IsRequired();
         map.Property(x => x.UpdatedAt);
         map.Property(x => x.PaidAt);
@@ -51,6 +72,10 @@ internal sealed class OrderMap : IEntityTypeConfiguration<Order>
         map.HasIndex(x => x.CreatedAt);
         map.HasIndex(x => new { x.CustomerUserId, x.CreatedAt })
             .HasDatabaseName("IX_orders_CustomerUserId_CreatedAt");
+        map.HasIndex(x => new { x.FulfillmentStatus, x.CreatedAt })
+            .HasDatabaseName("IX_orders_FulfillmentStatus_CreatedAt");
+        map.HasIndex(x => new { x.CustomerUserId, x.FulfillmentStatus, x.CreatedAt })
+            .HasDatabaseName("IX_orders_CustomerUserId_FulfillmentStatus_CreatedAt");
 
         map.HasMany(x => x.Items)
             .WithOne()

@@ -33,7 +33,10 @@ public sealed record CheckoutSessionSnapshot(
     decimal Subtotal,
     decimal? ShippingAmount,
     decimal Total,
-    IReadOnlyList<CheckoutSessionItemSnapshot> Items);
+    IReadOnlyList<CheckoutSessionItemSnapshot> Items,
+    string? PreferredDeliveryMethod = null,
+    DateOnly? PreferredDeliveryDate = null,
+    string? CustomerOrderNote = null);
 
 public interface ICheckoutSessionReader
 {

@@ -27,21 +27,18 @@
 - [x] Módulo **PaymentsPix** backend MVP (provider fake, `PixPayment` Pending)
 - [x] **Worker de expiração** — `CheckoutSession`/`Order`/`PixPayment` pendentes + liberação de estoque (`docs/expiration-worker.md`)
 - [x] **Demo catalog seed (roupas)** — 10 produtos, 94 SKUs, 20 imagens, estoque inicial (`docs/catalog-demo-seed.md`)
+- [x] **Delivery/Fulfillment Fase 2 (backend)** — preferência checkout, `FulfillmentStatus`, admin ship/deliver/internal-note (`docs/orders/delivery-fulfillment-phase-2.md`)
 
 ---
 
 ## Etapa imediata (prioridade 1)
 
-### Delivery / Fulfillment (próximo módulo operacional)
+### Delivery / Fulfillment (próximo: Fase 3 + FE)
 
 **Design:** `docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`  
-**Não implementar completo agora.** Separar pagamento × pedido × entrega.
+**Fase 2 backend:** feita (`docs/orders/delivery-fulfillment-phase-2.md`).
 
-**Fase 1 (feita):** bugs estoque remove + categoria no edit + CEP formatado + busca CEP via API Shopflow (`docs/integrations/postal-code-lookup.md`); documento de design.
-
-**Fase 2 (próximo prompt):** campos no Order (método, data preferida, notes, `FulfillmentStatus`), admin marcar enviado/entregue.
-
-**Fase 3:** `DeliveryBatch` / agrupamento.
+**Próximo:** frontend checkout/admin/customer para os novos campos; depois **Fase 3** `DeliveryBatch` / agrupamento.
 
 **Fase 4:** WhatsApp CTA; chat nativo só com decisão explícita.
 

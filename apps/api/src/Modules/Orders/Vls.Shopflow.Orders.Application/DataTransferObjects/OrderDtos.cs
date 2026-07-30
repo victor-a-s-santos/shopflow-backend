@@ -78,4 +78,5 @@ public sealed record GuestOrderStatusDto(
     GuestOrderMaskedCustomerDto Customer,
     GuestOrderAccessMetaDto Access,
     bool CanCreateAccount,
-    bool AccountExistsForEmail);
+    bool AccountExistsForEmail,
+    OrderDeliveryInfoDto? Delivery = null);

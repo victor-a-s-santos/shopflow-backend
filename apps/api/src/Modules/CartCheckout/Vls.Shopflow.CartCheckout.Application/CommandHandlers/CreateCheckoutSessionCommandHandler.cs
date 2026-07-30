@@ -7,6 +7,7 @@ using Vls.Shopflow.CartCheckout.Application.Repositories;
 using Vls.Shopflow.CartCheckout.Application.Services;
 using Vls.Shopflow.CartCheckout.Application.DataTransferObjects;
 using Vls.Shopflow.CartCheckout.Domain.Entities;
+using Vls.Shopflow.CartCheckout.Domain.Enums;
 using Vls.Shopflow.CartCheckout.Domain.Exceptions;
 
 namespace Vls.Shopflow.CartCheckout.Application.CommandHandlers;
@@ -71,6 +72,13 @@ public sealed class CreateCheckoutSessionCommandHandler(
                     salesSnapshot));
             }
 
+            DeliveryMethod? preferredMethod = null;
+            if (!string.IsNullOrWhiteSpace(command.PreferredDeliveryMethod)
+                && Enum.TryParse<DeliveryMethod>(command.PreferredDeliveryMethod.Trim(), ignoreCase: true, out var parsed))
+            {
+                preferredMethod = parsed;
+            }
+
             var session = CheckoutSession.CreatePending(
                 command.Customer.FullName,
                 command.Customer.Email,
@@ -83,7 +91,10 @@ public sealed class CreateCheckoutSessionCommandHandler(
                 command.Address.City,
                 command.Address.State,
                 expiresAt,
-                sessionItems);
+                sessionItems,
+                preferredMethod,
+                command.PreferredDeliveryDate,
+                command.CustomerOrderNote);
 
             await repository.AddAsync(session, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);

@@ -6,7 +6,10 @@ namespace Vls.Shopflow.CartCheckout.Application.Commands;
 public sealed record CreateCheckoutSessionCommand(
     CustomerInput Customer,
     AddressInput Address,
-    IReadOnlyList<CheckoutItemInput> Items
+    IReadOnlyList<CheckoutItemInput> Items,
+    string? PreferredDeliveryMethod = null,
+    DateOnly? PreferredDeliveryDate = null,
+    string? CustomerOrderNote = null
 ) : ICommand<CheckoutSessionResponseDto>;
 
 public sealed record CustomerInput(string FullName, string Email, string Phone);

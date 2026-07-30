@@ -33,7 +33,13 @@ public sealed record AdminOrderListItemDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
     int ItemsCount,
-    AdminOrderPaymentSummaryDto? Payment);
+    AdminOrderPaymentSummaryDto? Payment,
+    string FulfillmentStatus,
+    string? PreferredDeliveryMethod = null,
+    DateOnly? PreferredDeliveryDate = null,
+    DateTimeOffset? ShippedAt = null,
+    DateTimeOffset? DeliveredAt = null,
+    string? TrackingCode = null);
 
 public sealed record PagedAdminOrdersDto(
     IReadOnlyList<AdminOrderListItemDto> Items,
@@ -82,4 +88,26 @@ public sealed record AdminOrderDetailDto(
     AdminOrderShippingAddressDto ShippingAddress,
     AdminOrderAmountsDto Amounts,
     IReadOnlyList<AdminOrderItemDto> Items,
-    AdminOrderPaymentSummaryDto? Payment);
+    AdminOrderPaymentSummaryDto? Payment,
+    string? PreferredDeliveryMethod = null,
+    DateOnly? PreferredDeliveryDate = null,
+    string? CustomerOrderNote = null,
+    string? InternalOrderNote = null,
+    string FulfillmentStatus = "AwaitingShipment",
+    string? FinalDeliveryMethod = null,
+    string? TrackingCode = null,
+    DateTimeOffset? ShippedAt = null,
+    DateTimeOffset? DeliveredAt = null,
+    DateTimeOffset? FulfillmentUpdatedAt = null,
+    Guid? FulfillmentUpdatedByAdminId = null);
+
+/// <summary>Safe delivery/fulfillment projection (no internal notes or admin ids).</summary>
+public sealed record OrderDeliveryInfoDto(
+    string? PreferredDeliveryMethod,
+    DateOnly? PreferredDeliveryDate,
+    string? CustomerOrderNote,
+    string FulfillmentStatus,
+    string? FinalDeliveryMethod,
+    string? TrackingCode,
+    DateTimeOffset? ShippedAt,
+    DateTimeOffset? DeliveredAt);

@@ -22,7 +22,12 @@ public sealed record CustomerOrderListRow(
     decimal? ShippingAmount,
     decimal Total,
     int ItemsCount,
-    string? FirstItemName);
+    string? FirstItemName,
+    FulfillmentStatus FulfillmentStatus,
+    DeliveryMethod? PreferredDeliveryMethod,
+    DateOnly? PreferredDeliveryDate,
+    DateTimeOffset? ShippedAt,
+    DateTimeOffset? DeliveredAt);
 
 public sealed record CustomerOrderListPage(
     IReadOnlyList<CustomerOrderListRow> Items,

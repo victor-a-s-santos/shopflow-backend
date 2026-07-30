@@ -15,6 +15,9 @@ public sealed class AdminOrderReadModel(OrdersDbContext db) : IAdminOrderReadMod
         if (spec.Status is { } status)
             query = query.Where(o => o.Status == status);
 
+        if (spec.FulfillmentStatus is { } fulfillmentStatus)
+            query = query.Where(o => o.FulfillmentStatus == fulfillmentStatus);
+
         if (spec.CreatedFrom is { } from)
             query = query.Where(o => o.CreatedAt >= from);
 
@@ -64,7 +67,13 @@ public sealed class AdminOrderReadModel(OrdersDbContext db) : IAdminOrderReadMod
                 o.Total,
                 o.CreatedAt,
                 o.PaidAt,
-                o.Items.Count))
+                o.Items.Count,
+                o.FulfillmentStatus,
+                o.PreferredDeliveryMethod,
+                o.PreferredDeliveryDate,
+                o.ShippedAt,
+                o.DeliveredAt,
+                o.TrackingCode))
             .ToListAsync(cancellationToken);
 
         return new AdminOrderListPage(pageItems, totalItems);

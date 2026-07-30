@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Vls.Shopflow.CartCheckout.Infrastructure;
@@ -11,9 +12,11 @@ using Vls.Shopflow.CartCheckout.Infrastructure;
 namespace Vls.Shopflow.CartCheckout.Infrastructure.Migrations
 {
     [DbContext(typeof(CartCheckoutDbContext))]
-    partial class CartCheckoutDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260730005116_AddCheckoutDeliveryPreference")]
+    partial class AddCheckoutDeliveryPreference
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

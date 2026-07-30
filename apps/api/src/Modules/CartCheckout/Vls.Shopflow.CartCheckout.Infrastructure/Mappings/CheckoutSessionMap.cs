@@ -36,6 +36,12 @@ internal sealed class CheckoutSessionMap : IEntityTypeConfiguration<CheckoutSess
         map.Property(x => x.UpdatedAt).IsRequired();
         map.Property(x => x.CanceledAt);
 
+        map.Property(x => x.PreferredDeliveryMethod)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        map.Property(x => x.PreferredDeliveryDate);
+        map.Property(x => x.CustomerOrderNote).HasMaxLength(1000);
+
         map.HasMany(x => x.Items)
             .WithOne()
             .HasForeignKey(x => x.CheckoutSessionId)

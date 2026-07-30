@@ -13,6 +13,8 @@
 
 List/detail incluem `orderNumber` (string amigável). Detalhe inclui `items[].salesDisplay` (snapshot lote/pacote). Ver [`order-item-sales-snapshot.md`](./order-item-sales-snapshot.md), fluxo guest: [`post-pix-guest-flow.md`](./post-pix-guest-flow.md), [`guest-order-claim.md`](./guest-order-claim.md).
 
+Listagem inclui `fulfillmentStatus` e preferências resumidas. Detalhe inclui `delivery` (`OrderDeliveryInfoDto`: método/data preferidos, nota do cliente, status de envio, tracking, datas) — **sem** `internalOrderNote`. Ver [`delivery-fulfillment-phase-2.md`](./delivery-fulfillment-phase-2.md).
+
 - Sem login nas GETs → 401  
 - Admin Backoffice cookie **não** autoriza GETs  
 - GuestOrderAccessToken **sozinho** não autoriza listagem — só claim/create-account  
@@ -52,7 +54,7 @@ Detalhe inexistente / de outro customer / guest → **404** (não 403).
 
 ## Diferença vs Admin
 
-Ver `docs/orders/admin-orders.md` — admin vê PII + IDs Mercado Pago; customer não.
+Ver `docs/orders/admin-orders.md` — admin vê PII + IDs Mercado Pago + `internalOrderNote`; customer não.
 
 ## Pós-MVP
 

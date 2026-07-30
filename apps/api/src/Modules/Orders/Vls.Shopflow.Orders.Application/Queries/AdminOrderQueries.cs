@@ -12,6 +12,7 @@ public sealed record GetAdminOrdersQuery(
     DateTimeOffset? CreatedFrom = null,
     DateTimeOffset? CreatedTo = null,
     bool? PaidOnly = null,
-    string? Sort = null) : IQuery<PagedAdminOrdersDto>;
+    string? Sort = null,
+    string? FulfillmentStatus = null) : IQuery<PagedAdminOrdersDto>;
 
 public sealed record GetAdminOrderByIdQuery(Guid OrderId) : IQuery<AdminOrderDetailDto>;

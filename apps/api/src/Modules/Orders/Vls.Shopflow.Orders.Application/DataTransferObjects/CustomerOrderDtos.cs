@@ -24,7 +24,12 @@ public sealed record CustomerOrderListItemDto(
     int ItemsCount,
     string? FirstItemName,
     string? PreviewImageUrl,
-    CustomerOrderPaymentSummaryDto? Payment);
+    CustomerOrderPaymentSummaryDto? Payment,
+    string FulfillmentStatus = "AwaitingShipment",
+    string? PreferredDeliveryMethod = null,
+    DateOnly? PreferredDeliveryDate = null,
+    DateTimeOffset? ShippedAt = null,
+    DateTimeOffset? DeliveredAt = null);
 
 public sealed record PagedCustomerOrdersDto(
     IReadOnlyList<CustomerOrderListItemDto> Items,
@@ -69,4 +74,5 @@ public sealed record CustomerOrderDetailDto(
     CustomerOrderAmountsDto Amounts,
     string Currency,
     IReadOnlyList<CustomerOrderItemDto> Items,
-    CustomerOrderPaymentSummaryDto? Payment);
+    CustomerOrderPaymentSummaryDto? Payment,
+    OrderDeliveryInfoDto? Delivery = null);

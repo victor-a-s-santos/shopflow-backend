@@ -22,6 +22,10 @@ public sealed class GetAdminOrdersQueryHandler(
         if (!string.IsNullOrWhiteSpace(query.Status))
             status = Enum.Parse<OrderStatus>(query.Status.Trim(), ignoreCase: true);
 
+        FulfillmentStatus? fulfillmentStatus = null;
+        if (!string.IsNullOrWhiteSpace(query.FulfillmentStatus))
+            fulfillmentStatus = Enum.Parse<FulfillmentStatus>(query.FulfillmentStatus.Trim(), ignoreCase: true);
+
         IReadOnlyList<Guid>? restrictToOrderIds = null;
         if (!string.IsNullOrWhiteSpace(query.PaymentStatus))
         {
@@ -69,7 +73,8 @@ public sealed class GetAdminOrdersQueryHandler(
                 searchOrderId,
                 searchOrderNumber,
                 restrictToOrderIds,
-                sortAsc),
+                sortAsc,
+                fulfillmentStatus),
             cancellationToken);
 
         var orderIds = page.Items.Select(x => x.Id).ToList();
@@ -90,7 +95,13 @@ public sealed class GetAdminOrdersQueryHandler(
             row.CreatedAt,
             row.PaidAt,
             row.ItemsCount,
-            payments.TryGetValue(row.Id, out var payment) ? payment : null)).ToList();
+            payments.TryGetValue(row.Id, out var payment) ? payment : null,
+            row.FulfillmentStatus.ToString(),
+            row.PreferredDeliveryMethod?.ToString(),
+            row.PreferredDeliveryDate,
+            row.ShippedAt,
+            row.DeliveredAt,
+            row.TrackingCode)).ToList();
 
         var totalPages = page.TotalItems == 0
             ? 0
@@ -114,36 +125,6 @@ public sealed class GetAdminOrderByIdQueryHandler(
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
 
-        return new AdminOrderDetailDto(
-            order.Id,
-            order.FormatOrderNumber(),
-            order.Status.ToString(),
-            order.CreatedAt,
-            order.UpdatedAt,
-            order.PaidAt,
-            new AdminOrderCustomerDto(order.CustomerFullName, order.CustomerEmail, order.CustomerPhone),
-            new AdminOrderShippingAddressDto(
-                order.ShippingStreet,
-                order.ShippingNumber,
-                order.ShippingComplement,
-                order.ShippingNeighborhood,
-                order.ShippingCity,
-                order.ShippingState,
-                order.ShippingZipCode),
-            new AdminOrderAmountsDto(order.Subtotal, order.ShippingAmount, order.Total),
-            order.Items
-                .OrderBy(i => i.ProductName)
-                .ThenBy(i => i.SkuCode)
-                .Select(i => new AdminOrderItemDto(
-                    i.Id,
-                    i.SkuId,
-                    i.SkuCode,
-                    i.ProductName,
-                    i.Quantity,
-                    i.UnitPrice,
-                    i.Subtotal,
-                    OrderItemSalesDisplayMapper.ToDto(i)))
-                .ToList(),
-            payment);
+        return AdminOrderMapper.ToDetailDto(order, payment);
     }
 }

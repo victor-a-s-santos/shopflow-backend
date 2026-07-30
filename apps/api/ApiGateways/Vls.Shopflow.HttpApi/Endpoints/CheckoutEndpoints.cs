@@ -26,7 +26,10 @@ public static class CheckoutEndpoints
                         request.Address.Neighborhood,
                         request.Address.City,
                         request.Address.State),
-                    request.Items.Select(i => new CheckoutItemInput(i.SkuId, i.Quantity)).ToList()),
+                    request.Items.Select(i => new CheckoutItemInput(i.SkuId, i.Quantity)).ToList(),
+                    request.PreferredDeliveryMethod,
+                    request.PreferredDeliveryDate,
+                    request.CustomerOrderNote),
                 ct);
 
             return Results.Created($"/api/checkout/sessions/{result.CheckoutSessionId}", result);
@@ -57,7 +60,10 @@ public static class CheckoutEndpoints
 public sealed record CreateCheckoutSessionRequest(
     CustomerRequest Customer,
     AddressRequest Address,
-    IReadOnlyList<CheckoutItemRequest> Items);
+    IReadOnlyList<CheckoutItemRequest> Items,
+    string? PreferredDeliveryMethod = null,
+    DateOnly? PreferredDeliveryDate = null,
+    string? CustomerOrderNote = null);
 
 public sealed record CustomerRequest(string FullName, string Email, string Phone);
 

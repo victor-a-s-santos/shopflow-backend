@@ -63,6 +63,57 @@ public sealed class AdminOrderQueryHandlerTests
     }
 
     [Fact]
+    public async Task GetAdminOrders_FiltersByFulfillmentStatus()
+    {
+        var readModel = new Mock<IAdminOrderReadModel>();
+        readModel.Setup(x => x.GetPagedAsync(It.IsAny<AdminOrderListQuerySpec>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AdminOrderListPage([], 0));
+        var paymentReader = new Mock<IAdminOrderPixPaymentReader>();
+        paymentReader.Setup(x => x.GetLatestByOrderIdsAsync(It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, AdminOrderPaymentSummaryDto>());
+
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object);
+        await sut.Handle(new GetAdminOrdersQuery(FulfillmentStatus: "AwaitingShipment"), CancellationToken.None);
+
+        readModel.Verify(x => x.GetPagedAsync(
+            It.Is<AdminOrderListQuerySpec>(s => s.FulfillmentStatus == FulfillmentStatus.AwaitingShipment),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void GetAdminOrdersQueryValidator_RejectsInvalidFulfillmentStatus()
+    {
+        var validator = new GetAdminOrdersQueryValidator();
+        var result = validator.TestValidate(new GetAdminOrdersQuery(FulfillmentStatus: "Preparing"));
+        result.ShouldHaveValidationErrorFor(x => x.FulfillmentStatus);
+    }
+
+    [Fact]
+    public async Task GetAdminOrderById_IncludesInternalNoteAndFulfillment()
+    {
+        var order = CreateOrder("Ana", "ana@test.com", "11999999999");
+        order.SetDeliveryPreference(DeliveryMethod.Correios, new DateOnly(2026, 8, 10), "Obs cliente");
+        order.SetInternalOrderNote("Segurar até sexta");
+        order.MarkAsPaid();
+        order.MarkAsShipped(Guid.NewGuid(), DeliveryMethod.Correios, "BR123");
+
+        var repo = new Mock<IOrderRepository>();
+        repo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>())).ReturnsAsync(order);
+        var paymentReader = new Mock<IAdminOrderPixPaymentReader>();
+        paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AdminOrderPaymentSummaryDto?)null);
+
+        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, paymentReader.Object);
+        var result = await sut.Handle(new GetAdminOrderByIdQuery(order.Id), CancellationToken.None);
+
+        result.InternalOrderNote.Should().Be("Segurar até sexta");
+        result.CustomerOrderNote.Should().Be("Obs cliente");
+        result.FulfillmentStatus.Should().Be("Shipped");
+        result.TrackingCode.Should().Be("BR123");
+        result.PreferredDeliveryMethod.Should().Be("Correios");
+    }
+
+    [Fact]
     public async Task GetAdminOrders_FiltersByPaymentStatus()
     {
         var orderId = Guid.NewGuid();
@@ -252,7 +303,9 @@ public sealed class AdminOrderQueryHandlerTests
         string email,
         string phone,
         DateTimeOffset createdAt)
-        => new(id, 10582, OrderStatus.PendingPayment, name, email, phone, 100m, null, 100m, createdAt, null, 1);
+        => new(
+            id, 10582, OrderStatus.PendingPayment, name, email, phone, 100m, null, 100m, createdAt, null, 1,
+            FulfillmentStatus.AwaitingShipment, null, null, null, null, null);
 
     private static AdminOrderPaymentSummaryDto SamplePayment(Guid orderId)
         => new(

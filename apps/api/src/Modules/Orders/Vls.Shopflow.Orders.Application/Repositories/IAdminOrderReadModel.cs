@@ -13,7 +13,8 @@ public sealed record AdminOrderListQuerySpec(
     Guid? SearchOrderId,
     long? SearchOrderNumber,
     IReadOnlyList<Guid>? RestrictToOrderIds,
-    bool SortCreatedAtAscending = false);
+    bool SortCreatedAtAscending = false,
+    FulfillmentStatus? FulfillmentStatus = null);
 
 public sealed record AdminOrderListRow(
     Guid Id,
@@ -27,7 +28,13 @@ public sealed record AdminOrderListRow(
     decimal Total,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
-    int ItemsCount);
+    int ItemsCount,
+    FulfillmentStatus FulfillmentStatus,
+    DeliveryMethod? PreferredDeliveryMethod,
+    DateOnly? PreferredDeliveryDate,
+    DateTimeOffset? ShippedAt,
+    DateTimeOffset? DeliveredAt,
+    string? TrackingCode);
 
 public sealed record AdminOrderListPage(
     IReadOnlyList<AdminOrderListRow> Items,

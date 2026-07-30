@@ -49,6 +49,9 @@ public sealed class CheckoutSessionReader(CartCheckoutDbContext cartCheckoutDb) 
                 i.ShowTotalPieces,
                 i.TotalPieces,
                 i.EquivalentUnitPrice,
-                i.SalesDisplaySummary)).ToList());
+                i.SalesDisplaySummary)).ToList(),
+            session.PreferredDeliveryMethod?.ToString(),
+            session.PreferredDeliveryDate,
+            session.CustomerOrderNote);
     }
 }

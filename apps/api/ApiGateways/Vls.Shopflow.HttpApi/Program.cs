@@ -523,6 +523,101 @@ app.Use(async (ctx, next) =>
 
     }
 
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderNoteTooLongException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Validation(
+
+            ctx,
+
+            [
+
+                new FluentValidation.Results.ValidationFailure(ex.Field, ex.Message)
+
+                {
+
+                    ErrorCode = ex.Code
+
+                }
+
+            ],
+
+            title: "Validation failed",
+
+            detail: ex.Message,
+
+            code: ex.Code,
+
+            message: ex.Message);
+
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.TrackingCodeTooLongException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Validation(
+
+            ctx,
+
+            [
+
+                new FluentValidation.Results.ValidationFailure("trackingCode", ex.Message)
+
+                {
+
+                    ErrorCode = ex.Code
+
+                }
+
+            ],
+
+            title: "Validation failed",
+
+            detail: ex.Message,
+
+            code: ex.Code,
+
+            message: ex.Message);
+
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderFulfillmentException ex)
+
+    {
+
+        var status = ex.Code is
+            Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderMustBeShippedBeforeDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderNotPaidForShipment
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderCannotBeShipped
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderCannotBeDelivered
+            ? StatusCodes.Status409Conflict
+            : StatusCodes.Status400BadRequest;
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            status,
+            status == StatusCodes.Status409Conflict ? "Conflict" : "Bad Request",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = status;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
     catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderNotFoundException ex)
 
     {

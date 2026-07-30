@@ -1,6 +1,7 @@
 # DELIVERY / FULFILLMENT — Design técnico
 
-> Status: **design only** — não implementar migrations, endpoints ou UI completa neste documento.  
+> Status: **Fase 2 backend implementada** — ver `docs/orders/delivery-fulfillment-phase-2.md`.  
+> Design de referência; Fase 3 (batch) e FE ainda pendentes.  
 > Criado a partir da validação com cliente (assessoria de compras / lojistas e revendedores).  
 > Relacionado: `docs/orders/customer-orders.md`, `docs/orders/admin-orders.md`, `docs/prompts/features/delivery-fulfillment-roadmap-and-p0-fixes-cursor.md`.
 
@@ -41,11 +42,11 @@ Hoje (`customerStatus`): `AwaitingPayment` | `Confirmed` | `Canceled` | `Expired
 
 Códigos estáveis (API). Labels PT no frontend.
 
-| Code | Label |
-|------|--------|
-| `Transportadora` | Transportadora |
-| `OnibusExcursao` | Ônibus de excursão |
-| `Correios` | Correios |
+| Code | Label | API enum |
+|------|--------|----------|
+| Transportadora | Transportadora | `Carrier` |
+| OnibusExcursao | Ônibus de excursão | `ExcursionBus` |
+| Correios | Correios | `Correios` |
 
 Captura sugerida:
 
@@ -195,11 +196,15 @@ Não implementar chat real agora.
 
 ### Fase 2 — Campos + status no pedido
 
-- migrations: `DeliveryMethod?`, `PreferredDeliveryDate?`, `CustomerOrderNote?`, `InternalOrderNote?`, `FulfillmentStatus`, `ShippedAt`, `DeliveredAt`, `TrackingCode?`;
-- checkout captura preferências;
-- admin: marcar enviado/entregue;
-- contratos OpenAPI + testes;
-- `customerStatus` continua comercial; UI mostra bloco Entrega separado.
+**Status: backend feito** (`docs/orders/delivery-fulfillment-phase-2.md`).
+
+Enums API: `DeliveryMethod` = `Carrier` \| `ExcursionBus` \| `Correios` (labels PT no FE).
+
+- migrations: preferências + notes + `FulfillmentStatus` + ship/deliver fields;
+- checkout captura preferências (opcional; data ≥ 2 dias úteis);
+- admin: marcar enviado/entregue + nota interna;
+- DTOs admin/customer/guest; filtro `fulfillmentStatus`;
+- frontend Fase 2 ainda pendente.
 
 ### Fase 3 — Agrupamento
 
@@ -237,10 +242,8 @@ Não implementar chat real agora.
 
 ## 14. Próximo prompt recomendado
 
-`docs/prompts/features/delivery-fulfillment-phase-2-order-fields-cursor.md` (a criar):
+Frontend Fase 2 (checkout + admin orders + customer/guest delivery block) **ou** Fase 3 batch:
 
-1. migration + enums `DeliveryMethod` / `FulfillmentStatus`;
-2. checkout + create order snapshots;
-3. admin mark shipped/delivered;
-4. testes + docs de contrato;
-5. **sem** DeliveryBatch ainda.
+1. UI checkout (método, data, nota);
+2. admin ship/deliver/internal-note + filtro Aguardando envio;
+3. **sem** DeliveryBatch até prompt da Fase 3.

@@ -27,7 +27,8 @@ public sealed class CustomerOrderQueryHandlerTests
             [
                 new CustomerOrderListRow(
                     Guid.NewGuid(), 10582, OrderStatus.Paid, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
-                    100m, null, 100m, 1, "Camiseta")
+                    100m, null, 100m, 1, "Camiseta",
+                    FulfillmentStatus.AwaitingShipment, null, null, null, null)
             ], 1));
 
         var paymentReader = new Mock<ICustomerOrderPixPaymentReader>();
@@ -80,7 +81,8 @@ public sealed class CustomerOrderQueryHandlerTests
             [
                 new CustomerOrderListRow(
                     orderId, 10583, OrderStatus.PendingPayment, DateTimeOffset.UtcNow, null,
-                    50m, null, 50m, 1, "Item")
+                    50m, null, 50m, 1, "Item",
+                    FulfillmentStatus.AwaitingShipment, null, null, null, null)
             ], 1));
 
         var payment = new CustomerOrderPaymentSummaryDto(
@@ -101,6 +103,38 @@ public sealed class CustomerOrderQueryHandlerTests
         result.Items[0].Payment.ExpiresAt.Should().BeNull();
         result.Items[0].Currency.Should().Be("BRL");
         result.Items[0].OrderNumber.Should().Be("10583");
+        result.Items[0].FulfillmentStatus.Should().Be("AwaitingShipment");
+    }
+
+    [Fact]
+    public async Task GetCustomerOrderById_OwnOrder_ExposesDeliveryWithoutInternalNote()
+    {
+        var customerId = Guid.NewGuid();
+        var order = CreateBoundOrder(customerId);
+        order.SetDeliveryPreference(DeliveryMethod.Carrier, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5)), "Junto com pedido anterior");
+        order.SetInternalOrderNote("Não mostrar ao cliente");
+        order.MarkAsPaid();
+        order.MarkAsShipped(Guid.NewGuid(), DeliveryMethod.Carrier, "ABC123");
+
+        var repo = new Mock<IOrderRepository>();
+        repo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>())).ReturnsAsync(order);
+
+        var paymentReader = new Mock<ICustomerOrderPixPaymentReader>();
+        paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CustomerOrderPaymentSummaryDto?)null);
+
+        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, paymentReader.Object);
+        var result = await sut.Handle(new GetCustomerOrderByIdQuery(customerId, order.Id), CancellationToken.None);
+
+        result.Delivery.Should().NotBeNull();
+        result.Delivery!.FulfillmentStatus.Should().Be("Shipped");
+        result.Delivery.CustomerOrderNote.Should().Be("Junto com pedido anterior");
+        result.Delivery.TrackingCode.Should().Be("ABC123");
+
+        var json = JsonSerializer.Serialize(result);
+        json.Should().NotContain("InternalOrderNote");
+        json.Should().NotContain("Não mostrar ao cliente");
+        json.Should().NotContain("FulfillmentUpdatedByAdminId");
     }
 
     [Fact]

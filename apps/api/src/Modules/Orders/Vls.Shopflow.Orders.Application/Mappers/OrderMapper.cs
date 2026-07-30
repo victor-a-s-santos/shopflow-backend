@@ -82,7 +82,8 @@ internal static class OrderMapper
                 accessToken.ExpiresAt,
                 accessToken.LastUsedAt),
             canCreateAccount,
-            accountExistsForEmail);
+            accountExistsForEmail,
+            AdminOrderMapper.ToSafeDeliveryDto(order));
 
     public static void EnsureCheckoutSessionCanCreateOrder(string status, Guid checkoutSessionId)
     {
