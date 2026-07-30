@@ -32,6 +32,19 @@
 
 ## Etapa imediata (prioridade 1)
 
+### Delivery / Fulfillment (próximo módulo operacional)
+
+**Design:** `docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`  
+**Não implementar completo agora.** Separar pagamento × pedido × entrega.
+
+**Fase 1 (feita):** bugs estoque remove + categoria no edit + CEP formatado + busca CEP via API Shopflow (`docs/integrations/postal-code-lookup.md`); documento de design.
+
+**Fase 2 (próximo prompt):** campos no Order (método, data preferida, notes, `FulfillmentStatus`), admin marcar enviado/entregue.
+
+**Fase 3:** `DeliveryBatch` / agrupamento.
+
+**Fase 4:** WhatsApp CTA; chat nativo só com decisão explícita.
+
 ### Gateway Pix real + webhook
 
 **Objetivo:** cobrança e confirmação reais; marcar `PixPayment`/`Order` `Paid`; confirmar reserva no Inventory.

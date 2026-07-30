@@ -34,6 +34,8 @@ using Vls.Shopflow.Orders.Infrastructure;
 
 using Vls.Shopflow.PaymentsPix.Infrastructure;
 
+using Vls.Shopflow.Shipping.Infrastructure;
+
 using Vls.Shopflow.HttpApi.Endpoints;
 
 using Vls.Shopflow.HttpApi;
@@ -87,6 +89,8 @@ builder.Services.AddCartCheckoutModuleFromConfig(builder.Configuration, enableSe
 builder.Services.AddOrdersModuleFromConfig(builder.Configuration, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
 
 builder.Services.AddPaymentsPixModuleFromConfig(builder.Configuration, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
+
+builder.Services.AddShippingModuleFromConfig(builder.Configuration);
 
 builder.Services.AddIdentityAccessModuleFromConfig(builder.Configuration, builder.Environment, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
 
@@ -918,6 +922,8 @@ app.MapGroup("/api").MapAdminOrdersEndpoints();
 app.MapGroup("/api").MapCustomerOrdersEndpoints();
 
 app.MapGroup("/api").MapPaymentsPixEndpoints();
+
+app.MapGroup("/api").MapIntegrationsEndpoints();
 
 
 

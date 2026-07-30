@@ -22,7 +22,7 @@
 | **Lint frontend (erros pré-existentes)** | `npm run lint` — `textarea.tsx`, `api.ts`, `tailwind.config.ts` | CI futuro falhará |
 | **Upload local de imagens** | `Uploads__RootPath` filesystem | Não escala; sem CDN/R2 |
 | **Frontend customer auth desconectado** | Backend `/api/auth/customer/*` pronto; UI visual-only | Login/conta não funcionam na loja |
-| **Shipping pendente** | `ShippingAmount = null` | Frete sempre “a calcular” |
+| **Shipping pendente** | `ShippingAmount = null`; Delivery/Fulfillment ainda só em design (`docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`) | Frete/entrega operacional sem status próprio |
 | **Dashboard admin com dados fake** | `AdminDashboard` — pedidos hardcoded | Métricas enganosas |
 | **Race webhook vs worker** | Approved após expiração não auto-repara Order/reservas | Log crítico; intervenção manual |
 

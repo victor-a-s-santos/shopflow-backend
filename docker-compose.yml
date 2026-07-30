@@ -68,6 +68,11 @@ services:
       GuestOrderAccess__TokenTtlDays: ${GuestOrderAccess__TokenTtlDays:-30}
       GuestOrderAccess__TokenHashSecret: ${GuestOrderAccess__TokenHashSecret:-dev-only-guest-order-access-secret-change-me}
       GuestOrderAccess__RateLimitPerMinute: ${GuestOrderAccess__RateLimitPerMinute:-100}
+      PostalCodeLookup__Enabled: ${PostalCodeLookup__Enabled:-true}
+      PostalCodeLookup__Provider: ${PostalCodeLookup__Provider:-ViaCep}
+      PostalCodeLookup__BaseUrl: ${PostalCodeLookup__BaseUrl:-https://viacep.com.br}
+      PostalCodeLookup__TimeoutSeconds: ${PostalCodeLookup__TimeoutSeconds:-5}
+      PostalCodeLookup__RateLimitPerMinute: ${PostalCodeLookup__RateLimitPerMinute:-60}
     ports:
       - "5127:5127"
     volumes:

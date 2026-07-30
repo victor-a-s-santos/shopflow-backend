@@ -1,6 +1,6 @@
 # Shopflow — Estado atual do projeto
 
-> Última atualização: junho/2026. Baseado no código em `apps/api`, `apps/web` e `docs/`.
+> Última atualização: julho/2026. Baseado no código em `apps/api`, `apps/web` e `docs/`.
 > Se este arquivo divergir do código, **o código prevalece**.
 
 ## Visão geral
@@ -90,18 +90,19 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 
 | Módulo | Estado |
 |--------|--------|
-| **Shipping** | Scaffold vazio |
+| **Shipping** | Scaffold + **postal code lookup** (`GET /api/integrations/postal-code/br/{cep}`, ViaCEP no backend) | Frete / Delivery-Fulfillment completo |
+
 
 ### Pendente
 
-- Gateway Pix real + webhook
-- Shipping (frete)
-- Frontend integração customer auth (backend pronto)
+- Delivery/Fulfillment (design: `docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`) — Fase 2: status de entrega + admin actions; Fase 3: batch
+- Shipping / frete calculado
+- Frontend integração customer auth (backend pronto) — parcialmente wired
 - Storage externo de imagens (R2/S3)
 - CI/CD pipeline
-- Guest Order Access Token backend (`SEC-006`) — falta wiring frontend
-- Account orders
+- Guest order deep-link / e-mail com token
 - Testes HttpApi end-to-end
+- Chat nativo (após WhatsApp CTA)
 
 ---
 

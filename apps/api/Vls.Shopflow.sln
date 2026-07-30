@@ -127,6 +127,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vls.Shopflow.IdentityAccess
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vls.Shopflow.IdentityAccess.IntegrationTests", "tests\Vls.Shopflow.IdentityAccess.IntegrationTests\Vls.Shopflow.IdentityAccess.IntegrationTests.csproj", "{A0385253-6C4C-470F-B16B-E93F792F9B6E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vls.Shopflow.Shipping.UnitTests", "tests\Vls.Shopflow.Shipping.UnitTests\Vls.Shopflow.Shipping.UnitTests.csproj", "{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -701,6 +703,18 @@ Global
 		{A0385253-6C4C-470F-B16B-E93F792F9B6E}.Release|x64.Build.0 = Release|Any CPU
 		{A0385253-6C4C-470F-B16B-E93F792F9B6E}.Release|x86.ActiveCfg = Release|Any CPU
 		{A0385253-6C4C-470F-B16B-E93F792F9B6E}.Release|x86.Build.0 = Release|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Debug|x64.Build.0 = Debug|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Debug|x86.Build.0 = Debug|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Release|x64.ActiveCfg = Release|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Release|x64.Build.0 = Release|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Release|x86.ActiveCfg = Release|Any CPU
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -765,5 +779,6 @@ Global
 		{A9B495F0-07DF-406B-8D1A-A4714135D223} = {10F243C0-5589-5C7D-3314-BD3AC559A253}
 		{99461FD3-236F-40C2-95F7-5D0956A61418} = {10F243C0-5589-5C7D-3314-BD3AC559A253}
 		{A0385253-6C4C-470F-B16B-E93F792F9B6E} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{C91ACCD4-E349-43BF-8ECD-E0989C10D52C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

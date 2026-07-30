@@ -27,6 +27,7 @@ public static class DependencyInjection
     public const string CustomerResetPasswordRateLimitPolicy = "customer-reset-password";
     public const string GuestOrderStatusRateLimitPolicy = "guest-order-status";
     public const string GuestOrderClaimRateLimitPolicy = "guest-order-claim";
+    public const string PostalCodeLookupRateLimitPolicy = "postal-code-lookup";
     public const string CorsPolicyName = "AllowFrontend";
 
     public static IServiceCollection AddIdentityAccessModule(
@@ -296,6 +297,22 @@ public static class DependencyInjection
                     {
                         Window = TimeSpan.FromMinutes(1),
                         PermitLimit = guestOrderRateLimit,
+                        QueueLimit = 0
+                    }));
+
+            var postalCodeRateLimit = configuration.GetValue("PostalCodeLookup:RateLimitPerMinute", 60);
+            if (postalCodeRateLimit <= 0)
+                postalCodeRateLimit = 60;
+            if (environment.IsDevelopment() && postalCodeRateLimit < 100)
+                postalCodeRateLimit = Math.Max(postalCodeRateLimit, 100);
+
+            options.AddPolicy(PostalCodeLookupRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = postalCodeRateLimit,
                         QueueLimit = 0
                     }));
         });
