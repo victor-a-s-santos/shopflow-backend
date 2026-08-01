@@ -218,38 +218,200 @@ Critérios de aceite:
 - typecheck/build passam.
 
 ==================================================
-6. BUSCA CEP / AUTOPREENCHIMENTO
+6. BUSCA CEP / AUTOPREENCHIMENTO — VIA API DE INTEGRAÇÃO
 ==================================================
 
-Avaliar implementação de busca CEP.
+Decisão de arquitetura:
+A busca de CEP deve ser feita via API de integração do backend Shopflow, e não por base manual no frontend.
 
-Decisão recomendada para MVP:
-- implementar no frontend somente se já houver padrão seguro para chamada externa ou service próprio;
-- preferir ViaCEP se projeto aceitar dependência externa no frontend;
-- se o projeto evitar chamada externa direta, documentar necessidade de backend proxy.
+Não implementar tabela/base manual de CEP.
+Não chamar provedor externo diretamente do frontend.
+Não acoplar checkout/admin a ViaCEP, BrasilAPI, Correios ou qualquer provider específico.
 
-Comportamento desejado:
+Fluxo desejado:
+
+Frontend
+→ GET /api/integrations/postal-code/br/{cep}
+ou rota equivalente definida no backend
+→ Backend Shopflow
+→ Provider externo configurável
+→ Backend normaliza resposta
+→ Frontend preenche endereço
+
+Objetivo:
+- centralizar integração no backend;
+- permitir trocar provider sem mexer no frontend;
+- aplicar rate limit;
+- aplicar timeout;
+- tratar erros;
+- normalizar resposta;
+- evitar dependência direta do browser com provider externo;
+- manter preenchimento manual como fallback.
+
+==================================================
+6.1 ENDPOINT BACKEND SUGERIDO
+==================================================
+
+Criar futuramente endpoint:
+
+GET /api/integrations/postal-code/br/{cep}
+
+ou, se o projeto tiver padrão melhor:
+
+GET /api/address/lookup?postalCode={cep}
+
+Recomendação:
+GET /api/integrations/postal-code/br/{cep}
+
+Motivo:
+- deixa claro que é integração externa;
+- permite no futuro outros países ou provedores;
+- evita misturar com domínio de pedido/endereço.
+
+Endpoint deve ser público ou acessível ao checkout convidado.
+Como é GET, não precisa CSRF.
+Deve ter rate limit.
+
+Entrada:
+- CEP com ou sem máscara:
+  - 02310000
+  - 02310-000
+
+Validação:
+- aceitar apenas 8 dígitos após remover máscara;
+- se inválido, retornar 400 com ProblemDetails;
+- não consultar provider se inválido.
+
+Resposta normalizada sugerida:
+
+{
+  "postalCode": "02310-000",
+  "street": "Rua Exemplo",
+  "neighborhood": "Santana",
+  "city": "São Paulo",
+  "state": "SP",
+  "country": "BR",
+  "source": "provider",
+  "found": true
+}
+
+Se não encontrado:
+
+{
+  "postalCode": "02310-000",
+  "found": false
+}
+
+Ou 404, conforme padrão do projeto.
+Recomendação para UX:
+- retornar 200 com found=false ou 404 bem tratado.
+- documentar decisão.
+
+Não retornar payload bruto do provider.
+
+==================================================
+6.2 SERVICE BACKEND SUGERIDO
+==================================================
+
+Criar interface:
+
+IPostalCodeLookupService
+
+Método:
+LookupBrazilPostalCodeAsync(string cep, CancellationToken cancellationToken)
+
+Implementação:
+- provider externo configurável;
+- timeout curto;
+- tratamento de erro;
+- normalização de resposta;
+- logs sem PII excessiva;
+- cache opcional futuro.
+
+Configuração sugerida:
+
+PostalCodeLookup:
+  Enabled: true
+  Provider: "ViaCep" ou provider escolhido
+  BaseUrl: "..."
+  TimeoutSeconds: 5
+  RateLimitPerMinute: 60
+
+Importante:
+- provider deve ser detalhe de infraestrutura;
+- Application/API não deve depender diretamente de provider específico;
+- frontend não deve saber qual provider é usado.
+
+==================================================
+6.3 FRONTEND
+==================================================
+
+Frontend deve consumir apenas a API do Shopflow:
+
+GET /api/integrations/postal-code/br/{cep}
+
+Comportamento:
 - usuário digita CEP;
-- ao completar 8 dígitos, buscar endereço;
-- preencher rua, bairro, cidade, UF;
-- permitir edição manual;
-- mostrar erro amigável se CEP não encontrado;
-- não travar checkout;
-- não enviar request a cada tecla sem debounce/controle.
+- ao completar 8 dígitos, chama backend;
+- debounce ou trigger ao blur;
+- exibe loading discreto;
+- se encontrado, preenche:
+  - rua;
+  - bairro;
+  - cidade;
+  - UF;
+- número e complemento continuam manuais;
+- usuário pode editar qualquer campo preenchido;
+- se não encontrado, mostrar:
+  "CEP não encontrado. Preencha o endereço manualmente."
+- se API falhar, mostrar:
+  "Não foi possível buscar o CEP agora. Preencha o endereço manualmente."
 
-Atenção:
-- não incluir API key;
-- não depender de serviço externo para finalizar pedido;
-- se falhar, usuário deve preencher manualmente.
+Não bloquear checkout se a busca falhar.
+O preenchimento manual continua obrigatório como fallback.
 
-Se implementar agora:
-- criar helper/service isolado;
-- aplicar no checkout e/ou cadastro de endereço, conforme existir;
-- testes unitários;
-- não quebrar checkout.
+Aplicar nos formulários relevantes:
+- checkout/endereço de entrega;
+- cadastro/edição de endereço, se existir;
+- futuramente admin, se houver endereço editável.
 
-Se não implementar agora:
-- documentar como P1 em frontend-next-actions.
+==================================================
+6.4 TESTES FUTUROS
+==================================================
+
+Backend:
+1. CEP inválido retorna erro sem chamar provider.
+2. CEP com máscara é normalizado.
+3. CEP sem máscara é normalizado.
+4. Provider encontrado retorna DTO normalizado.
+5. Provider não encontrado retorna resposta controlada.
+6. Timeout retorna erro controlado.
+7. Rate limit funciona.
+8. Endpoint não exige autenticação se usado no checkout convidado.
+9. Não retorna payload bruto do provider.
+
+Frontend:
+1. CEP válido chama API do Shopflow, não provider externo.
+2. CEP válido preenche endereço.
+3. CEP inválido não chama API.
+4. CEP não encontrado permite preenchimento manual.
+5. Falha da API permite preenchimento manual.
+6. Campo número/complemento não é sobrescrito.
+7. Usuário pode editar rua/bairro/cidade/UF após autopreenchimento.
+
+==================================================
+6.5 NESTE PROMPT
+==================================================
+
+Neste prompt atual:
+- não implementar integração completa de CEP, salvo se for explicitamente solicitado.
+- apenas documentar a decisão no DELIVERY-FULFILLMENT-DESIGN.md e nos next-actions.
+- se corrigir apenas formatação de CEP, usar helper visual formatCepBR.
+- busca CEP via API de integração deve virar prompt próprio backend + frontend.
+
+Registrar como próxima etapa:
+1. Backend: criar API de integração de CEP.
+2. Frontend: consumir API do Shopflow nos formulários de endereço.
 
 ==================================================
 7. DOCUMENTO TÉCNICO DELIVERY/FULFILLMENT

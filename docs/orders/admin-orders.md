@@ -16,7 +16,10 @@ GET não exige CSRF (padrão do projeto). Mutations cookie-admin exigem CSRF (`G
 
 Detalhe inclui `items[].salesDisplay` (snapshot de lote/pacote; null em Unit/pedidos antigos). Ver `docs/orders/order-item-sales-snapshot.md`.
 
-Fulfillment (envio/entrega): ver `docs/orders/delivery-fulfillment-phase-2.md`.
+Fulfillment (envio/entrega): ver `docs/orders/delivery-fulfillment-phase-2.md`.  
+Remessa agrupada: ver `docs/orders/delivery-batch-phase-3.md` (`GET .../delivery-batch-candidates`, `/api/admin/delivery-batches`).
+
+List/detail podem incluir `deliveryBatchId` / `deliveryBatchNumber` quando o pedido está em uma remessa.
 
 ## Listagem — query params
 
@@ -66,10 +69,14 @@ curl -sS -b cookies.txt -H "X-CSRF-TOKEN: $TOKEN" -H 'Content-Type: application/
 Customer orders (`/api/customer/orders`) exigem CustomerCookie e só listam pedidos com `CustomerUserId` do autenticado — nunca por e-mail. Ver `docs/orders/customer-orders.md`.
 `internalOrderNote` **nunca** aparece em customer/guest.
 
+Fulfillment (envio/entrega): ver `docs/orders/delivery-fulfillment-phase-2.md`.  
+Remessa agrupada: ver `docs/orders/delivery-batch-phase-3.md` (`GET .../delivery-batch-candidates`, `/api/admin/delivery-batches`).
+
+List/detail podem incluir `deliveryBatchId` / `deliveryBatchNumber` quando o pedido está em uma remessa.
+
 ## Pós-MVP (não neste escopo)
 
-- Frontend admin de fulfillment
-- DeliveryBatch / agrupamento (Fase 3)
+- Frontend admin de fulfillment / remessa
 - Cancelamento e reembolso
 - Nota fiscal
 - Timeline de eventos

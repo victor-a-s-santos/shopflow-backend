@@ -8,6 +8,8 @@ public sealed class OrdersDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<GuestOrderAccessToken> GuestOrderAccessTokens => Set<GuestOrderAccessToken>();
+    public DbSet<DeliveryBatch> DeliveryBatches => Set<DeliveryBatch>();
+    public DbSet<DeliveryBatchOrder> DeliveryBatchOrders => Set<DeliveryBatchOrder>();
 
     public OrdersDbContext(DbContextOptions<OrdersDbContext> options) : base(options) { }
 

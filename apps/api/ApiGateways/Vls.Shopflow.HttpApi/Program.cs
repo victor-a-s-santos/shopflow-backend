@@ -523,6 +523,80 @@ app.Use(async (ctx, next) =>
 
     }
 
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.DeliveryBatchAddressMismatchException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            StatusCodes.Status409Conflict,
+            "Conflict",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+        problem.Extensions["addresses"] = ex.AddressSummaries;
+
+        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.DeliveryBatchNotFoundException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            StatusCodes.Status404NotFound,
+            "Not Found",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+        problem.Extensions["batchId"] = ex.BatchId;
+
+        ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.DeliveryBatchException ex)
+
+    {
+
+        var status = ex.Code is
+            Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.AddressMismatch
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.CustomerMismatch
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderAlreadyInBatch
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderNotPaid
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderNotEligible
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderAlreadyShipped
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderAlreadyDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.CannotBeShipped
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.CannotBeDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.MustBeShippedBeforeDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.AlreadyDelivered
+            ? StatusCodes.Status409Conflict
+            : StatusCodes.Status400BadRequest;
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            status,
+            status == StatusCodes.Status409Conflict ? "Conflict" : "Bad Request",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = status;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
     catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderNoteTooLongException ex)
 
     {
@@ -1013,6 +1087,8 @@ app.MapGroup("/api").MapCheckoutEndpoints();
 app.MapGroup("/api").MapOrdersEndpoints();
 
 app.MapGroup("/api").MapAdminOrdersEndpoints();
+
+app.MapGroup("/api").MapAdminDeliveryBatchesEndpoints();
 
 app.MapGroup("/api").MapCustomerOrdersEndpoints();
 

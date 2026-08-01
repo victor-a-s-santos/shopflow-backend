@@ -33,7 +33,7 @@ public sealed class AdminOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdsAsync(It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, AdminOrderPaymentSummaryDto>());
 
-        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object);
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object, MockBatchRepo());
         var result = await sut.Handle(new GetAdminOrdersQuery(1, 20), CancellationToken.None);
 
         result.TotalItems.Should().Be(2);
@@ -54,7 +54,7 @@ public sealed class AdminOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdsAsync(It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, AdminOrderPaymentSummaryDto>());
 
-        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object);
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object, MockBatchRepo());
         await sut.Handle(new GetAdminOrdersQuery(Status: "Paid"), CancellationToken.None);
 
         readModel.Verify(x => x.GetPagedAsync(
@@ -72,7 +72,7 @@ public sealed class AdminOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdsAsync(It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, AdminOrderPaymentSummaryDto>());
 
-        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object);
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object, MockBatchRepo());
         await sut.Handle(new GetAdminOrdersQuery(FulfillmentStatus: "AwaitingShipment"), CancellationToken.None);
 
         readModel.Verify(x => x.GetPagedAsync(
@@ -103,7 +103,7 @@ public sealed class AdminOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AdminOrderPaymentSummaryDto?)null);
 
-        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, paymentReader.Object);
+        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, paymentReader.Object, MockBatchRepo());
         var result = await sut.Handle(new GetAdminOrderByIdQuery(order.Id), CancellationToken.None);
 
         result.InternalOrderNote.Should().Be("Segurar até sexta");
@@ -130,7 +130,7 @@ public sealed class AdminOrderQueryHandlerTests
                 [orderId] = SamplePayment(orderId)
             });
 
-        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object);
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object, MockBatchRepo());
         var result = await sut.Handle(new GetAdminOrdersQuery(PaymentStatus: "Paid"), CancellationToken.None);
 
         result.Items.Should().ContainSingle();
@@ -151,7 +151,7 @@ public sealed class AdminOrderQueryHandlerTests
             .ReturnsAsync(new AdminOrderListPage([], 0));
         var paymentReader = MockEmptyPayments();
 
-        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object);
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object, MockBatchRepo());
         await sut.Handle(new GetAdminOrdersQuery(Q: q), CancellationToken.None);
 
         readModel.Verify(x => x.GetPagedAsync(
@@ -168,7 +168,7 @@ public sealed class AdminOrderQueryHandlerTests
             .ReturnsAsync(new AdminOrderListPage([], 0));
         var paymentReader = MockEmptyPayments();
 
-        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object);
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object, MockBatchRepo());
         await sut.Handle(new GetAdminOrdersQuery(Q: orderId.ToString("D")), CancellationToken.None);
 
         readModel.Verify(x => x.GetPagedAsync(
@@ -189,7 +189,7 @@ public sealed class AdminOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdsAsync(It.IsAny<IReadOnlyList<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, AdminOrderPaymentSummaryDto> { [orderId] = payment });
 
-        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object);
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, paymentReader.Object, MockBatchRepo());
         var result = await sut.Handle(new GetAdminOrdersQuery(), CancellationToken.None);
 
         result.Items[0].Payment.Should().BeEquivalentTo(payment);
@@ -203,7 +203,7 @@ public sealed class AdminOrderQueryHandlerTests
         readModel.Setup(x => x.GetPagedAsync(It.IsAny<AdminOrderListQuerySpec>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AdminOrderListPage([Row(orderId, "A", "a@b.com", "1", DateTimeOffset.UtcNow)], 1));
 
-        var sut = new GetAdminOrdersQueryHandler(readModel.Object, MockEmptyPayments().Object);
+        var sut = new GetAdminOrdersQueryHandler(readModel.Object, MockEmptyPayments().Object, MockBatchRepo());
         var result = await sut.Handle(new GetAdminOrdersQuery(), CancellationToken.None);
 
         result.Items[0].Payment.Should().BeNull();
@@ -221,7 +221,7 @@ public sealed class AdminOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);
 
-        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, paymentReader.Object);
+        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, paymentReader.Object, MockBatchRepo());
         var result = await sut.Handle(new GetAdminOrderByIdQuery(order.Id), CancellationToken.None);
 
         result.Id.Should().Be(order.Id);
@@ -239,7 +239,7 @@ public sealed class AdminOrderQueryHandlerTests
         repo.Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Order?)null);
 
-        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, Mock.Of<IAdminOrderPixPaymentReader>());
+        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, Mock.Of<IAdminOrderPixPaymentReader>(), MockBatchRepo());
         var act = () => sut.Handle(new GetAdminOrderByIdQuery(Guid.NewGuid()), CancellationToken.None);
 
         await act.Should().ThrowAsync<OrderNotFoundException>();
@@ -287,6 +287,16 @@ public sealed class AdminOrderQueryHandlerTests
             CreatedFrom: DateTimeOffset.UtcNow,
             CreatedTo: DateTimeOffset.UtcNow.AddDays(-1)));
         result.ShouldHaveAnyValidationError();
+    }
+
+    private static IDeliveryBatchRepository MockBatchRepo()
+    {
+        var mock = new Mock<IDeliveryBatchRepository>();
+        mock.Setup(x => x.FindMembershipsByOrderIdsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, DeliveryBatchMembership>());
+        mock.Setup(x => x.FindMembershipByOrderIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DeliveryBatchMembership?)null);
+        return mock.Object;
     }
 
     private static Mock<IAdminOrderPixPaymentReader> MockEmptyPayments()

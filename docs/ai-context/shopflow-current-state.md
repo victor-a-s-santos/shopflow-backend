@@ -91,12 +91,12 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 | Módulo | Estado | Pendente |
 |--------|--------|----------|
 | **Shipping** | Scaffold + **postal code lookup** (`GET /api/integrations/postal-code/br/{cep}`, ViaCEP no backend) | Frete calculado |
-| **Orders / Fulfillment** | Fase 2: preferência checkout + `FulfillmentStatus` + admin ship/deliver (`docs/orders/delivery-fulfillment-phase-2.md`) | FE + DeliveryBatch (Fase 3) |
+| **Orders / Fulfillment** | Fase 2+3: preferência + `FulfillmentStatus` + admin ship/deliver + **DeliveryBatch** (`docs/orders/delivery-batch-phase-3.md`) | FE admin/checkout |
 
 
 ### Pendente
 
-- Delivery/Fulfillment Fase 3 (batch) + FE checkout/admin (`docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`)
+- Delivery/Fulfillment frontend (checkout + admin remessa)
 - Shipping / frete calculado
 - Frontend integração customer auth (backend pronto) — parcialmente wired
 - Storage externo de imagens (R2/S3)

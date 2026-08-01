@@ -21,6 +21,7 @@ public sealed class OrderFulfillmentCommandHandlerTests
         var sut = new ShipOrderFulfillmentCommandHandler(
             repo.Object,
             Mock.Of<IAdminOrderPixPaymentReader>(),
+            MockBatchRepo(),
             Mock.Of<IOrdersUnitOfWork>());
 
         var act = () => sut.Handle(
@@ -39,6 +40,7 @@ public sealed class OrderFulfillmentCommandHandlerTests
         var sut = new DeliverOrderFulfillmentCommandHandler(
             repo.Object,
             Mock.Of<IAdminOrderPixPaymentReader>(),
+            MockBatchRepo(),
             Mock.Of<IOrdersUnitOfWork>());
 
         var act = () => sut.Handle(
@@ -58,6 +60,7 @@ public sealed class OrderFulfillmentCommandHandlerTests
         var sut = new ShipOrderFulfillmentCommandHandler(
             repo.Object,
             Mock.Of<IAdminOrderPixPaymentReader>(),
+            MockBatchRepo(),
             Mock.Of<IOrdersUnitOfWork>());
 
         var act = () => sut.Handle(
@@ -78,7 +81,11 @@ public sealed class OrderFulfillmentCommandHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AdminOrderPaymentSummaryDto?)null);
 
-        var sut = new ShipOrderFulfillmentCommandHandler(repo.Object, paymentReader.Object, uow.Object);
+        var sut = new ShipOrderFulfillmentCommandHandler(
+            repo.Object,
+            paymentReader.Object,
+            MockBatchRepo(),
+            uow.Object);
         var result = await sut.Handle(
             new ShipOrderFulfillmentCommand(order.Id, Guid.NewGuid(), "Carrier", "T1"),
             CancellationToken.None);
@@ -98,13 +105,25 @@ public sealed class OrderFulfillmentCommandHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AdminOrderPaymentSummaryDto?)null);
 
-        var sut = new UpdateOrderInternalNoteCommandHandler(repo.Object, paymentReader.Object, uow.Object);
+        var sut = new UpdateOrderInternalNoteCommandHandler(
+            repo.Object,
+            paymentReader.Object,
+            MockBatchRepo(),
+            uow.Object);
         var result = await sut.Handle(
             new UpdateOrderInternalNoteCommand(order.Id, "Segurar"),
             CancellationToken.None);
 
         result.InternalOrderNote.Should().Be("Segurar");
         order.InternalOrderNote.Should().Be("Segurar");
+    }
+
+    private static IDeliveryBatchRepository MockBatchRepo()
+    {
+        var mock = new Mock<IDeliveryBatchRepository>();
+        mock.Setup(x => x.FindMembershipByOrderIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DeliveryBatchMembership?)null);
+        return mock.Object;
     }
 
     private static Mock<IOrderRepository> MockRepo(Order order)

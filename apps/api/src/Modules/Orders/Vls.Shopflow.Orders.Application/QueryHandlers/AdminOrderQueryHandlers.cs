@@ -11,7 +11,8 @@ namespace Vls.Shopflow.Orders.Application.QueryHandlers;
 
 public sealed class GetAdminOrdersQueryHandler(
     IAdminOrderReadModel readModel,
-    IAdminOrderPixPaymentReader pixPaymentReader)
+    IAdminOrderPixPaymentReader pixPaymentReader,
+    IDeliveryBatchRepository batchRepository)
     : IQueryHandler<GetAdminOrdersQuery, PagedAdminOrdersDto>
 {
     public async Task<PagedAdminOrdersDto> Handle(
@@ -82,26 +83,36 @@ public sealed class GetAdminOrdersQueryHandler(
             ? new Dictionary<Guid, AdminOrderPaymentSummaryDto>()
             : await pixPaymentReader.GetLatestByOrderIdsAsync(orderIds, cancellationToken);
 
-        var items = page.Items.Select(row => new AdminOrderListItemDto(
-            row.Id,
-            row.OrderNumber.ToString(),
-            row.Status.ToString(),
-            row.CustomerFullName,
-            row.CustomerEmail,
-            row.CustomerPhone,
-            row.Subtotal,
-            row.ShippingAmount,
-            row.Total,
-            row.CreatedAt,
-            row.PaidAt,
-            row.ItemsCount,
-            payments.TryGetValue(row.Id, out var payment) ? payment : null,
-            row.FulfillmentStatus.ToString(),
-            row.PreferredDeliveryMethod?.ToString(),
-            row.PreferredDeliveryDate,
-            row.ShippedAt,
-            row.DeliveredAt,
-            row.TrackingCode)).ToList();
+        var memberships = orderIds.Count == 0
+            ? new Dictionary<Guid, DeliveryBatchMembership>()
+            : await batchRepository.FindMembershipsByOrderIdsAsync(orderIds, cancellationToken);
+
+        var items = page.Items.Select(row =>
+        {
+            memberships.TryGetValue(row.Id, out var membership);
+            return new AdminOrderListItemDto(
+                row.Id,
+                row.OrderNumber.ToString(),
+                row.Status.ToString(),
+                row.CustomerFullName,
+                row.CustomerEmail,
+                row.CustomerPhone,
+                row.Subtotal,
+                row.ShippingAmount,
+                row.Total,
+                row.CreatedAt,
+                row.PaidAt,
+                row.ItemsCount,
+                payments.TryGetValue(row.Id, out var payment) ? payment : null,
+                row.FulfillmentStatus.ToString(),
+                row.PreferredDeliveryMethod?.ToString(),
+                row.PreferredDeliveryDate,
+                row.ShippedAt,
+                row.DeliveredAt,
+                row.TrackingCode,
+                membership?.DeliveryBatchId,
+                membership is null ? null : membership.BatchNumber.ToString());
+        }).ToList();
 
         var totalPages = page.TotalItems == 0
             ? 0
@@ -113,7 +124,8 @@ public sealed class GetAdminOrdersQueryHandler(
 
 public sealed class GetAdminOrderByIdQueryHandler(
     IOrderRepository orderRepository,
-    IAdminOrderPixPaymentReader pixPaymentReader)
+    IAdminOrderPixPaymentReader pixPaymentReader,
+    IDeliveryBatchRepository batchRepository)
     : IQueryHandler<GetAdminOrderByIdQuery, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -124,7 +136,12 @@ public sealed class GetAdminOrderByIdQueryHandler(
                     ?? throw new OrderNotFoundException(query.OrderId);
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
+        var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);
 
-        return AdminOrderMapper.ToDetailDto(order, payment);
+        return AdminOrderMapper.ToDetailDto(
+            order,
+            payment,
+            membership?.DeliveryBatchId,
+            membership is null ? null : membership.BatchNumber.ToString());
     }
 }

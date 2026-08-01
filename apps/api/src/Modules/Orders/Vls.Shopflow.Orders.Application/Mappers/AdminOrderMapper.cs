@@ -7,7 +7,9 @@ internal static class AdminOrderMapper
 {
     public static AdminOrderDetailDto ToDetailDto(
         Order order,
-        AdminOrderPaymentSummaryDto? payment)
+        AdminOrderPaymentSummaryDto? payment,
+        Guid? deliveryBatchId = null,
+        string? deliveryBatchNumber = null)
         => new(
             order.Id,
             order.FormatOrderNumber(),
@@ -49,7 +51,9 @@ internal static class AdminOrderMapper
             order.ShippedAt,
             order.DeliveredAt,
             order.FulfillmentUpdatedAt,
-            order.FulfillmentUpdatedByAdminId);
+            order.FulfillmentUpdatedByAdminId,
+            deliveryBatchId,
+            deliveryBatchNumber);
 
     public static OrderDeliveryInfoDto ToSafeDeliveryDto(Order order)
         => new(

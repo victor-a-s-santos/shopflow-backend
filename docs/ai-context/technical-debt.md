@@ -23,7 +23,7 @@
 | **Upload local de imagens** | `Uploads__RootPath` filesystem | Não escala; sem CDN/R2 |
 | **Frontend customer auth desconectado** | Backend `/api/auth/customer/*` pronto; UI visual-only | Login/conta não funcionam na loja |
 | **Shipping / frete** | `ShippingAmount = null`; CEP lookup OK; frete calculado pendente | Cotação de frete |
-| **DeliveryBatch** | Fulfillment por pedido (Fase 2) pronto; agrupamento não | Fase 3 |
+| **Delivery FE** | Batch/fulfillment backend pronto; UI admin/checkout não | Frontend remessa + preferências |
 | **Dashboard admin com dados fake** | `AdminDashboard` — pedidos hardcoded | Métricas enganosas |
 | **Race webhook vs worker** | Approved após expiração não auto-repara Order/reservas | Log crítico; intervenção manual |
 

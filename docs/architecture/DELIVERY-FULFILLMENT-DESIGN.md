@@ -1,7 +1,7 @@
 # DELIVERY / FULFILLMENT — Design técnico
 
-> Status: **Fase 2 backend implementada** — ver `docs/orders/delivery-fulfillment-phase-2.md`.  
-> Design de referência; Fase 3 (batch) e FE ainda pendentes.  
+> Status: **Fase 2+3 backend implementadas** — `docs/orders/delivery-fulfillment-phase-2.md`, `docs/orders/delivery-batch-phase-3.md`.  
+> Design de referência; frontend ainda pendente.  
 > Criado a partir da validação com cliente (assessoria de compras / lojistas e revendedores).  
 > Relacionado: `docs/orders/customer-orders.md`, `docs/orders/admin-orders.md`, `docs/prompts/features/delivery-fulfillment-roadmap-and-p0-fixes-cursor.md`.
 
@@ -208,9 +208,12 @@ Enums API: `DeliveryMethod` = `Carrier` \| `ExcursionBus` \| `Correios` (labels 
 
 ### Fase 3 — Agrupamento
 
-- entidade `DeliveryBatch` / `ShipmentBatch`;
-- APIs admin de criar batch e marcar lote;
-- UX seleção múltipla + alerta de endereço divergente.
+**Status: backend feito** (`docs/orders/delivery-batch-phase-3.md`).
+
+- entidade `DeliveryBatch` + join `delivery_batch_orders`;
+- APIs admin: candidates, create, list/detail, ship, deliver, internal-note;
+- alerta de endereço divergente com `confirmDifferentAddresses`;
+- frontend seleção/agrupar ainda pendente.
 
 ### Fase 4 — Contato
 
@@ -242,8 +245,8 @@ Enums API: `DeliveryMethod` = `Carrier` \| `ExcursionBus` \| `Correios` (labels 
 
 ## 14. Próximo prompt recomendado
 
-Frontend Fase 2 (checkout + admin orders + customer/guest delivery block) **ou** Fase 3 batch:
+Frontend Fase 2+3 (checkout delivery fields + admin ship/deliver + remessa agrupada):
 
 1. UI checkout (método, data, nota);
-2. admin ship/deliver/internal-note + filtro Aguardando envio;
-3. **sem** DeliveryBatch até prompt da Fase 3.
+2. admin: filtro Aguardando envio, ship/deliver, candidates + criar remessa;
+3. WhatsApp CTA (Fase 4) separado.

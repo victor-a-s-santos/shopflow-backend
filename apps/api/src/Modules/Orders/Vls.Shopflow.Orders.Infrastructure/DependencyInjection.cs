@@ -55,6 +55,9 @@ public static class DependencyInjection
         services.AddScoped<IOrdersUnitOfWork, OrdersUnitOfWork>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IOrderNumberGenerator, PostgresOrderNumberGenerator>();
+        services.AddScoped<IDeliveryBatchNumberGenerator, PostgresDeliveryBatchNumberGenerator>();
+        services.AddScoped<IDeliveryBatchRepository, DeliveryBatchRepository>();
+        services.AddScoped<IDeliveryBatchReadModel, DeliveryBatchReadModel>();
         services.AddScoped<IAdminOrderReadModel, AdminOrderReadModel>();
         services.AddScoped<ICustomerOrderReadModel, CustomerOrderReadModel>();
         services.AddScoped<IGuestOrderAccessTokenRepository, GuestOrderAccessTokenRepository>();

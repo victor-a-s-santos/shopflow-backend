@@ -61,4 +61,4 @@ Ship exige `OrderStatus.Paid`. Deliver exige `FulfillmentStatus.Shipped` (code `
 
 ## Fora desta fase
 
-DeliveryBatch, bulk, WhatsApp, chat, frete, feriados, frontend.
+~~DeliveryBatch~~ → [`delivery-batch-phase-3.md`](./delivery-batch-phase-3.md). Ainda fora: bulk UI/frontend, WhatsApp, chat, frete, feriados.

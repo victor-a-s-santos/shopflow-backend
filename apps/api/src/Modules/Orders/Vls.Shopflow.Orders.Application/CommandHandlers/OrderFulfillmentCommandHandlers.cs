@@ -12,6 +12,7 @@ namespace Vls.Shopflow.Orders.Application.CommandHandlers;
 public sealed class ShipOrderFulfillmentCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
+    IDeliveryBatchRepository batchRepository,
     IOrdersUnitOfWork unitOfWork)
     : IRequestHandler<ShipOrderFulfillmentCommand, AdminOrderDetailDto>
 {
@@ -38,13 +39,19 @@ public sealed class ShipOrderFulfillmentCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
-        return AdminOrderMapper.ToDetailDto(order, payment);
+        var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);
+        return AdminOrderMapper.ToDetailDto(
+            order,
+            payment,
+            membership?.DeliveryBatchId,
+            membership is null ? null : membership.BatchNumber.ToString());
     }
 }
 
 public sealed class DeliverOrderFulfillmentCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
+    IDeliveryBatchRepository batchRepository,
     IOrdersUnitOfWork unitOfWork)
     : IRequestHandler<DeliverOrderFulfillmentCommand, AdminOrderDetailDto>
 {
@@ -60,13 +67,19 @@ public sealed class DeliverOrderFulfillmentCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
-        return AdminOrderMapper.ToDetailDto(order, payment);
+        var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);
+        return AdminOrderMapper.ToDetailDto(
+            order,
+            payment,
+            membership?.DeliveryBatchId,
+            membership is null ? null : membership.BatchNumber.ToString());
     }
 }
 
 public sealed class UpdateOrderInternalNoteCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
+    IDeliveryBatchRepository batchRepository,
     IOrdersUnitOfWork unitOfWork)
     : IRequestHandler<UpdateOrderInternalNoteCommand, AdminOrderDetailDto>
 {
@@ -82,6 +95,11 @@ public sealed class UpdateOrderInternalNoteCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
-        return AdminOrderMapper.ToDetailDto(order, payment);
+        var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);
+        return AdminOrderMapper.ToDetailDto(
+            order,
+            payment,
+            membership?.DeliveryBatchId,
+            membership is null ? null : membership.BatchNumber.ToString());
     }
 }

@@ -18,6 +18,19 @@ public interface IOrderRepository
     Task<Order?> GetPendingPaymentByCheckoutSessionIdAsync(
         Guid checkoutSessionId,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Order>> GetByIdsWithItemsAsync(
+        IReadOnlyCollection<Guid> orderIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Paid + AwaitingShipment orders for the same customer (by user id or email+phone).
+    /// </summary>
+    Task<IReadOnlyList<Order>> FindEligibleGroupingCandidatesAsync(
+        Guid? customerUserId,
+        string? emailNormalized,
+        string? phoneNormalized,
+        CancellationToken cancellationToken);
 }
 
 public interface IGuestOrderAccessTokenRepository

@@ -54,6 +54,15 @@ public static class AdminOrdersEndpoints
             return Results.Ok(result);
         });
 
+        adminOrders.MapGet("/{orderId:guid}/delivery-batch-candidates", async (
+            ISender sender,
+            Guid orderId,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(new GetDeliveryBatchCandidatesQuery(orderId), ct);
+            return Results.Ok(result);
+        });
+
         adminOrders.MapPost("/{orderId:guid}/fulfillment/ship", async (
             ISender sender,
             ICurrentAdminAccessor currentAdmin,
