@@ -104,7 +104,14 @@ public sealed record OrderPaidWriteResult(
     bool AlreadyPaid,
     bool MarkedPaid,
     string? Status,
-    Guid? CheckoutSessionId);
+    Guid? CheckoutSessionId,
+    long? OrderNumber = null,
+    string? CustomerEmail = null,
+    string? CustomerFullName = null,
+    decimal? Total = null,
+    Guid? CustomerUserId = null,
+    string? PreferredDeliveryMethod = null,
+    DateOnly? PreferredDeliveryDate = null);
 
 public interface ICheckoutReservationIdsReader
 {

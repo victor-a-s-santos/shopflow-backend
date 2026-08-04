@@ -125,6 +125,7 @@ public sealed class CreatePixPaymentIntegrationTests
                 TokenTtlDays = 30,
                 TokenHashSecret = "test-secret"
             }),
+            new Vls.Shopflow.Orders.Infrastructure.Services.NullOrderEmailNotifier(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
 
         var order = await createOrderHandler.Handle(

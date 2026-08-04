@@ -274,6 +274,7 @@ public sealed class MercadoPagoPixReconciliationProcessorTests
             reservationReader.Object,
             confirmer.Object,
             uow.Object,
+            Mock.Of<Vls.Shopflow.Orders.Application.Interfaces.IOrderEmailNotifier>(),
             NullLogger<MercadoPagoPixPaidTransitionService>.Instance);
 
         var result = await sut.ApplyPaidAsync(payment, mpOrder, CancellationToken.None);

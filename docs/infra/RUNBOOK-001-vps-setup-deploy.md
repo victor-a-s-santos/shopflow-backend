@@ -237,6 +237,8 @@ Para redefinir a senha via variável de ambiente (procedimento explícito e temp
 
 Mantenha `SHOPFLOW_ADMIN_RESET_PASSWORD=false` no dia a dia. Use `true` apenas durante rotação de senha.
 
+Script one-shot (TESTE): `deploy/scripts/rotate-admin-teste-and-disable-dangerous-flags.sh` — rotaciona senha, desliga raw capture e reset; grava a senha só em `/root/.shopflow_admin_teste_password_tmp` na VPS (não imprime). Copie para o cofre e apague o arquivo.
+
 ---
 
 ## Checklist pós-deploy

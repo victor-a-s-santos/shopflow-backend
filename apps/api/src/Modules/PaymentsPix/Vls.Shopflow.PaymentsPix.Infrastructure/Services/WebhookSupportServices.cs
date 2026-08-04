@@ -18,12 +18,7 @@ public sealed class OrderPaidWriter(OrdersDbContext ordersDb) : IOrderPaidWriter
         if (order is null)
             return new OrderPaidWriteResult(false, false, false, null, null);
 
-        return new OrderPaidWriteResult(
-            true,
-            order.Status == OrderStatus.Paid,
-            false,
-            order.Status.ToString(),
-            order.CheckoutSessionId);
+        return ToResult(order, alreadyPaid: order.Status == OrderStatus.Paid, markedPaid: false);
     }
 
     public async Task<OrderPaidWriteResult> MarkAsPaidAsync(
@@ -36,20 +31,34 @@ public sealed class OrderPaidWriter(OrdersDbContext ordersDb) : IOrderPaidWriter
             return new OrderPaidWriteResult(false, false, false, null, null);
 
         if (order.Status == OrderStatus.Paid)
-        {
-            return new OrderPaidWriteResult(true, true, false, order.Status.ToString(), order.CheckoutSessionId);
-        }
+            return ToResult(order, alreadyPaid: true, markedPaid: false);
 
         if (order.Status != OrderStatus.PendingPayment)
-        {
-            return new OrderPaidWriteResult(true, false, false, order.Status.ToString(), order.CheckoutSessionId);
-        }
+            return ToResult(order, alreadyPaid: false, markedPaid: false);
 
         order.MarkAsPaid(paidAt);
         await ordersDb.SaveChangesAsync(cancellationToken);
 
-        return new OrderPaidWriteResult(true, false, true, order.Status.ToString(), order.CheckoutSessionId);
+        return ToResult(order, alreadyPaid: false, markedPaid: true);
     }
+
+    private static OrderPaidWriteResult ToResult(
+        Vls.Shopflow.Orders.Domain.Entities.Order order,
+        bool alreadyPaid,
+        bool markedPaid)
+        => new(
+            true,
+            alreadyPaid,
+            markedPaid,
+            order.Status.ToString(),
+            order.CheckoutSessionId,
+            order.OrderNumber,
+            order.CustomerEmail,
+            order.CustomerFullName,
+            order.Total,
+            order.CustomerUserId,
+            order.PreferredDeliveryMethod?.ToString(),
+            order.PreferredDeliveryDate);
 }
 
 public sealed class CheckoutReservationIdsReader(CartCheckoutDbContext cartCheckoutDb)

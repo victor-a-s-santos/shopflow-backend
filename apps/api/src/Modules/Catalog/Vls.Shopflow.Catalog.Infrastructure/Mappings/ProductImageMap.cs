@@ -12,7 +12,10 @@ internal sealed class ProductImageMap : IEntityTypeConfiguration<ProductImage>
         map.HasKey(x => x.Id);
 
         map.Property(x => x.Url).HasMaxLength(500).IsRequired();
-        map.Property(x => x.StoragePath).HasMaxLength(500);
+        map.Property(x => x.ObjectKey).HasMaxLength(500);
+        map.Property(x => x.StorageProvider).HasMaxLength(50);
+        map.Property(x => x.ContentType).HasMaxLength(100);
+        map.Property(x => x.SizeBytes);
         map.Property(x => x.SortOrder);
         map.Property(x => x.IsPrimary);
         map.Property(x => x.CreatedAt);
@@ -27,5 +30,6 @@ internal sealed class ProductImageMap : IEntityTypeConfiguration<ProductImage>
 
         map.HasIndex(x => new { x.ProductId, x.SortOrder });
         map.HasIndex(x => new { x.ProductId, x.IsPrimary });
+        map.HasIndex(x => x.ObjectKey);
     }
 }

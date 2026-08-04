@@ -6,6 +6,7 @@
 
 ## Concluído recentemente
 
+- [x] **Brevo transactional emails** — outbox `notifications.email_outbox` + worker + templates PT-BR (confirm/reset/order/paid/ship/deliver); (`docs/integrations/brevo-transactional-emails.md`); pendência FE `?t=` no tracking + páginas confirm/reset
 - [x] **Product description + isActive contract** — create/update/detail persistem e retornam `description`/`isActive`; migration `description`; (`docs/catalog/admin-product-contract.md`); pendência FE enviar/hidratar no formulário
 - [x] **Admin Inventory SKUs listing** — `GET /api/admin/inventory/skus` paginado (q/status/stockStatus/category/sort + estoque); separado de Catalog Admin (`docs/inventory/admin-inventory-skus-listing.md`); pendência FE Inventory Admin
 - [x] **Admin products listing** — `GET /api/admin/catalog/products` paginado (status/featured/q/category/sort); separado da vitrine (`docs/catalog/admin-products-listing.md`); pendência FE Admin Products
@@ -29,6 +30,8 @@
 - [x] **Demo catalog seed (roupas)** — 10 produtos, 94 SKUs, 20 imagens, estoque inicial (`docs/catalog-demo-seed.md`)
 - [x] **Delivery/Fulfillment Fase 2 (backend)** — preferência checkout, `FulfillmentStatus`, admin ship/deliver/internal-note (`docs/orders/delivery-fulfillment-phase-2.md`)
 - [x] **DeliveryBatch Fase 3 (backend)** — remessa agrupada, candidates, ship/deliver em lote (`docs/orders/delivery-batch-phase-3.md`)
+- [x] **Cloudflare R2 product images** — `IObjectStorageService` + R2/Local, upload/delete, `StorageProvider`, envs (`docs/integrations/cloudflare-r2-product-images.md`)
+- [x] **R2 TEST product-images backfill** — CLI + script manual, dry-run/execute, anti-Production (`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`)
 
 ---
 
@@ -72,7 +75,7 @@
 | 5f | **Frontend Admin Products table** | Backend `/api/admin/catalog/products` pronto; substituir listagem limitada pela API admin |
 | 5g | **Frontend Admin Inventory SKUs** | Backend `/api/admin/inventory/skus` pronto; listar SKUs/estoque sem Admin Products + getProductById |
 | 6 | **Shipping** | Frete real; hoje `ShippingAmount` é null |
-| 7 | **Notifications** | E-mail real (confirm/reset/pedido) |
+| 7 | **Notifications / Brevo** | Backend outbox pronto; validar em HML com ApiKey real + FE deep-links |
 
 ---
 

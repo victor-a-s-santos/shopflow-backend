@@ -223,7 +223,7 @@ public sealed class DemoClothingCatalogSeedIntegrationTests
 
         var refreshed = await catalogDb.ProductImages
             .AsNoTracking()
-            .Where(i => i.StoragePath == "seed-products/camiseta-basica-branca.png")
+            .Where(i => i.ObjectKey == "seed-products/camiseta-basica-branca.png")
             .Select(i => i.Url)
             .FirstOrDefaultAsync();
 
@@ -246,7 +246,7 @@ public sealed class DemoClothingCatalogSeedIntegrationTests
             product,
             publicFileName: "camiseta-basica-branca.png",
             publicUrl: "https://api-teste.vipassessoriadigital.com.br/uploads/seed-products/camiseta-basica-branca.png",
-            storagePath: "seed-products/camiseta-basica-branca.png");
+            objectKey: "seed-products/camiseta-basica-branca.png");
 
         found.Should().NotBeNull();
         found!.Id.Should().Be(existing.Id);

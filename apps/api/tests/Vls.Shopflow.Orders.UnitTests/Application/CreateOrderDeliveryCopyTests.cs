@@ -70,6 +70,7 @@ public sealed class CreateOrderDeliveryCopyTests
             hasher.Object,
             Mock.Of<IOrdersUnitOfWork>(),
             Options.Create(new GuestOrderAccessOptions { Enabled = false }),
+            Mock.Of<IOrderEmailNotifier>(),
             NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
 
         await handler.Handle(new CreateOrderFromCheckoutSessionCommand(sessionId), CancellationToken.None);
@@ -133,6 +134,7 @@ public sealed class CreateOrderDeliveryCopyTests
             hasher.Object,
             Mock.Of<IOrdersUnitOfWork>(),
             Options.Create(new GuestOrderAccessOptions { Enabled = false }),
+            Mock.Of<IOrderEmailNotifier>(),
             NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
 
         await handler.Handle(new CreateOrderFromCheckoutSessionCommand(sessionId), CancellationToken.None);

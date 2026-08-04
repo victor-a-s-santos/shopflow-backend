@@ -105,7 +105,8 @@ public sealed class ShipDeliveryBatchCommandHandler(
     IDeliveryBatchRepository batchRepository,
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
-    IOrdersUnitOfWork unitOfWork)
+    IOrdersUnitOfWork unitOfWork,
+    IOrderEmailNotifier orderEmailNotifier)
     : IRequestHandler<ShipDeliveryBatchCommand, DeliveryBatchDetailDto>
 {
     public async Task<DeliveryBatchDetailDto> Handle(
@@ -158,6 +159,13 @@ public sealed class ShipDeliveryBatchCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
+        foreach (var order in orders)
+        {
+            await orderEmailNotifier.NotifyOrderShippedAsync(
+                OrderEmailNotifyMapper.FromOrder(order),
+                cancellationToken);
+        }
+
         var payments = await pixPaymentReader.GetLatestByOrderIdsAsync(orderIds, cancellationToken);
         var paymentStatuses = payments.ToDictionary(kv => kv.Key, kv => (string?)kv.Value.Status);
         return DeliveryBatchMapper.ToDetailDto(batch, orders, paymentStatuses);
@@ -168,7 +176,8 @@ public sealed class DeliverDeliveryBatchCommandHandler(
     IDeliveryBatchRepository batchRepository,
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
-    IOrdersUnitOfWork unitOfWork)
+    IOrdersUnitOfWork unitOfWork,
+    IOrderEmailNotifier orderEmailNotifier)
     : IRequestHandler<DeliverDeliveryBatchCommand, DeliveryBatchDetailDto>
 {
     public async Task<DeliveryBatchDetailDto> Handle(
@@ -204,6 +213,13 @@ public sealed class DeliverDeliveryBatchCommandHandler(
             order.MarkAsDelivered(command.AdminId, internalNote: null);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        foreach (var order in orders)
+        {
+            await orderEmailNotifier.NotifyOrderDeliveredAsync(
+                OrderEmailNotifyMapper.FromOrder(order),
+                cancellationToken);
+        }
 
         var payments = await pixPaymentReader.GetLatestByOrderIdsAsync(orderIds, cancellationToken);
         var paymentStatuses = payments.ToDictionary(kv => kv.Key, kv => (string?)kv.Value.Status);

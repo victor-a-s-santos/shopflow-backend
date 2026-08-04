@@ -6,6 +6,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Vls.Shopflow.BuildingBlocks.Domain.ValueObjects;
+using Vls.Shopflow.Catalog.Application.Interfaces;
+using Vls.Shopflow.Catalog.Application.Options;
+using Vls.Shopflow.Catalog.Application.Services;
 using Vls.Shopflow.Catalog.Domain.Entities;
 using Vls.Shopflow.Catalog.Domain.ValueObjects;
 
@@ -32,6 +35,7 @@ public static class DemoClothingCatalogSeed
         IHostEnvironment environment,
         IWebHostEnvironment webHostEnvironment,
         ILogger logger,
+        IObjectStorageService? objectStorage = null,
         CancellationToken cancellationToken = default)
     {
         var options = configuration.GetSection(DemoCatalogSeedOptions.SectionName).Get<DemoCatalogSeedOptions>()
@@ -59,10 +63,23 @@ public static class DemoClothingCatalogSeed
         var categoriesByName = categories.ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase);
 
         var uploadsRoot = ResolveUploadsRoot(configuration, webHostEnvironment);
-        var publicBaseUrl = configuration["Uploads:PublicBaseUrl"]?.TrimEnd('/') ?? string.Empty;
+        var publicBaseUrl = configuration["Storage:Local:PublicBaseUrl"]
+                            ?? configuration["Uploads:PublicBaseUrl"]?.TrimEnd('/')
+                            ?? string.Empty;
         var seedAssetsDir = ResolveSeedAssetsDirectory(webHostEnvironment);
         var seedProductsDir = Path.Combine(uploadsRoot, SeedProductsFolder);
-        Directory.CreateDirectory(seedProductsDir);
+
+        var useR2 = objectStorage is not null
+                    && string.Equals(
+                        objectStorage.ProviderName,
+                        StorageOptions.ProviderCloudflareR2,
+                        StringComparison.OrdinalIgnoreCase);
+        var keyPrefix = configuration["Storage:R2:KeyPrefix"]
+                        ?? configuration["R2Storage:ProductImagesPrefix"]
+                        ?? "products";
+
+        if (!useR2)
+            Directory.CreateDirectory(seedProductsDir);
 
         ValidateSeedAssets(options, environment, seedAssetsDir, logger);
 
@@ -112,23 +129,27 @@ public static class DemoClothingCatalogSeed
             foreach (var color in definition.Colors)
             {
                 var publicFileName = color.PublicFileName ?? SanitizePublicFileName(color.SourceFileName);
-                var publicUrl = BuildPublicUrl(publicBaseUrl, publicFileName);
-                var storagePath = $"{SeedProductsFolder}/{publicFileName}";
 
-                if (options.CopyImages && seedAssetsDir is not null)
+                string objectKey;
+                string publicUrl;
+                string? storageProvider;
+                string? contentType = null;
+                long? sizeBytes = null;
+
+                if (useR2 && objectStorage is not null)
                 {
-                    var copied = TryCopySeedImage(
-                        seedAssetsDir,
-                        seedProductsDir,
-                        color.SourceFileName,
-                        publicFileName,
-                        logger);
-
-                    if (copied)
-                        imagesCopied++;
+                    objectKey = ProductImageStorageKeys.BuildSeedKey(keyPrefix, definition.Slug, publicFileName);
+                    publicUrl = objectStorage.BuildPublicUrl(objectKey);
+                    storageProvider = StorageOptions.ProviderCloudflareR2;
+                }
+                else
+                {
+                    objectKey = $"{SeedProductsFolder}/{publicFileName}";
+                    publicUrl = BuildPublicUrl(publicBaseUrl, publicFileName);
+                    storageProvider = StorageOptions.ProviderLocal;
                 }
 
-                var existingImage = FindExistingSeedImage(product, publicFileName, publicUrl, storagePath);
+                var existingImage = FindExistingSeedImage(product, publicFileName, publicUrl, objectKey);
                 if (existingImage is not null)
                 {
                     // Refresh absolute URL when PublicBaseUrl changed — without mutating tracked entities.
@@ -145,15 +166,62 @@ public static class DemoClothingCatalogSeed
                     continue;
                 }
 
+                if (options.CopyImages && seedAssetsDir is not null)
+                {
+                    var sourcePath = Path.Combine(seedAssetsDir, color.SourceFileName);
+                    if (!File.Exists(sourcePath))
+                    {
+                        logger.LogWarning("Demo seed: missing source image {File}.", color.SourceFileName);
+                    }
+                    else if (useR2 && objectStorage is not null)
+                    {
+                        await using var fs = new FileStream(
+                            sourcePath,
+                            FileMode.Open,
+                            FileAccess.Read,
+                            FileShare.Read,
+                            65536,
+                            useAsync: true);
+                        var mime = GuessContentType(publicFileName);
+                        var uploaded = await objectStorage.UploadAsync(
+                            new ObjectStorageUploadRequest(
+                                objectKey,
+                                fs,
+                                mime,
+                                R2StorageOptions.ImageCacheControl),
+                            cancellationToken);
+                        publicUrl = uploaded.PublicUrl;
+                        contentType = uploaded.ContentType;
+                        sizeBytes = uploaded.SizeBytes;
+                        imagesCopied++;
+                    }
+                    else
+                    {
+                        var copied = TryCopySeedImage(
+                            seedAssetsDir,
+                            seedProductsDir,
+                            color.SourceFileName,
+                            publicFileName,
+                            logger);
+
+                        if (copied)
+                            imagesCopied++;
+                        contentType = GuessContentType(publicFileName);
+                    }
+                }
+
                 // Insert only via DbSet for existing products. Never call Product.AddImage when
                 // images already exist — AddImage flips IsPrimary on persisted rows and can crash
                 // startup with DbUpdateConcurrencyException.
                 var image = ProductImage.Create(
                     product.Id,
                     publicUrl,
-                    storagePath,
+                    objectKey,
                     sortOrder: imageSortOrder,
-                    isPrimary: !productAlreadyHasImages && imageSortOrder == 0);
+                    isPrimary: !productAlreadyHasImages && imageSortOrder == 0,
+                    storageProvider: storageProvider,
+                    contentType: contentType,
+                    sizeBytes: sizeBytes);
 
                 if (!productAlreadyHasImages)
                 {
@@ -276,23 +344,23 @@ public static class DemoClothingCatalogSeed
         Product product,
         string publicFileName,
         string publicUrl,
-        string storagePath)
+        string objectKey)
     {
         return product.Images.FirstOrDefault(i =>
             string.Equals(i.Url, publicUrl, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(i.StoragePath, storagePath, StringComparison.OrdinalIgnoreCase)
-            || StoragePathEndsWithFileName(i.StoragePath, publicFileName)
+            || string.Equals(i.ObjectKey, objectKey, StringComparison.OrdinalIgnoreCase)
+            || ObjectKeyEndsWithFileName(i.ObjectKey, publicFileName)
             || UrlContainsFileName(i.Url, publicFileName));
     }
 
-    internal static bool StoragePathEndsWithFileName(string? storagePath, string publicFileName)
+    internal static bool ObjectKeyEndsWithFileName(string? objectKey, string publicFileName)
     {
-        if (string.IsNullOrWhiteSpace(storagePath))
+        if (string.IsNullOrWhiteSpace(objectKey))
             return false;
 
-        return storagePath.EndsWith(publicFileName, StringComparison.OrdinalIgnoreCase)
-               || storagePath.EndsWith("/" + publicFileName, StringComparison.OrdinalIgnoreCase)
-               || storagePath.EndsWith("\\" + publicFileName, StringComparison.OrdinalIgnoreCase);
+        return objectKey.EndsWith(publicFileName, StringComparison.OrdinalIgnoreCase)
+               || objectKey.EndsWith("/" + publicFileName, StringComparison.OrdinalIgnoreCase)
+               || objectKey.EndsWith("\\" + publicFileName, StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool UrlContainsFileName(string? url, string publicFileName)
@@ -471,12 +539,22 @@ public static class DemoClothingCatalogSeed
 
     private static string ResolveUploadsRoot(IConfiguration configuration, IWebHostEnvironment env)
     {
-        var configured = configuration["Uploads:RootPath"];
+        var configured = configuration["Storage:Local:RootPath"]
+                         ?? configuration["Uploads:RootPath"];
         if (!string.IsNullOrWhiteSpace(configured))
             return configured;
 
         return Path.Combine(env.ContentRootPath, "wwwroot", "uploads");
     }
+
+    private static string GuessContentType(string fileName)
+        => Path.GetExtension(fileName).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            _ => "application/octet-stream"
+        };
 
     internal static string? ResolveSeedAssetsDirectory(IWebHostEnvironment env)
     {

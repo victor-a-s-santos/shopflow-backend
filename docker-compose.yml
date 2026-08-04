@@ -41,6 +41,19 @@ services:
       SHOPFLOW_ADMIN_NAME: ${SHOPFLOW_ADMIN_NAME:-Shopflow Admin}
       Uploads__RootPath: /app/wwwroot/uploads
       Uploads__PublicBaseUrl: http://localhost:5127
+      Storage__Provider: ${Storage__Provider:-Local}
+      Storage__MaxImageBytes: ${Storage__MaxImageBytes:-5242880}
+      Storage__Local__RootPath: ${Storage__Local__RootPath:-/app/wwwroot/uploads}
+      Storage__Local__PublicBaseUrl: ${Storage__Local__PublicBaseUrl:-http://localhost:5127}
+      Storage__R2__Endpoint: ${Storage__R2__Endpoint:-}
+      Storage__R2__AccountId: ${Storage__R2__AccountId:-}
+      Storage__R2__Bucket: ${Storage__R2__Bucket:-}
+      Storage__R2__AccessKeyId: ${Storage__R2__AccessKeyId:-}
+      Storage__R2__SecretAccessKey: ${Storage__R2__SecretAccessKey:-}
+      Storage__R2__Region: ${Storage__R2__Region:-auto}
+      Storage__R2__ForcePathStyle: ${Storage__R2__ForcePathStyle:-true}
+      Storage__R2__PublicBaseUrl: ${Storage__R2__PublicBaseUrl:-}
+      Storage__R2__KeyPrefix: ${Storage__R2__KeyPrefix:-products}
       DemoCatalogSeed__Enabled: "true"
       DemoCatalogSeed__CopyImages: "true"
       DemoCatalogSeed__CreateInventory: "true"

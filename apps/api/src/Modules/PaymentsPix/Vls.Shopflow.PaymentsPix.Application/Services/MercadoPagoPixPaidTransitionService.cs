@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
 using Vls.Shopflow.PaymentsPix.Application.Repositories;
 using Vls.Shopflow.PaymentsPix.Domain.Entities;
@@ -11,6 +12,7 @@ public sealed class MercadoPagoPixPaidTransitionService(
     ICheckoutReservationIdsReader reservationIdsReader,
     IInventoryReservationConfirmer reservationConfirmer,
     IPaymentsPixUnitOfWork unitOfWork,
+    IOrderEmailNotifier orderEmailNotifier,
     ILogger<MercadoPagoPixPaidTransitionService> logger)
     : IMercadoPagoPixPaidTransitionService
 {
@@ -124,6 +126,23 @@ public sealed class MercadoPagoPixPaidTransitionService(
             mpOrder.TransactionId);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        if (orderWrite.MarkedPaid
+            && orderWrite.OrderNumber is { } orderNumber
+            && !string.IsNullOrWhiteSpace(orderWrite.CustomerEmail))
+        {
+            await orderEmailNotifier.NotifyPaymentConfirmedAsync(
+                new OrderEmailNotifyRequest(
+                    pixPayment.OrderId,
+                    orderNumber,
+                    orderWrite.CustomerEmail!,
+                    orderWrite.CustomerFullName ?? orderWrite.CustomerEmail!,
+                    orderWrite.Total ?? 0m,
+                    orderWrite.CustomerUserId,
+                    PreferredDeliveryMethod: orderWrite.PreferredDeliveryMethod,
+                    PreferredDeliveryDate: orderWrite.PreferredDeliveryDate),
+                cancellationToken);
+        }
 
         return new MercadoPagoPixPaidTransitionResult(
             true,

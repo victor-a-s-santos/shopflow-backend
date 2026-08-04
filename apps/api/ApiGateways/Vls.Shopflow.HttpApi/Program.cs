@@ -14,6 +14,8 @@ using Scalar.AspNetCore;
 
 using Vls.Shopflow.Catalog.Application.Behaviors;
 
+using Vls.Shopflow.Catalog.Application.Interfaces;
+
 using Vls.Shopflow.Catalog.Infrastructure;
 
 using Vls.Shopflow.Catalog.Infrastructure.Seed;
@@ -35,6 +37,8 @@ using Vls.Shopflow.Orders.Infrastructure;
 using Vls.Shopflow.PaymentsPix.Infrastructure;
 
 using Vls.Shopflow.Shipping.Infrastructure;
+
+using Vls.Shopflow.Notifications.Infrastructure;
 
 using Vls.Shopflow.HttpApi.Endpoints;
 
@@ -93,6 +97,9 @@ builder.Services.AddPaymentsPixModuleFromConfig(builder.Configuration, enableSen
 builder.Services.AddShippingModuleFromConfig(builder.Configuration);
 
 builder.Services.AddIdentityAccessModuleFromConfig(builder.Configuration, builder.Environment, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
+
+// After Identity/Orders so outbox email adapters override logging/null stubs.
+builder.Services.AddNotificationsModuleFromConfig(builder.Configuration, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
 
 builder.Services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.ICustomerAccountPort, Vls.Shopflow.HttpApi.Services.CustomerAccountPort>();
 
@@ -207,7 +214,8 @@ using (var scope = app.Services.CreateScope())
         builder.Configuration,
         app.Environment,
         app.Environment,
-        demoSeedLogger);
+        demoSeedLogger,
+        scope.ServiceProvider.GetRequiredService<IObjectStorageService>());
 
     if (demoOptions.Enabled && demoOptions.CreateInventory)
     {
@@ -246,6 +254,12 @@ using (var scope = app.Services.CreateScope())
     var identityDb = scope.ServiceProvider.GetRequiredService<IdentityAccessDbContext>();
 
     await identityDb.Database.MigrateAsync();
+
+
+
+    var notificationsDb = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+
+    await notificationsDb.Database.MigrateAsync();
 
 
 

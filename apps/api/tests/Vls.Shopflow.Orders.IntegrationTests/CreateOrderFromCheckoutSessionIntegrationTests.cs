@@ -118,6 +118,7 @@ public sealed class CreateOrderFromCheckoutSessionIntegrationTests
                 hasher,
                 unitOfWork,
                 options,
+                new Vls.Shopflow.Orders.Infrastructure.Services.NullOrderEmailNotifier(),
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance),
             new GetOrderByIdQueryHandler(orderRepository),
             new GetGuestOrderStatusQueryHandler(

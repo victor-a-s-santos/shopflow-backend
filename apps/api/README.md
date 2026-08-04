@@ -12,8 +12,9 @@ Gateway HTTP: `ApiGateways/Vls.Shopflow.HttpApi` (ASP.NET Core / .NET 10).
 `ApiGateways/Vls.Shopflow.HttpApi/appsettings.Development.json`:
 
 - `ConnectionStrings:Catalog` — Npgsql
-- `Uploads:RootPath` — vazio = `wwwroot/uploads` relativo ao content root
-- `Uploads:PublicBaseUrl` — base para URLs absolutas de imagem (ex.: `http://localhost:5127`)
+- `Storage:Provider` — `Local` (dev) ou `CloudflareR2` (teste/prod)
+- `Storage:R2:*` / `Storage:Local:*` — ver `docs/infra/RUNBOOK-005-cloudflare-r2-product-images.md`
+- `Uploads:*` — fallback legado para Local
 
 ## Rodar localmente
 

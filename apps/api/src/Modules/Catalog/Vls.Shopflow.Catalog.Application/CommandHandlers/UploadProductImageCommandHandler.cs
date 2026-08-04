@@ -78,6 +78,7 @@ public sealed class UploadProductImageCommandHandler(
 
         var stored = await imageStorage.SaveAsync(
             product.Id,
+            product.Slug.Value,
             request.Content,
             fileName,
             request.ContentType,
@@ -85,10 +86,14 @@ public sealed class UploadProductImageCommandHandler(
 
         var image = ProductImage.Create(
             product.Id,
-            stored.Url,
-            stored.StoragePath,
+            stored.PublicUrl,
+            stored.ObjectKey,
             sortOrder,
-            isPrimary: false);
+            isPrimary: false,
+            storageProvider: stored.StorageProvider,
+            id: stored.ImageId,
+            contentType: stored.ContentType,
+            sizeBytes: stored.SizeBytes);
 
         product.AddImage(image);
 

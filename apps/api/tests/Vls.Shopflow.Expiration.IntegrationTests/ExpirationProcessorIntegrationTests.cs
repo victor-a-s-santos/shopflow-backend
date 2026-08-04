@@ -184,6 +184,7 @@ public sealed class ExpirationProcessorIntegrationTests
                 TokenTtlDays = 30,
                 TokenHashSecret = "test-secret"
             }),
+            new Vls.Shopflow.Orders.Infrastructure.Services.NullOrderEmailNotifier(),
             NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
 
         var order = await createOrderHandler.Handle(

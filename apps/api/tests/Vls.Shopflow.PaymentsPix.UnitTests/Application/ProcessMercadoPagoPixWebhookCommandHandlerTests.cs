@@ -816,6 +816,7 @@ public sealed class ProcessMercadoPagoPixWebhookCommandHandlerTests
             reservationIdsReader ?? Mock.Of<ICheckoutReservationIdsReader>(),
             reservationConfirmer ?? Mock.Of<IInventoryReservationConfirmer>(),
             uow,
+            Mock.Of<Vls.Shopflow.Orders.Application.Interfaces.IOrderEmailNotifier>(),
             NullLogger<MercadoPagoPixPaidTransitionService>.Instance);
 
         return new ProcessMercadoPagoPixWebhookCommandHandler(

@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderPixPaymentStatusReader, NullOrderPixPaymentStatusReader>();
         services.AddScoped<IAdminOrderPixPaymentReader, NullAdminOrderPixPaymentReader>();
         services.AddScoped<ICustomerOrderPixPaymentReader, NullCustomerOrderPixPaymentReader>();
+        services.AddScoped<IOrderEmailNotifier, NullOrderEmailNotifier>();
         services.AddSingleton<IGuestOrderAccessTokenHasher, GuestOrderAccessTokenHasher>();
     }
 }

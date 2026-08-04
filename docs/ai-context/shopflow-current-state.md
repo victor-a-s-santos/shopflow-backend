@@ -51,7 +51,8 @@ Shopflow é um e-commerce modular em monorepo: backend .NET (monólito modular) 
 | `worker` | — | Expiração de checkout/pedidos/Pix pendentes |
 | `web` | 8080 | Vite dev — proxy `/api` → API |
 
-Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
+Upload de imagens: **Cloudflare R2** (S3-compatible) quando `Storage__Provider=CloudflareR2`; fallback local `wwwroot/uploads`. Ver `docs/integrations/cloudflare-r2-product-images.md`. Backfill local→R2 só TEST manual (`R2ImageBackfill__Enabled`).
+
 
 ---
 
@@ -71,7 +72,8 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 | **CartCheckout (backend)** | `POST/GET /api/checkout/sessions`, cancelamento, reserva de estoque na criação, compensação em falha parcial, **worker de expiração** | Confirmar sessão (pagamento real), shipping |
 | **CartCheckout (frontend)** | UI 4 etapas, `POST /api/checkout/sessions`, reserva real, cria pedido + Pix Pending | Shipping |
 | **Orders (backend)** | create + guest status; `orderNumber`; Admin/Customer orders; **guest claim** create-account/claim com codes oficiais + Identity password errors; Paid via Pix | Frontend pós-Pix (conta opcional), “Meus pedidos”, claim UI |
-| **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API**; webhook via **mercadopago-sdk** + oráculo manual; `SendNotificationUrlInOrderCreate` (painel vs payload); reconciliação Worker `GET /v1/orders` (fallback); Paid só `processed`/`accredited` | Frontend QR, e-mail |
+| **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API**; webhook via **mercadopago-sdk** + oráculo manual; `SendNotificationUrlInOrderCreate` (painel vs payload); reconciliação Worker `GET /v1/orders` (fallback); Paid só `processed`/`accredited` | Frontend QR |
+| **Notifications / Brevo** | Outbox `notifications.email_outbox` + `EmailOutboxWorker` + templates HTML PT-BR; auth + order/paid/ship/deliver | Config HML ApiKey; FE deep-links |
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |
 | **Cart (frontend)** | CRUD local por `skuId`, drawer, persistência | Sincronização com backend (não previsto ainda) |
@@ -99,9 +101,9 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 - Delivery/Fulfillment frontend (checkout + admin remessa)
 - Shipping / frete calculado
 - Frontend integração customer auth (backend pronto) — parcialmente wired
-- Storage externo de imagens (R2/S3)
+- Storage externo de imagens (R2) — **feito** (`docs/integrations/cloudflare-r2-product-images.md`); backfill TEST manual documentado (`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`)
 - CI/CD pipeline
-- Guest order deep-link / e-mail com token
+- FE guest tracking hidratar `?t=` do e-mail; páginas confirm/reset email
 - Testes HttpApi end-to-end
 - Chat nativo (após WhatsApp CTA)
 
@@ -249,7 +251,7 @@ Registradas em `apps/web/src/App.tsx`:
 | Funcionalidade | Real | Simulado / stub / visual |
 |----------------|------|--------------------------|
 | Listagem e CRUD de produtos | ✓ API | |
-| Upload de imagem | ✓ local disk | |
+| Upload de imagem | ✓ R2 (prod) / local (dev) | |
 | Estoque e reservas (API) | ✓ API | |
 | Sessão de checkout (API) | ✓ API | |
 | Finalizar compra na UI | ✓ sessão + pedido + Pix Pending | |

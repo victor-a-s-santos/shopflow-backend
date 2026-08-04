@@ -36,4 +36,8 @@ A primeira imagem do produto vira principal automaticamente. Uploads seguintes e
 
 O frontend deve: carregar detalhe → upload novos arquivos um a um → DELETE dos removidos → POST primary.
 
-Paths internos de disco **nunca** são expostos na API (só URL pública).
+Paths internos de disco / object keys (`StoragePath`) **nunca** são expostos na API (só URL pública).
+
+Storage: Local (dev) ou Cloudflare R2 — ver [`docs/integrations/cloudflare-r2-product-images.md`](../integrations/cloudflare-r2-product-images.md) e [`docs/catalog/product-images.md`](./product-images.md).
+
+Delete remove metadata no banco e tenta apagar o objeto no storage (falha no storage é logada, não reverte o DB).

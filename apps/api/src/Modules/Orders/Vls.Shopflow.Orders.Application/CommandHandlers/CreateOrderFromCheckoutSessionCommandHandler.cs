@@ -21,6 +21,7 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
     IGuestOrderAccessTokenHasher tokenHasher,
     IOrdersUnitOfWork unitOfWork,
     IOptions<GuestOrderAccessOptions> guestOrderAccessOptions,
+    IOrderEmailNotifier orderEmailNotifier,
     ILogger<CreateOrderFromCheckoutSessionCommandHandler> logger)
     : IRequestHandler<CreateOrderFromCheckoutSessionCommand, OrderDto>
 {
@@ -100,6 +101,19 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await orderEmailNotifier.NotifyOrderCreatedAsync(
+            new OrderEmailNotifyRequest(
+                order.Id,
+                order.OrderNumber,
+                order.CustomerEmail,
+                order.CustomerFullName,
+                order.Total,
+                order.CustomerUserId,
+                rawToken,
+                PreferredDeliveryMethod: order.PreferredDeliveryMethod?.ToString(),
+                PreferredDeliveryDate: order.PreferredDeliveryDate),
+            cancellationToken);
 
         logger.LogInformation(
             "Created order {OrderId} (#{OrderNumber}) from checkout session {CheckoutSessionId} with status PendingPayment. " +

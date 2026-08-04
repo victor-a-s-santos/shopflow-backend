@@ -96,6 +96,10 @@ Em **Environment variables** (escopo **Production**):
 | `VITE_API_BASE_URL` | `https://api-teste.vipassessoriadigital.com.br/api` |
 | `VITE_APP_ENV` | `test` |
 | `NODE_VERSION` | `20` |
+| `VITE_SUPPORT_WHATSAPP_ENABLED` | `true` |
+| `VITE_SUPPORT_WHATSAPP_PHONE` | número real só dígitos (ex. `5511…`) — **nunca** `55DDDNUMERO` / `5511999999999` |
+
+`VITE_*` entra no **build**. Qualquer mudança de telefone exige **Retry deployment** / novo build.
 
 Salve e dispare o primeiro deploy (push em `develop` ou **Retry deployment**).
 
@@ -141,6 +145,8 @@ Variáveis (**Production**):
 | `VITE_API_BASE_URL` | `https://api-hml.vipassessoriadigital.com.br/api` |
 | `VITE_APP_ENV` | `hml` |
 | `NODE_VERSION` | `20` |
+| `VITE_SUPPORT_WHATSAPP_ENABLED` | `true` |
+| `VITE_SUPPORT_WHATSAPP_PHONE` | número real só dígitos — não usar placeholder |
 
 Domínio customizado: `hml.vipassessoriadigital.com.br`.
 

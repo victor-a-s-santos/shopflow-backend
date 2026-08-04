@@ -13,7 +13,8 @@ public sealed class ShipOrderFulfillmentCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
     IDeliveryBatchRepository batchRepository,
-    IOrdersUnitOfWork unitOfWork)
+    IOrdersUnitOfWork unitOfWork,
+    IOrderEmailNotifier orderEmailNotifier)
     : IRequestHandler<ShipOrderFulfillmentCommand, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -38,6 +39,10 @@ public sealed class ShipOrderFulfillmentCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
+        await orderEmailNotifier.NotifyOrderShippedAsync(
+            OrderEmailNotifyMapper.FromOrder(order),
+            cancellationToken);
+
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
         var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);
         return AdminOrderMapper.ToDetailDto(
@@ -52,7 +57,8 @@ public sealed class DeliverOrderFulfillmentCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
     IDeliveryBatchRepository batchRepository,
-    IOrdersUnitOfWork unitOfWork)
+    IOrdersUnitOfWork unitOfWork,
+    IOrderEmailNotifier orderEmailNotifier)
     : IRequestHandler<DeliverOrderFulfillmentCommand, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -65,6 +71,10 @@ public sealed class DeliverOrderFulfillmentCommandHandler(
         order.MarkAsDelivered(command.AdminId, command.InternalNote);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await orderEmailNotifier.NotifyOrderDeliveredAsync(
+            OrderEmailNotifyMapper.FromOrder(order),
+            cancellationToken);
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
         var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);

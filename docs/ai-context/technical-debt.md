@@ -20,7 +20,7 @@
 | **N+1 no Admin Inventory** | ~~Backend sem listagem SKU~~ → `GET /api/admin/inventory/skus` pronto; FE ainda pode indexar via catalog/getProductById | Wiring FE Inventory Admin (`docs/inventory/admin-inventory-skus-listing.md`) |
 | **Batch Product Edit** | ~~ausente~~ → `POST /api/admin/inventory/skus/availability` | Wiring frontend Product Edit |
 | **Lint frontend (erros pré-existentes)** | `npm run lint` — `textarea.tsx`, `api.ts`, `tailwind.config.ts` | CI futuro falhará |
-| **Upload local de imagens** | `Uploads__RootPath` filesystem | Não escala; sem CDN/R2 |
+| **Upload local de imagens** | ~~só filesystem~~ → R2 via `Storage__*` (`docs/integrations/cloudflare-r2-product-images.md`); local permanece fallback | Blobs antigos: backfill **TEST** manual (`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`); prod TBD |
 | **Frontend customer auth desconectado** | Backend `/api/auth/customer/*` pronto; UI visual-only | Login/conta não funcionam na loja |
 | **Shipping / frete** | `ShippingAmount = null`; CEP lookup OK; frete calculado pendente | Cotação de frete |
 | **Delivery FE** | Batch/fulfillment backend pronto; UI admin/checkout não | Frontend remessa + preferências |
@@ -39,9 +39,10 @@
 | **Admin Products usa listagem pública** | Backend `/api/admin/catalog/products` pronto; FE ainda limitado (~48) | `docs/catalog/admin-products-listing.md` |
 | **Admin product form description/isActive wire** | Backend create/update/detail prontos; FE ainda pode strippar `description` no create e não hidratar no edit | `docs/catalog/admin-product-contract.md` |
 | **Subcategorias na listagem** | Filtro é match exato de categoria | Árvore/filhos não incluídos |
-| **Guest claim sem e-mail / magic link** | Claim exige token no browser; sem e-mail transacional pós-Pix | Recuperação de pedido se o cliente perder o token (`docs/orders/post-pix-guest-flow.md`) |
+| **Guest claim sem e-mail / magic link** | E-mail de pedido criado pode incluir `?t=`; tracking público ainda precisa hidratar query; sem magic link pós-perda | `docs/integrations/brevo-transactional-emails.md` |
+| **FE confirm/reset pages** | Backend envia links `/confirm-email` e `/reset-password` | Wiring UI customer auth |
 | **Salvar produto admin multi-endpoint** | Create shell → variants → images separados; sem transação global | Persistência parcial se o FE falhar no meio; ver `docs/catalog/admin-product-contract.md` |
-| **Arquivos de imagem órfãos no disco** | DELETE imagem remove só o registro DB | Lixo em `uploads/` |
+| **Arquivos de imagem órfãos** | Delete agora tenta remover objeto (R2/local); falha só logada | Lixo residual se storage falhar |
 | **Sem testes HttpApi** | Nenhum teste E2E na API | Contratos não validados automaticamente |
 | **AuthContext `signInVisualOnly` não wired** | Login não chama helper | Preview de UI logada indisponível |
 | **Integração tests skip sem Postgres** | `SHOPFLOW_TEST_DB` opcional | CI local inconsistente |
