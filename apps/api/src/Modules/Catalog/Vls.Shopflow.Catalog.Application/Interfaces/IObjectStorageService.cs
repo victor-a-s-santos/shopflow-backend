@@ -26,5 +26,8 @@ public interface IObjectStorageService
     /// <summary>Deletes the object. Missing keys should not throw.</summary>
     Task DeleteAsync(ObjectStorageDeleteRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Head/exists check for a single object key. Does not list the bucket.</summary>
+    Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken);
+
     string BuildPublicUrl(string objectKey);
 }

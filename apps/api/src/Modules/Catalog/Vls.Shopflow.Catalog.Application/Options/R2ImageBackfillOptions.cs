@@ -10,6 +10,10 @@ public sealed class R2ImageBackfillOptions
 
     public const string ConfirmPhrase = "TESTE_R2_IMAGE_BACKFILL";
 
+    public const string AllowedTestBucket = "shopflow-products-test";
+
+    public const string AllowedTestPublicHost = "assets-teste.vipassessoriadigital.com.br";
+
     /// <summary>Must be true for --execute. Dry-run does not require it.</summary>
     public bool Enabled { get; set; }
 }

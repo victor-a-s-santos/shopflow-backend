@@ -62,6 +62,21 @@ public sealed class LocalFileObjectStorageService(
         return Task.CompletedTask;
     }
 
+    public Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(objectKey))
+            return Task.FromResult(false);
+
+        try
+        {
+            return Task.FromResult(File.Exists(ResolvePhysicalPath(objectKey)));
+        }
+        catch
+        {
+            return Task.FromResult(false);
+        }
+    }
+
     public string BuildPublicUrl(string objectKey)
     {
         var local = storageOptions.Value.Local;

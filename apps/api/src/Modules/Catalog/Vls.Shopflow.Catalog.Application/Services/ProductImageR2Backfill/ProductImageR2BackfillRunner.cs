@@ -50,14 +50,14 @@ public sealed class ProductImageR2BackfillRunner(
 
         foreach (var row in rows)
         {
-            if (ProductImageBackfillSelector.IsAlreadyOnR2(row.StorageProvider))
+            if (await ShouldSkipAsCompleteR2Async(row, options, cancellationToken))
             {
                 alreadyOnR2++;
                 skipped.Add(new ProductImageBackfillSkipped(
                     row.ImageId,
                     row.ProductId,
                     ProductImageBackfillSkipReason.AlreadyOnR2,
-                    "StorageProvider=CloudflareR2"));
+                    "StorageProvider=CloudflareR2, key/url valid, object exists"));
                 continue;
             }
 
@@ -95,7 +95,8 @@ public sealed class ProductImageR2BackfillRunner(
                 continue;
             }
 
-            var absolute = Path.GetFullPath(Path.Combine(options.SourceRoot, relative.Replace('/', Path.DirectorySeparatorChar)));
+            var absolute = Path.GetFullPath(
+                Path.Combine(options.SourceRoot, relative.Replace('/', Path.DirectorySeparatorChar)));
             if (!absolute.StartsWith(Path.GetFullPath(options.SourceRoot), StringComparison.OrdinalIgnoreCase))
             {
                 skipped.Add(new ProductImageBackfillSkipped(
@@ -151,6 +152,7 @@ public sealed class ProductImageR2BackfillRunner(
         var results = new List<ProductImageBackfillItemResult>();
         var uploaded = 0;
         var errors = 0;
+        var metadataOnly = 0;
 
         if (options.Execute)
         {
@@ -158,21 +160,37 @@ public sealed class ProductImageR2BackfillRunner(
             {
                 try
                 {
-                    await using var fs = new FileStream(
-                        item.AbsoluteLocalPath,
-                        FileMode.Open,
-                        FileAccess.Read,
-                        FileShare.Read,
-                        65536,
-                        useAsync: true);
-
-                    var upload = await objectStorage.UploadAsync(
-                        new ObjectStorageUploadRequest(
+                    var didUpload = false;
+                    ObjectStorageUploadResult upload;
+                    if (await objectStorage.ExistsAsync(item.PlannedObjectKey, cancellationToken))
+                    {
+                        upload = new ObjectStorageUploadResult(
                             item.PlannedObjectKey,
-                            fs,
+                            item.PlannedPublicUrl,
                             item.ContentType,
-                            R2StorageOptions.ImageCacheControl),
-                        cancellationToken);
+                            item.SizeBytes);
+                        metadataOnly++;
+                    }
+                    else
+                    {
+                        await using var fs = new FileStream(
+                            item.AbsoluteLocalPath,
+                            FileMode.Open,
+                            FileAccess.Read,
+                            FileShare.Read,
+                            65536,
+                            useAsync: true);
+
+                        upload = await objectStorage.UploadAsync(
+                            new ObjectStorageUploadRequest(
+                                item.PlannedObjectKey,
+                                fs,
+                                item.ContentType,
+                                R2StorageOptions.ImageCacheControl),
+                            cancellationToken);
+                        didUpload = true;
+                        uploaded++;
+                    }
 
                     await store.PersistMigrationAsync(
                         item.ImageId,
@@ -183,13 +201,12 @@ public sealed class ProductImageR2BackfillRunner(
                         upload.SizeBytes,
                         cancellationToken);
 
-                    uploaded++;
                     results.Add(new ProductImageBackfillItemResult(
                         item.ImageId,
                         item.ProductId,
                         upload.ObjectKey,
                         upload.PublicUrl,
-                        Uploaded: true,
+                        Uploaded: didUpload,
                         DbUpdated: true,
                         Error: null));
                 }
@@ -209,6 +226,7 @@ public sealed class ProductImageR2BackfillRunner(
         }
 
         var finished = DateTimeOffset.UtcNow;
+        var unchanged = alreadyOnR2 + metadataOnly;
         return new ProductImageBackfillReport(
             started,
             finished,
@@ -223,9 +241,26 @@ public sealed class ProductImageR2BackfillRunner(
             skipped.Count,
             uploaded,
             errors,
+            unchanged,
             planned,
             skipped,
             results);
+    }
+
+    private async Task<bool> ShouldSkipAsCompleteR2Async(
+        ProductImageBackfillRow row,
+        ProductImageBackfillOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (!ProductImageBackfillSelector.IsAlreadyOnR2(row.StorageProvider))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(row.ObjectKey)
+            || DemoSeedR2MigrationRules.IsLegacySeedObjectKey(row.ObjectKey)
+            || !DemoSeedR2MigrationRules.UrlMatchesR2PublicBase(row.Url, options.R2PublicBaseUrl))
+            return false;
+
+        return await objectStorage.ExistsAsync(row.ObjectKey, cancellationToken);
     }
 }
 
@@ -253,7 +288,8 @@ public static class ProductImageBackfillReportWriter
         sb.AppendLine($"| Already on R2 | {report.AlreadyOnR2} |");
         sb.AppendLine($"| Skipped | {report.Skipped} |");
         sb.AppendLine($"| Uploaded | {report.Uploaded} |");
-        sb.AppendLine($"| Errors | {report.Errors} |");
+        sb.AppendLine($"| Unchanged | {report.Unchanged} |");
+        sb.AppendLine($"| Errors / failed | {report.Errors} |");
         sb.AppendLine();
 
         if (report.Planned.Count > 0)
@@ -305,7 +341,7 @@ public static class ProductImageBackfillReportWriter
         sb.AppendLine();
         sb.AppendLine("- Secrets (AccessKey/Secret) are never written to this report.");
         sb.AppendLine("- Local files are **not** deleted by this tool.");
-        sb.AppendLine("- Production backfill is forbidden.");
+        sb.AppendLine("- Only Testing + shopflow-products-test is allowed.");
         sb.AppendLine();
         sb.AppendLine("## Next steps");
         sb.AppendLine();

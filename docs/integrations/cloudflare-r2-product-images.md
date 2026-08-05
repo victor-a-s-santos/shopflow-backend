@@ -44,4 +44,4 @@ Migração local → R2 **somente TESTE**, sob demanda (CLI / script). Sem worke
 - Flag: `R2ImageBackfill__Enabled` (default `false`; nunca em Production)
 - Relatório / how-to: [`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`](../qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md)
 
-Guards: aborta Production, connection string “prod-looking”, provider ≠ CloudflareR2, source root ausente; execute exige flag + frase `TESTE_R2_IMAGE_BACKFILL`. DB só após upload OK; arquivos locais **não** são apagados.
+Guards: aborta fora de Testing, bucket ≠ `shopflow-products-test`, PublicBaseUrl host ≠ `assets-teste…`, Production, connection “prod-looking”, provider ≠ CloudflareR2; execute exige flag + frase `TESTE_R2_IMAGE_BACKFILL`. DB só após upload OK (ou objeto já existente); arquivos locais **não** são apagados. Seed R2 não reescreve Url sem upload — ver [`docs/infra/DEPLOY-006-r2-seed-backfill-test.md`](../infra/DEPLOY-006-r2-seed-backfill-test.md).

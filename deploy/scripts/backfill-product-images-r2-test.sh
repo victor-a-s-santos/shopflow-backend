@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manual TEST-only backfill: local product images → Cloudflare R2.
-# NEVER run against Production.
+# NEVER run against Production / HML.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +14,9 @@ CONFIRM=""
 SOURCE_ROOT=""
 ENVIRONMENT="Testing"
 
+ALLOWED_BUCKET="shopflow-products-test"
+ALLOWED_PUBLIC_HOST="assets-teste.vipassessoriadigital.com.br"
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -24,12 +27,13 @@ Options:
   --dry-run                 Plan only (default)
   --execute                 Upload + update DB (requires confirm + R2ImageBackfill__Enabled=true)
   --confirm PHRASE          Must be TESTE_R2_IMAGE_BACKFILL for execute
-  --source-root PATH        Local uploads root (default: Storage/Local or /app/wwwroot/uploads)
-  --environment NAME        Must not be Production (default: Testing)
+  --source-root PATH        Local uploads root (default: /app/wwwroot/uploads)
+  --environment NAME        Must be Testing (default: Testing)
   -h|--help
 
-Requires deploy/.env.test with Storage__Provider=CloudflareR2 and Catalog connection string.
-Does NOT delete local files. Does NOT target production.
+Requires deploy/.env.test with Storage__Provider=CloudflareR2,
+bucket shopflow-products-test, PublicBaseUrl assets-teste.
+Does NOT delete local files. Does NOT target HML/production.
 EOF
 }
 
@@ -45,8 +49,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${ENVIRONMENT}" == "Production" || "${ENVIRONMENT}" == "Prod" || "${ENVIRONMENT}" == "production" ]]; then
-  echo "ABORT: Production is forbidden."
+if [[ "${ENVIRONMENT}" != "Testing" ]]; then
+  echo "ABORT: environment must be Testing (got ${ENVIRONMENT})"
   exit 1
 fi
 
@@ -58,7 +62,6 @@ fi
 
 # shellcheck disable=SC1090
 set -a
-# shared postgres secrets if present
 [[ -f "$DEPLOY_DIR/.env" ]] && source "$DEPLOY_DIR/.env"
 source "$ENV_FILE"
 set +a
@@ -68,15 +71,29 @@ if [[ "${ASPNETCORE_ENVIRONMENT:-}" == "Production" || "${DOTNET_ENVIRONMENT:-}"
   exit 1
 fi
 
-export ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-$ENVIRONMENT}"
-export DOTNET_ENVIRONMENT="${DOTNET_ENVIRONMENT:-$ASPNETCORE_ENVIRONMENT}"
+export ASPNETCORE_ENVIRONMENT=Testing
+export DOTNET_ENVIRONMENT=Testing
+
+BUCKET="${Storage__R2__Bucket:-}"
+PUBLIC_BASE="${Storage__R2__PublicBaseUrl:-}"
+if [[ "$BUCKET" != "$ALLOWED_BUCKET" ]]; then
+  echo "ABORT: Storage__R2__Bucket must be ${ALLOWED_BUCKET} (got '${BUCKET}')"
+  exit 1
+fi
+case "$PUBLIC_BASE" in
+  *"://${ALLOWED_PUBLIC_HOST}"|*"://${ALLOWED_PUBLIC_HOST}/"*) ;;
+  *)
+    echo "ABORT: Storage__R2__PublicBaseUrl host must be ${ALLOWED_PUBLIC_HOST}"
+    exit 1
+    ;;
+esac
 
 SOURCE_ROOT="${SOURCE_ROOT:-${Storage__Local__RootPath:-${Uploads__RootPath:-/app/wwwroot/uploads}}}"
 REPORT_DIR="$REPO_ROOT/artifacts/r2-backfill"
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/report-$(date -u +%Y%m%d-%H%M%S).md"
 
-ARGS=(product-images backfill-r2 --environment "$ASPNETCORE_ENVIRONMENT" --source-root "$SOURCE_ROOT" --report "$REPORT_FILE")
+ARGS=(product-images backfill-r2 --environment Testing --source-root "$SOURCE_ROOT" --report "$REPORT_FILE")
 
 if [[ "$MODE" == "execute" ]]; then
   if [[ "$CONFIRM" != "TESTE_R2_IMAGE_BACKFILL" ]]; then
@@ -93,7 +110,7 @@ else
 fi
 
 echo "==> Running TEST product-images R2 backfill ($MODE)"
-echo "    env=$ASPNETCORE_ENVIRONMENT source-root=$SOURCE_ROOT"
+echo "    env=Testing source-root=$SOURCE_ROOT bucket=$ALLOWED_BUCKET"
 echo "    report=$REPORT_FILE"
 
 cd "$API_DIR"

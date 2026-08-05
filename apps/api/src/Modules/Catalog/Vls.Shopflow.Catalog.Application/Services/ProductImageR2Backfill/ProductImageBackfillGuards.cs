@@ -1,5 +1,4 @@
 using Vls.Shopflow.Catalog.Application.Options;
-using Vls.Shopflow.Catalog.Application.Services;
 
 namespace Vls.Shopflow.Catalog.Application.Services.ProductImageR2Backfill;
 
@@ -10,6 +9,10 @@ public static class ProductImageBackfillGuards
         if (IsProduction(options.EnvironmentName))
             throw new InvalidOperationException(
                 "Product image R2 backfill is forbidden in Production.");
+
+        if (!IsAllowedTestEnvironment(options.EnvironmentName))
+            throw new InvalidOperationException(
+                "Product image R2 backfill is allowed only in Testing.");
 
         if (LooksLikeProductionConnectionString(options.ConnectionString))
             throw new InvalidOperationException(
@@ -23,11 +26,13 @@ public static class ProductImageBackfillGuards
             throw new InvalidOperationException(
                 "Storage:Provider must be CloudflareR2 for backfill (configure TEST env).");
 
-        if (string.IsNullOrWhiteSpace(options.R2Bucket))
-            throw new InvalidOperationException("Storage:R2:Bucket is required.");
+        if (!string.Equals(options.R2Bucket, R2ImageBackfillOptions.AllowedTestBucket, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Storage:R2:Bucket must be '{R2ImageBackfillOptions.AllowedTestBucket}' for TEST backfill.");
 
-        if (string.IsNullOrWhiteSpace(options.R2PublicBaseUrl))
-            throw new InvalidOperationException("Storage:R2:PublicBaseUrl is required.");
+        if (!PublicBaseUrlMatchesTestHost(options.R2PublicBaseUrl))
+            throw new InvalidOperationException(
+                $"Storage:R2:PublicBaseUrl host must be '{R2ImageBackfillOptions.AllowedTestPublicHost}'.");
 
         if (!options.Execute)
             return;
@@ -50,13 +55,29 @@ public static class ProductImageBackfillGuards
                || string.Equals(environmentName, "Prod", StringComparison.OrdinalIgnoreCase);
     }
 
+    public static bool IsAllowedTestEnvironment(string? environmentName)
+        => string.Equals(environmentName, "Testing", StringComparison.OrdinalIgnoreCase);
+
+    public static bool PublicBaseUrlMatchesTestHost(string? publicBaseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(publicBaseUrl))
+            return false;
+
+        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var uri))
+            return false;
+
+        return string.Equals(
+            uri.Host,
+            R2ImageBackfillOptions.AllowedTestPublicHost,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool LooksLikeProductionConnectionString(string? connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
             return false;
 
         var cs = connectionString.ToLowerInvariant();
-        // Explicit prod markers — avoid matching "shopflow" alone.
         string[] markers =
         [
             "database=shopflow_prod",
@@ -85,18 +106,41 @@ public static class ProductImageBackfillSelector
 
     public static bool IsEligibleProvider(string? storageProvider)
         => string.IsNullOrWhiteSpace(storageProvider)
-           || string.Equals(storageProvider, StorageOptions.ProviderLocal, StringComparison.OrdinalIgnoreCase);
+           || string.Equals(storageProvider, StorageOptions.ProviderLocal, StringComparison.OrdinalIgnoreCase)
+           || IsAlreadyOnR2(storageProvider);
 
     public static string? TryResolveLocalRelativePath(string? objectKey, string? url)
     {
         if (!string.IsNullOrWhiteSpace(objectKey))
-            return objectKey.Replace('\\', '/').TrimStart('/');
+        {
+            var key = objectKey.Replace('\\', '/').TrimStart('/');
+
+            // R2 seed key → local seed-products file
+            if (key.StartsWith("products/seed/", StringComparison.OrdinalIgnoreCase)
+                || key.Contains("/seed/", StringComparison.OrdinalIgnoreCase))
+            {
+                return "seed-products/" + Path.GetFileName(key);
+            }
+
+            return key;
+        }
 
         url ??= string.Empty;
         var marker = "/uploads/";
         var idx = url.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
         if (idx >= 0)
             return url[(idx + marker.Length)..].TrimStart('/');
+
+        // Broken R2-shaped URL without ObjectKey: .../products/seed/{slug}/{file}
+        var seedMarker = "/products/seed/";
+        var seedIdx = url.IndexOf(seedMarker, StringComparison.OrdinalIgnoreCase);
+        if (seedIdx >= 0)
+        {
+            var after = url[(seedIdx + seedMarker.Length)..].TrimStart('/');
+            var file = Path.GetFileName(after.Split('?', 2)[0]);
+            if (!string.IsNullOrWhiteSpace(file))
+                return "seed-products/" + file;
+        }
 
         return null;
     }
@@ -121,7 +165,6 @@ public static class ProductImageBackfillSelector
         if (ext == ".bin")
             ext = ".jpg";
 
-        // Preserve seed layout when migrating seed-products/*
         if (localRelativePath.StartsWith("seed-products/", StringComparison.OrdinalIgnoreCase)
             || localRelativePath.Contains("/seed/", StringComparison.OrdinalIgnoreCase))
         {

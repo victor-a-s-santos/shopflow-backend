@@ -2,6 +2,7 @@ using FluentAssertions;
 using Moq;
 using Vls.Shopflow.Catalog.Application.Interfaces;
 using Vls.Shopflow.Catalog.Application.Options;
+using Vls.Shopflow.Catalog.Application.Services;
 using Vls.Shopflow.Catalog.Application.Services.ProductImageR2Backfill;
 using Vls.Shopflow.Catalog.Domain.Entities;
 
@@ -22,11 +23,19 @@ public sealed class ProductImageR2BackfillTests
             ConfirmPhrase: confirm,
             BackfillFlagEnabled: enabled,
             StorageProvider: StorageOptions.ProviderCloudflareR2,
-            R2Bucket: "shopflow-products-test",
-            R2PublicBaseUrl: "https://assets-teste.vipassessoriadigital.com.br",
+            R2Bucket: R2ImageBackfillOptions.AllowedTestBucket,
+            R2PublicBaseUrl: $"https://{R2ImageBackfillOptions.AllowedTestPublicHost}",
             KeyPrefix: "products",
             ConnectionString: connectionString,
             ReportPath: null);
+
+    private static Mock<IObjectStorageService> StorageMock(bool exists = false)
+    {
+        var storage = new Mock<IObjectStorageService>();
+        storage.Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(exists);
+        return storage;
+    }
 
     [Fact]
     public async Task Aborts_InProduction()
@@ -38,6 +47,46 @@ public sealed class ProductImageR2BackfillTests
         var act = () => runner.RunAsync(BaseOptions(environment: "Production"));
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Production*");
+    }
+
+    [Fact]
+    public async Task Aborts_OutsideTesting()
+    {
+        var runner = new ProductImageR2BackfillRunner(
+            Mock.Of<IProductImageBackfillStore>(),
+            Mock.Of<IObjectStorageService>());
+
+        var act = () => runner.RunAsync(BaseOptions(environment: "Development"));
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Testing*");
+    }
+
+    [Fact]
+    public async Task Aborts_WrongBucket()
+    {
+        var root = CreateTempSourceRoot();
+        try
+        {
+            var runner = new ProductImageR2BackfillRunner(
+                Mock.Of<IProductImageBackfillStore>(s =>
+                    s.LoadAllAsync(It.IsAny<CancellationToken>())
+                     == Task.FromResult<IReadOnlyList<ProductImageBackfillRow>>(
+                         Array.Empty<ProductImageBackfillRow>())),
+                Mock.Of<IObjectStorageService>());
+
+            var act = () => runner.RunAsync(BaseOptions() with
+            {
+                SourceRoot = root,
+                R2Bucket = "wrong-bucket"
+            });
+
+            await act.Should().ThrowAsync<InvalidOperationException>()
+                .WithMessage("*shopflow-products-test*");
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
     }
 
     [Fact]
@@ -123,7 +172,7 @@ public sealed class ProductImageR2BackfillTests
                     4)
             ]);
 
-        var storage = new Mock<IObjectStorageService>();
+        var storage = StorageMock();
         var runner = new ProductImageR2BackfillRunner(store.Object, storage.Object);
 
         var report = await runner.RunAsync(BaseOptions() with { SourceRoot = root, Execute = false });
@@ -144,12 +193,18 @@ public sealed class ProductImageR2BackfillTests
                 It.IsAny<long>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
+        Directory.Delete(root, true);
     }
 
     [Fact]
-    public async Task Ignores_AlreadyOnR2()
+    public async Task NullProvider_IsEligibleForMigration()
     {
         var root = CreateTempSourceRoot();
+        var relative = "seed-products/camiseta-basica-branca.png";
+        var absolute = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(absolute)!);
+        await File.WriteAllBytesAsync(absolute, [1, 2, 3]);
+
         var store = new Mock<IProductImageBackfillStore>();
         store.Setup(s => s.LoadAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(
@@ -157,19 +212,100 @@ public sealed class ProductImageR2BackfillTests
                 new ProductImageBackfillRow(
                     Guid.NewGuid(),
                     Guid.NewGuid(),
-                    "p",
-                    "https://assets-teste.example/products/x.png",
-                    "products/x.png",
+                    "camiseta-basica-algodao",
+                    "https://assets-teste.vipassessoriadigital.com.br/products/seed/x/camiseta-basica-branca.png",
+                    relative,
+                    null,
+                    null,
+                    null)
+            ]);
+
+        var report = await new ProductImageR2BackfillRunner(store.Object, StorageMock().Object)
+            .RunAsync(BaseOptions() with { SourceRoot = root });
+
+        report.Eligible.Should().Be(1);
+        Directory.Delete(root, true);
+    }
+
+    [Fact]
+    public async Task Ignores_AlreadyOnR2_WhenObjectExists()
+    {
+        var root = CreateTempSourceRoot();
+        var key = "products/seed/camiseta/camiseta-basica-branca.png";
+        var store = new Mock<IProductImageBackfillStore>();
+        store.Setup(s => s.LoadAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new ProductImageBackfillRow(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    "camiseta",
+                    "https://assets-teste.vipassessoriadigital.com.br/" + key,
+                    key,
                     StorageOptions.ProviderCloudflareR2,
                     "image/png",
                     10)
             ]);
 
-        var runner = new ProductImageR2BackfillRunner(store.Object, Mock.Of<IObjectStorageService>());
-        var report = await runner.RunAsync(BaseOptions() with { SourceRoot = root });
+        var storage = StorageMock(exists: true);
+        var report = await new ProductImageR2BackfillRunner(store.Object, storage.Object)
+            .RunAsync(BaseOptions() with { SourceRoot = root });
 
         report.AlreadyOnR2.Should().Be(1);
         report.Eligible.Should().Be(0);
+        report.Unchanged.Should().Be(1);
+        Directory.Delete(root, true);
+    }
+
+    [Fact]
+    public async Task CloudflareR2_MissingObject_IsReuploaded()
+    {
+        var root = CreateTempSourceRoot();
+        var relative = "seed-products/camiseta-basica-branca.png";
+        var absolute = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(absolute)!);
+        await File.WriteAllBytesAsync(absolute, [9, 9, 9]);
+
+        var imageId = Guid.NewGuid();
+        var key = "products/seed/camiseta-basica-algodao/camiseta-basica-branca.png";
+        var store = new Mock<IProductImageBackfillStore>();
+        store.Setup(s => s.LoadAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new ProductImageBackfillRow(
+                    imageId,
+                    Guid.NewGuid(),
+                    "camiseta-basica-algodao",
+                    "https://assets-teste.vipassessoriadigital.com.br/" + key,
+                    key,
+                    StorageOptions.ProviderCloudflareR2,
+                    "image/png",
+                    3)
+            ]);
+        store.Setup(s => s.PersistMigrationAsync(
+                imageId,
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                StorageOptions.ProviderCloudflareR2,
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var storage = StorageMock(exists: false);
+        storage.Setup(s => s.UploadAsync(It.IsAny<ObjectStorageUploadRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ObjectStorageUploadRequest req, CancellationToken _) =>
+                new ObjectStorageUploadResult(req.ObjectKey, "https://assets-teste.vipassessoriadigital.com.br/" + req.ObjectKey, req.ContentType, 3));
+
+        var report = await new ProductImageR2BackfillRunner(store.Object, storage.Object)
+            .RunAsync(BaseOptions(execute: true, enabled: true) with
+            {
+                SourceRoot = root,
+                ConfirmPhrase = R2ImageBackfillOptions.ConfirmPhrase
+            });
+
+        report.Uploaded.Should().Be(1);
+        store.VerifyAll();
         Directory.Delete(root, true);
     }
 
@@ -192,8 +328,8 @@ public sealed class ProductImageR2BackfillTests
                     null)
             ]);
 
-        var runner = new ProductImageR2BackfillRunner(store.Object, Mock.Of<IObjectStorageService>());
-        var report = await runner.RunAsync(BaseOptions() with { SourceRoot = root });
+        var report = await new ProductImageR2BackfillRunner(store.Object, StorageMock().Object)
+            .RunAsync(BaseOptions() with { SourceRoot = root });
 
         report.Eligible.Should().Be(0);
         report.SkippedItems.Should().Contain(s => s.Reason == ProductImageBackfillSkipReason.MissingLocalFile);
@@ -251,7 +387,7 @@ public sealed class ProductImageR2BackfillTests
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var storage = new Mock<IObjectStorageService>();
+        var storage = StorageMock(exists: false);
         storage.Setup(s => s.UploadAsync(It.IsAny<ObjectStorageUploadRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ObjectStorageUploadRequest req, CancellationToken _) =>
                 new ObjectStorageUploadResult(
@@ -260,12 +396,12 @@ public sealed class ProductImageR2BackfillTests
                     req.ContentType,
                     4));
 
-        var runner = new ProductImageR2BackfillRunner(store.Object, storage.Object);
-        var report = await runner.RunAsync(BaseOptions(execute: true, enabled: true) with
-        {
-            SourceRoot = root,
-            ConfirmPhrase = R2ImageBackfillOptions.ConfirmPhrase
-        });
+        var report = await new ProductImageR2BackfillRunner(store.Object, storage.Object)
+            .RunAsync(BaseOptions(execute: true, enabled: true) with
+            {
+                SourceRoot = root,
+                ConfirmPhrase = R2ImageBackfillOptions.ConfirmPhrase
+            });
 
         report.Uploaded.Should().Be(1);
         report.Errors.Should().Be(0);
@@ -299,16 +435,16 @@ public sealed class ProductImageR2BackfillTests
                     3)
             ]);
 
-        var storage = new Mock<IObjectStorageService>();
+        var storage = StorageMock(exists: false);
         storage.Setup(s => s.UploadAsync(It.IsAny<ObjectStorageUploadRequest>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("R2 down"));
 
-        var runner = new ProductImageR2BackfillRunner(store.Object, storage.Object);
-        var report = await runner.RunAsync(BaseOptions(execute: true, enabled: true) with
-        {
-            SourceRoot = root,
-            ConfirmPhrase = R2ImageBackfillOptions.ConfirmPhrase
-        });
+        var report = await new ProductImageR2BackfillRunner(store.Object, storage.Object)
+            .RunAsync(BaseOptions(execute: true, enabled: true) with
+            {
+                SourceRoot = root,
+                ConfirmPhrase = R2ImageBackfillOptions.ConfirmPhrase
+            });
 
         report.Errors.Should().Be(1);
         report.Uploaded.Should().Be(0);
@@ -337,6 +473,7 @@ public sealed class ProductImageR2BackfillTests
             "shopflow-products-test",
             "https://assets-teste.vipassessoriadigital.com.br",
             1,
+            0,
             0,
             0,
             0,
@@ -394,5 +531,84 @@ public sealed class ProductImageR2BackfillTests
         var root = Path.Combine(Path.GetTempPath(), "shopflow-backfill-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         return root;
+    }
+}
+
+public sealed class DemoSeedR2MigrationRulesTests
+{
+    private const string Base = "https://assets-teste.vipassessoriadigital.com.br";
+    private const string TargetKey = "products/seed/camiseta-basica-algodao/camiseta-basica-branca.png";
+
+    [Fact]
+    public void NullProvider_NeedsUpload()
+    {
+        DemoSeedR2MigrationRules.NeedsR2Upload(
+                null,
+                "seed-products/camiseta-basica-branca.png",
+                Base + "/" + TargetKey,
+                TargetKey,
+                Base)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void LocalProvider_NeedsUpload()
+    {
+        DemoSeedR2MigrationRules.NeedsR2Upload(
+                "Local",
+                "seed-products/x.png",
+                "http://localhost/uploads/seed-products/x.png",
+                TargetKey,
+                Base)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void LegacySeedKey_NeedsUpload()
+    {
+        DemoSeedR2MigrationRules.NeedsR2Upload(
+                StorageOptions.ProviderCloudflareR2,
+                "seed-products/camiseta-basica-branca.png",
+                Base + "/" + TargetKey,
+                TargetKey,
+                Base)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidR2Row_DoesNotNeedUpload_ByMetadata()
+    {
+        DemoSeedR2MigrationRules.NeedsR2Upload(
+                StorageOptions.ProviderCloudflareR2,
+                TargetKey,
+                Base + "/" + TargetKey,
+                TargetKey,
+                Base)
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void UrlNotMatchingPublicBase_NeedsUpload()
+    {
+        DemoSeedR2MigrationRules.NeedsR2Upload(
+                StorageOptions.ProviderCloudflareR2,
+                TargetKey,
+                "https://api-teste.example/uploads/seed-products/x.png",
+                TargetKey,
+                Base)
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void Seed_DoesNotRewriteUrlWithoutUpload_RuleIsNeedsUploadFirst()
+    {
+        // Documented contract: rewrite only after upload — NeedsR2Upload true means seed must upload first.
+        var needs = DemoSeedR2MigrationRules.NeedsR2Upload(
+            null,
+            "seed-products/x.png",
+            "https://assets-teste.vipassessoriadigital.com.br/products/seed/p/x.png",
+            "products/seed/p/x.png",
+            Base);
+        needs.Should().BeTrue("seed must not treat URL-only rewrite as complete");
     }
 }

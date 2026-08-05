@@ -65,6 +65,7 @@ public sealed record ProductImageBackfillReport(
     int Skipped,
     int Uploaded,
     int Errors,
+    int Unchanged,
     IReadOnlyList<ProductImageBackfillCandidate> Planned,
     IReadOnlyList<ProductImageBackfillSkipped> SkippedItems,
     IReadOnlyList<ProductImageBackfillItemResult> Results);

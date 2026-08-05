@@ -126,39 +126,228 @@ public static class DemoClothingCatalogSeed
             var imageSortOrder = product.Images.Count;
             var productAlreadyHasImages = product.Images.Count > 0;
 
+            var r2PublicBaseUrl = configuration["Storage:R2:PublicBaseUrl"]
+                                  ?? configuration["R2Storage:PublicBaseUrl"]
+                                  ?? string.Empty;
+
             foreach (var color in definition.Colors)
             {
                 var publicFileName = color.PublicFileName ?? SanitizePublicFileName(color.SourceFileName);
 
-                string objectKey;
-                string publicUrl;
-                string? storageProvider;
-                string? contentType = null;
-                long? sizeBytes = null;
-
                 if (useR2 && objectStorage is not null)
                 {
-                    objectKey = ProductImageStorageKeys.BuildSeedKey(keyPrefix, definition.Slug, publicFileName);
-                    publicUrl = objectStorage.BuildPublicUrl(objectKey);
-                    storageProvider = StorageOptions.ProviderCloudflareR2;
-                }
-                else
-                {
-                    objectKey = $"{SeedProductsFolder}/{publicFileName}";
-                    publicUrl = BuildPublicUrl(publicBaseUrl, publicFileName);
-                    storageProvider = StorageOptions.ProviderLocal;
+                    var targetKey = ProductImageStorageKeys.BuildSeedKey(
+                        keyPrefix,
+                        definition.Slug,
+                        publicFileName);
+                    var targetUrl = objectStorage.BuildPublicUrl(targetKey);
+                    var existingImage = FindExistingSeedImage(product, publicFileName, targetUrl, targetKey);
+
+                    if (existingImage is not null)
+                    {
+                        var needsUpload = DemoSeedR2MigrationRules.NeedsR2Upload(
+                            existingImage,
+                            targetKey,
+                            r2PublicBaseUrl);
+
+                        if (!needsUpload)
+                        {
+                            var objectExists = await objectStorage.ExistsAsync(
+                                existingImage.ObjectKey ?? targetKey,
+                                cancellationToken);
+                            if (objectExists)
+                            {
+                                imagesSkipped++;
+                                continue;
+                            }
+
+                            needsUpload = true;
+                            logger.LogWarning(
+                                "Demo seed: CloudflareR2 row {ImageId} missing object {Key}; will re-upload.",
+                                existingImage.Id,
+                                existingImage.ObjectKey ?? targetKey);
+                        }
+
+                        if (!options.CopyImages || seedAssetsDir is null)
+                        {
+                            logger.LogWarning(
+                                "Demo seed: cannot migrate image {File} — CopyImages disabled or assets missing.",
+                                publicFileName);
+                            continue;
+                        }
+
+                        var sourcePath = Path.Combine(seedAssetsDir, color.SourceFileName);
+                        if (!File.Exists(sourcePath))
+                        {
+                            logger.LogWarning("Demo seed: missing source image {File}.", color.SourceFileName);
+                            continue;
+                        }
+
+                        try
+                        {
+                            var mime = GuessContentType(publicFileName);
+                            var objectAlreadyThere = await objectStorage.ExistsAsync(targetKey, cancellationToken);
+                            ObjectStorageUploadResult uploaded;
+                            if (objectAlreadyThere)
+                            {
+                                uploaded = new ObjectStorageUploadResult(
+                                    targetKey,
+                                    targetUrl,
+                                    mime,
+                                    new FileInfo(sourcePath).Length);
+                                logger.LogInformation(
+                                    "Demo seed: object {Key} already in R2; updating DB metadata only.",
+                                    targetKey);
+                            }
+                            else
+                            {
+                                await using var fs = new FileStream(
+                                    sourcePath,
+                                    FileMode.Open,
+                                    FileAccess.Read,
+                                    FileShare.Read,
+                                    65536,
+                                    useAsync: true);
+                                uploaded = await objectStorage.UploadAsync(
+                                    new ObjectStorageUploadRequest(
+                                        targetKey,
+                                        fs,
+                                        mime,
+                                        R2StorageOptions.ImageCacheControl),
+                                    cancellationToken);
+                            }
+
+                            // Persist only after successful upload / confirmed object.
+                            existingImage.MarkMigratedToObjectStorage(
+                                uploaded.PublicUrl,
+                                uploaded.ObjectKey,
+                                StorageOptions.ProviderCloudflareR2,
+                                uploaded.ContentType,
+                                uploaded.SizeBytes);
+                            await db.SaveChangesAsync(cancellationToken);
+                            imagesCopied++;
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(
+                                ex,
+                                "Demo seed: R2 upload failed for {File}; leaving DB row unchanged.",
+                                publicFileName);
+                            db.ChangeTracker.Clear();
+                            product = await db.Products
+                                .Include(p => p.Skus)
+                                .Include(p => p.Images)
+                                .FirstAsync(p => p.Id == product.Id, cancellationToken);
+                        }
+
+                        continue;
+                    }
+
+                    // New image row — upload first, then insert.
+                    string? contentType = null;
+                    long? sizeBytes = null;
+                    var publicUrl = targetUrl;
+                    var blobReady = false;
+
+                    if (options.CopyImages && seedAssetsDir is not null)
+                    {
+                        var sourcePath = Path.Combine(seedAssetsDir, color.SourceFileName);
+                        if (!File.Exists(sourcePath))
+                        {
+                            logger.LogWarning("Demo seed: missing source image {File}.", color.SourceFileName);
+                        }
+                        else
+                        {
+                            try
+                            {
+                                var mime = GuessContentType(publicFileName);
+                                if (await objectStorage.ExistsAsync(targetKey, cancellationToken))
+                                {
+                                    publicUrl = targetUrl;
+                                    contentType = mime;
+                                    sizeBytes = new FileInfo(sourcePath).Length;
+                                    blobReady = true;
+                                }
+                                else
+                                {
+                                    await using var fs = new FileStream(
+                                        sourcePath,
+                                        FileMode.Open,
+                                        FileAccess.Read,
+                                        FileShare.Read,
+                                        65536,
+                                        useAsync: true);
+                                    var uploaded = await objectStorage.UploadAsync(
+                                        new ObjectStorageUploadRequest(
+                                            targetKey,
+                                            fs,
+                                            mime,
+                                            R2StorageOptions.ImageCacheControl),
+                                        cancellationToken);
+                                    publicUrl = uploaded.PublicUrl;
+                                    contentType = uploaded.ContentType;
+                                    sizeBytes = uploaded.SizeBytes;
+                                    blobReady = true;
+                                }
+
+                                imagesCopied++;
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogError(
+                                    ex,
+                                    "Demo seed: R2 upload failed for new image {File}; skipping insert.",
+                                    publicFileName);
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (!blobReady)
+                    {
+                        // No blob uploaded — do not insert a dangling R2 URL row.
+                        logger.LogWarning(
+                            "Demo seed: skipping insert for {File} without successful R2 upload.",
+                            publicFileName);
+                        continue;
+                    }
+
+                    var image = ProductImage.Create(
+                        product.Id,
+                        publicUrl,
+                        targetKey,
+                        sortOrder: imageSortOrder,
+                        isPrimary: !productAlreadyHasImages && imageSortOrder == 0,
+                        storageProvider: StorageOptions.ProviderCloudflareR2,
+                        contentType: contentType,
+                        sizeBytes: sizeBytes);
+
+                    if (!productAlreadyHasImages)
+                    {
+                        product.AddImage(image);
+                        imageSortOrder = product.Images.Count;
+                    }
+                    else
+                    {
+                        db.ProductImages.Add(image);
+                        imageSortOrder++;
+                    }
+
+                    continue;
                 }
 
-                var existingImage = FindExistingSeedImage(product, publicFileName, publicUrl, objectKey);
-                if (existingImage is not null)
+                // Local provider path
+                var objectKey = $"{SeedProductsFolder}/{publicFileName}";
+                var localPublicUrl = BuildPublicUrl(publicBaseUrl, publicFileName);
+                var existingLocal = FindExistingSeedImage(product, publicFileName, localPublicUrl, objectKey);
+                if (existingLocal is not null)
                 {
-                    // Refresh absolute URL when PublicBaseUrl changed — without mutating tracked entities.
-                    if (!string.Equals(existingImage.Url, publicUrl, StringComparison.Ordinal))
+                    if (!string.Equals(existingLocal.Url, localPublicUrl, StringComparison.Ordinal))
                     {
                         await db.ProductImages
-                            .Where(i => i.Id == existingImage.Id)
+                            .Where(i => i.Id == existingLocal.Id)
                             .ExecuteUpdateAsync(
-                                setters => setters.SetProperty(i => i.Url, publicUrl),
+                                setters => setters.SetProperty(i => i.Url, localPublicUrl),
                                 cancellationToken);
                     }
 
@@ -166,72 +355,39 @@ public static class DemoClothingCatalogSeed
                     continue;
                 }
 
+                string? localContentType = null;
                 if (options.CopyImages && seedAssetsDir is not null)
                 {
-                    var sourcePath = Path.Combine(seedAssetsDir, color.SourceFileName);
-                    if (!File.Exists(sourcePath))
-                    {
-                        logger.LogWarning("Demo seed: missing source image {File}.", color.SourceFileName);
-                    }
-                    else if (useR2 && objectStorage is not null)
-                    {
-                        await using var fs = new FileStream(
-                            sourcePath,
-                            FileMode.Open,
-                            FileAccess.Read,
-                            FileShare.Read,
-                            65536,
-                            useAsync: true);
-                        var mime = GuessContentType(publicFileName);
-                        var uploaded = await objectStorage.UploadAsync(
-                            new ObjectStorageUploadRequest(
-                                objectKey,
-                                fs,
-                                mime,
-                                R2StorageOptions.ImageCacheControl),
-                            cancellationToken);
-                        publicUrl = uploaded.PublicUrl;
-                        contentType = uploaded.ContentType;
-                        sizeBytes = uploaded.SizeBytes;
-                        imagesCopied++;
-                    }
-                    else
-                    {
-                        var copied = TryCopySeedImage(
-                            seedAssetsDir,
-                            seedProductsDir,
-                            color.SourceFileName,
-                            publicFileName,
-                            logger);
+                    var copied = TryCopySeedImage(
+                        seedAssetsDir,
+                        seedProductsDir,
+                        color.SourceFileName,
+                        publicFileName,
+                        logger);
 
-                        if (copied)
-                            imagesCopied++;
-                        contentType = GuessContentType(publicFileName);
-                    }
+                    if (copied)
+                        imagesCopied++;
+                    localContentType = GuessContentType(publicFileName);
                 }
 
-                // Insert only via DbSet for existing products. Never call Product.AddImage when
-                // images already exist — AddImage flips IsPrimary on persisted rows and can crash
-                // startup with DbUpdateConcurrencyException.
-                var image = ProductImage.Create(
+                var localImage = ProductImage.Create(
                     product.Id,
-                    publicUrl,
+                    localPublicUrl,
                     objectKey,
                     sortOrder: imageSortOrder,
                     isPrimary: !productAlreadyHasImages && imageSortOrder == 0,
-                    storageProvider: storageProvider,
-                    contentType: contentType,
-                    sizeBytes: sizeBytes);
+                    storageProvider: StorageOptions.ProviderLocal,
+                    contentType: localContentType,
+                    sizeBytes: null);
 
                 if (!productAlreadyHasImages)
                 {
-                    // New product / empty collection: AddImage is safe (no persisted rows to mutate).
-                    product.AddImage(image);
+                    product.AddImage(localImage);
                     imageSortOrder = product.Images.Count;
                 }
                 else
                 {
-                    db.ProductImages.Add(image);
+                    db.ProductImages.Add(localImage);
                     imageSortOrder++;
                 }
             }

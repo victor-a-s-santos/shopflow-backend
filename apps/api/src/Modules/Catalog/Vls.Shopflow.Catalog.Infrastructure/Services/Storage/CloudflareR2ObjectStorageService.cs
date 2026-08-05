@@ -122,6 +122,25 @@ public sealed class CloudflareR2ObjectStorageService : IObjectStorageService, ID
         }
     }
 
+    public async Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(objectKey))
+            return false;
+
+        try
+        {
+            await _s3.GetObjectMetadataAsync(_options.R2.Bucket, objectKey, cancellationToken);
+            return true;
+        }
+        catch (AmazonS3Exception ex) when (
+            ex.StatusCode == System.Net.HttpStatusCode.NotFound
+            || string.Equals(ex.ErrorCode, "NotFound", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(ex.ErrorCode, "NoSuchKey", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+    }
+
     public string BuildPublicUrl(string objectKey)
         => ProductImageStorageKeys.BuildPublicUrl(_options.R2.PublicBaseUrl, objectKey, prependUploadsSegment: false);
 
