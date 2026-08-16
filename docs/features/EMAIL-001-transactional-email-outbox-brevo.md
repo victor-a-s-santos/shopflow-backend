@@ -25,6 +25,8 @@ Brevo HTTP POST /v3/smtp/email
 
 Identity (confirm/reset) **não** usa `orders.email_intents`. Continua pós-commit/best-effort: `OutboxIdentityEmailSender` → outbox.
 
+Aprovação de cadastro também é pós-commit/best-effort: `OutboxCustomerAccessNotifier` → outbox. Ver `docs/customer/customer-approval-emails.md`.
+
 ## Problema que esta feature corrige
 
 O enqueue de e-mail de pedido era pós-commit, em `NotificationsDbContext` separado. Se o commit do pedido/pagamento/fulfillment passasse e o enqueue falhasse (ou `AlreadyPaid` pulasse a notificação), o e-mail podia ser perdido sem registro durável no bounded context de Orders.

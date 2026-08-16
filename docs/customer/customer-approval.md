@@ -1,6 +1,6 @@
 # Aprovação de clientes
 
-Fase 1 backend. Frontend (fila, guards, login unificado) = Fase 2. E-mails Brevo = Fase 3.
+Fase 1 backend + Fase 3 e-mails transacionais. Frontend (fila, guards, login unificado) = Fase 2.
 
 Enum persistido: `CustomerAccessStatus` (`PendingApproval`, `Approved`, `Rejected`, `Suspended`). JSON público usa `approvalStatus=Pending` como alias de `PendingApproval`.
 
@@ -19,7 +19,7 @@ Loja `Closed` (ou `RequireApproval=true` / checkout que exige aprovado): cria `P
 
 Loja `Open` com `RequireApproval=false`: cria `Approved` (compatibilidade). Confirmação de e-mail continua técnica e independente.
 
-Hook de aplicação `CustomerRegisteredPendingApproval` (hoje só log). Sem outbox Brevo nesta fase.
+Cadastro Pending dispara `ICustomerAccessNotifier` → outbox Brevo (admin + cliente). Ver `docs/customer/customer-approval-emails.md`.
 
 ## Login / me
 
@@ -30,3 +30,5 @@ Pending/Rejected/Suspended **podem autenticar**. Catálogo/checkout são bloquea
 ## Admin
 
 Backoffice + CSRF nas mutações. Ver `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`.
+
+Aprovar / recusar / suspender / reativar enfileiram e-mail ao cliente (sem `AccessDecisionReason` no corpo).

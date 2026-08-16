@@ -28,6 +28,7 @@ public sealed class EmailNotificationServiceTests
         var sut = new EmailNotificationService(
             outbox.Object,
             Options.Create(new PublicAppOptions { BaseUrl = "https://loja.test" }),
+            Options.Create(new AdminNotificationsOptions { ApprovalRequestsEmail = "ops@test.local" }),
             NullLogger<EmailNotificationService>.Instance);
 
         var orderId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -51,6 +52,7 @@ public sealed class EmailNotificationServiceTests
         var sut = new EmailNotificationService(
             outbox.Object,
             Options.Create(new PublicAppOptions()),
+            Options.Create(new AdminNotificationsOptions()),
             NullLogger<EmailNotificationService>.Instance);
 
         await sut.EnqueuePaymentConfirmedAsync(
@@ -255,6 +257,7 @@ public sealed class EmailNotificationServiceTests
         var sut = new EmailNotificationService(
             outbox.Object,
             Options.Create(new PublicAppOptions { BaseUrl = "https://loja.test" }),
+            Options.Create(new AdminNotificationsOptions()),
             NullLogger<EmailNotificationService>.Instance);
 
         var act = () => sut.EnqueuePaymentConfirmedAsync(
@@ -283,5 +286,152 @@ public sealed class EmailNotificationServiceTests
         await sut.ProcessAsync(CancellationToken.None);
 
         captured.Should().Be(TimeSpan.FromSeconds(90));
+    }
+
+    [Fact]
+    public async Task EnqueueCustomerApprovalRequestAdmin_UsesAdminInboxAndIdempotencyKey()
+    {
+        EmailOutboxMessage? saved = null;
+        var outbox = CreateCapturingOutbox(m => saved = m);
+        var customerId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var sut = CreateEmailService(outbox.Object, adminEmail: "ops@shop.test");
+
+        await sut.EnqueueCustomerApprovalRequestAdminAsync(
+            new CustomerApprovalEmailRequest(customerId, "ana@c.com", "Ana", "1199", DateTimeOffset.UtcNow));
+
+        saved.Should().NotBeNull();
+        saved!.RecipientEmail.Should().Be("ops@shop.test");
+        saved.Type.Should().Be(EmailNotificationType.CustomerApprovalRequestAdmin);
+        saved.IdempotencyKey.Should().Be($"customer:{customerId:D}:approval-request-admin");
+        saved.Subject.Should().Contain("aprovação");
+        saved.HtmlBody.Should().Contain("/admin/customers/approvals");
+    }
+
+    [Fact]
+    public async Task EnqueueCustomerApprovalRequestAdmin_SkipsWhenAdminEmailMissing()
+    {
+        var outbox = new Mock<IEmailOutboxRepository>(MockBehavior.Strict);
+        var sut = CreateEmailService(outbox.Object, adminEmail: " ");
+
+        await sut.EnqueueCustomerApprovalRequestAdminAsync(
+            new CustomerApprovalEmailRequest(Guid.NewGuid(), "ana@c.com", "Ana"));
+
+        outbox.Verify(x => x.TryAddNewAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task EnqueueCustomerRegistrationReceived_UsesCustomerIdempotencyKey()
+    {
+        EmailOutboxMessage? saved = null;
+        var outbox = CreateCapturingOutbox(m => saved = m);
+        var customerId = Guid.NewGuid();
+        var sut = CreateEmailService(outbox.Object);
+
+        await sut.EnqueueCustomerRegistrationReceivedAsync(
+            new CustomerApprovalEmailRequest(customerId, "ana@c.com", "Ana"));
+
+        saved!.Type.Should().Be(EmailNotificationType.CustomerRegistrationReceived);
+        saved.RecipientEmail.Should().Be("ana@c.com");
+        saved.IdempotencyKey.Should().Be($"customer:{customerId:D}:registration-received");
+        saved.HtmlBody.Should().Contain("em análise");
+    }
+
+    [Fact]
+    public async Task EnqueueCustomerApproved_UsesApprovedKey()
+    {
+        EmailOutboxMessage? saved = null;
+        var outbox = CreateCapturingOutbox(m => saved = m);
+        var customerId = Guid.NewGuid();
+        var sut = CreateEmailService(outbox.Object);
+
+        var decided = DateTimeOffset.Parse("2026-08-16T13:00:00Z");
+        await sut.EnqueueCustomerApprovedAsync(
+            new CustomerApprovalEmailRequest(customerId, "ana@c.com", "Ana", DecidedAt: decided));
+
+        saved!.IdempotencyKey.Should().Be(
+            EmailNotificationService.CustomerAccessIdempotencyKey("approved", customerId, decided));
+        saved.HtmlBody.Should().Contain("/login");
+    }
+
+    [Fact]
+    public async Task EnqueueCustomerApproved_SecondDecisionUsesDistinctKey()
+    {
+        var keys = new List<string>();
+        var outbox = CreateCapturingOutbox(m => keys.Add(m.IdempotencyKey));
+        var sut = CreateEmailService(outbox.Object);
+        var customerId = Guid.NewGuid();
+        var first = DateTimeOffset.Parse("2026-08-16T13:00:00Z");
+        var second = DateTimeOffset.Parse("2026-08-16T14:00:00Z");
+
+        await sut.EnqueueCustomerApprovedAsync(
+            new CustomerApprovalEmailRequest(customerId, "ana@c.com", "Ana", DecidedAt: first));
+        await sut.EnqueueCustomerApprovedAsync(
+            new CustomerApprovalEmailRequest(customerId, "ana@c.com", "Ana", DecidedAt: second));
+
+        keys.Should().HaveCount(2);
+        keys[0].Should().NotBe(keys[1]);
+        keys[1].Should().Contain(":approved:");
+    }
+
+    [Fact]
+    public async Task EnqueueCustomerRejected_DoesNotIncludeInternalReason()
+    {
+        EmailOutboxMessage? saved = null;
+        var outbox = CreateCapturingOutbox(m => saved = m);
+        var sut = CreateEmailService(outbox.Object);
+
+        await sut.EnqueueCustomerRejectedAsync(
+            new CustomerApprovalEmailRequest(Guid.NewGuid(), "ana@c.com", "Ana"));
+
+        saved!.HtmlBody.Should().NotContain("AccessDecisionReason");
+        saved.IdempotencyKey.Should().Contain(":rejected:");
+    }
+
+    [Fact]
+    public async Task EnqueueCustomerSuspended_UsesSuspendedKey()
+    {
+        EmailOutboxMessage? saved = null;
+        var outbox = CreateCapturingOutbox(m => saved = m);
+        var customerId = Guid.NewGuid();
+        var decided = DateTimeOffset.Parse("2026-08-16T15:00:00Z");
+        var sut = CreateEmailService(outbox.Object);
+
+        await sut.EnqueueCustomerSuspendedAsync(
+            new CustomerApprovalEmailRequest(customerId, "ana@c.com", "Ana", DecidedAt: decided));
+
+        saved!.Type.Should().Be(EmailNotificationType.CustomerSuspended);
+        saved.IdempotencyKey.Should().Be(
+            EmailNotificationService.CustomerAccessIdempotencyKey("suspended", customerId, decided));
+        saved.HtmlBody.Should().NotContain("AccessDecisionReason");
+    }
+
+    [Fact]
+    public void MaskEmail_HidesLocalPart()
+    {
+        EmailNotificationService.MaskEmail("ana.lojista@example.com").Should().Be("a***@example.com");
+    }
+
+    private static EmailNotificationService CreateEmailService(
+        IEmailOutboxRepository outbox,
+        string adminEmail = "ops@test.local")
+        => new(
+            outbox,
+            Options.Create(new PublicAppOptions
+            {
+                BaseUrl = "https://loja.test",
+                AdminBaseUrl = "https://admin.test"
+            }),
+            Options.Create(new AdminNotificationsOptions { ApprovalRequestsEmail = adminEmail }),
+            NullLogger<EmailNotificationService>.Instance);
+
+    private static Mock<IEmailOutboxRepository> CreateCapturingOutbox(Action<EmailOutboxMessage> capture)
+    {
+        var outbox = new Mock<IEmailOutboxRepository>();
+        outbox.Setup(x => x.ExistsByIdempotencyKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        outbox.Setup(x => x.TryAddNewAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()))
+            .Callback<EmailOutboxMessage, CancellationToken>((m, _) => capture(m))
+            .ReturnsAsync(true);
+        return outbox;
     }
 }

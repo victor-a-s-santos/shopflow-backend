@@ -6,7 +6,7 @@
 
 ## Concluído recentemente
 
-- [x] **Brevo transactional emails** — outbox `notifications.email_outbox` + worker + templates PT-BR (confirm/reset/order/paid/ship/deliver); (`docs/integrations/brevo-transactional-emails.md`); FE deep-link guest: `docs/features/EMAIL-002-guest-order-link-validation.md`
+- [x] **Brevo transactional emails** — outbox `notifications.email_outbox` + worker + templates PT-BR (confirm/reset/order/paid/ship/deliver + **aprovação de cadastro Fase 3**); (`docs/integrations/brevo-transactional-emails.md`, `docs/customer/customer-approval-emails.md`); FE deep-link guest: `docs/features/EMAIL-002-guest-order-link-validation.md`
 - [x] **Product description + isActive contract** — create/update/detail persistem e retornam `description`/`isActive`; migration `description`; (`docs/catalog/admin-product-contract.md`); pendência FE enviar/hidratar no formulário
 - [x] **Admin Inventory SKUs listing** — `GET /api/admin/inventory/skus` paginado (q/status/stockStatus/category/sort + estoque); separado de Catalog Admin (`docs/inventory/admin-inventory-skus-listing.md`); pendência FE Inventory Admin
 - [x] **Admin products listing** — `GET /api/admin/catalog/products` paginado (status/featured/q/category/sort); separado da vitrine (`docs/catalog/admin-products-listing.md`); pendência FE Admin Products
@@ -42,7 +42,7 @@
 **ADR:** `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md`  
 **Fase 1 backend:** `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`
 
-**Próximo:** Fase 2 frontend (`CustomerApprovedRoute`, login unificado, fila `/admin/customers/approvals`). Fase 3 e-mails Brevo de aprovação. Backend desta fase: `docs/ai-context/backend-next-actions.md`.
+**Próximo:** Fase 2 frontend (`CustomerApprovedRoute`, login unificado, fila `/admin/customers/approvals`). Fase 3 e-mails Brevo de aprovação: **feita** (`docs/customer/customer-approval-emails.md`).
 
 ### Delivery / Fulfillment (próximo: FE)
 
@@ -92,7 +92,7 @@
 
 **Fase 1 store access (ago/2026):** `CustomerAccessStatus`, `GET /api/store/access` (`mode` Open/Closed), catálogo/checkout gated, admin `/api/admin/customers/approvals`. Docs: `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`, `docs/ai-context/backend-next-actions.md`.
 
-**Pendente:** Fase 2 frontend (`authService`, guards, tela de aprovações, login visual unificado); Fase 3 e-mails Brevo.
+**Pendente:** Fase 2 frontend (`authService`, guards, tela de aprovações, login visual unificado). Fase 3 e-mails Brevo: feita (`docs/customer/customer-approval-emails.md`).
 
 Checkout convidado fica atrás de `Checkout:AllowGuest` (desligado no cliente atual). Guest tracking legado permanece.
 

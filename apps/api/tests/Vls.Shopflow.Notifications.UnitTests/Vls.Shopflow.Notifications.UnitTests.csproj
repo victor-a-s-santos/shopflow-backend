@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\src\Modules\Notifications\Vls.Shopflow.Notifications.Application\Vls.Shopflow.Notifications.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Notifications\Vls.Shopflow.Notifications.Domain\Vls.Shopflow.Notifications.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Notifications\Vls.Shopflow.Notifications.Infrastructure\Vls.Shopflow.Notifications.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\IdentityAccess\Vls.Shopflow.IdentityAccess.Application\Vls.Shopflow.IdentityAccess.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Application\Vls.Shopflow.Orders.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Domain\Vls.Shopflow.Orders.Domain.csproj" />
   </ItemGroup>

@@ -14,19 +14,19 @@ public static class TransactionalEmailTemplates
         string fullName,
         string token)
     {
-        var link = $"{TrimBase(app.BaseUrl)}/confirm-email?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
-        var subject = "Confirme seu cadastro";
+        var link = $"{app.StorefrontBaseUrl}/confirm-email?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
+        var subject = "Confirme seu e-mail";
         var greeting = Greeting(fullName);
         var html = Layout(
             app.StoreName,
             subject,
             $"""
             <p>{greeting}</p>
-            <p>Obrigado por se cadastrar. Confirme seu e-mail para ativar sua conta:</p>
+            <p>Confirme seu endereço de e-mail. Esta etapa é técnica e <strong>independente</strong> da aprovação comercial do cadastro.</p>
             <p style="margin:24px 0"><a href="{Escape(link)}" style="background:#111;color:#fff;padding:12px 18px;text-decoration:none;border-radius:4px">Confirmar e-mail</a></p>
             <p style="color:#666;font-size:13px">Se o botão não funcionar, copie e cole este link:<br/>{Escape(link)}</p>
             """);
-        var text = $"{greeting}\n\nConfirme seu e-mail: {link}\n";
+        var text = $"{greeting}\n\nConfirme seu e-mail (independente da aprovação comercial): {link}\n";
         return (subject, html, text);
     }
 
@@ -36,7 +36,7 @@ public static class TransactionalEmailTemplates
         string? fullName,
         string token)
     {
-        var link = $"{TrimBase(app.BaseUrl)}/reset-password?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
+        var link = $"{app.StorefrontBaseUrl}/reset-password?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
         var subject = "Redefinição de senha";
         var greeting = Greeting(fullName);
         var html = Layout(
@@ -153,9 +153,111 @@ public static class TransactionalEmailTemplates
         return (subject, html, text);
     }
 
+    public static (string Subject, string Html, string Text) CustomerApprovalRequestAdmin(
+        PublicAppOptions app,
+        CustomerApprovalEmailRequest customer)
+    {
+        var subject = "Novo cadastro aguardando aprovação";
+        var adminLink = $"{app.ResolvedAdminBaseUrl}/admin/customers/approvals";
+        var requested = customer.RequestedAt?.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR")) ?? "—";
+        var phone = string.IsNullOrWhiteSpace(customer.Phone) ? "—" : Escape(customer.Phone);
+        var html = Layout(
+            app.StoreName,
+            subject,
+            $"""
+            <p>Um novo cadastro está aguardando aprovação.</p>
+            <p>Nome: <strong>{Escape(customer.FullName)}</strong></p>
+            <p>E-mail: <strong>{Escape(customer.Email)}</strong></p>
+            <p>Telefone: <strong>{phone}</strong></p>
+            <p>Solicitado em: <strong>{Escape(requested)}</strong></p>
+            {Cta(adminLink, "Abrir aprovações")}
+            {LinkFallback(adminLink)}
+            """);
+        var text = $"Novo cadastro pendente\nNome: {customer.FullName}\nE-mail: {customer.Email}\nTelefone: {customer.Phone}\n{adminLink}\n";
+        return (subject, html, text);
+    }
+
+    public static (string Subject, string Html, string Text) CustomerRegistrationReceived(
+        PublicAppOptions app,
+        CustomerApprovalEmailRequest customer)
+    {
+        var subject = "Recebemos sua solicitação de cadastro";
+        var loginLink = $"{app.StorefrontBaseUrl}/login";
+        var pendingLink = $"{app.StorefrontBaseUrl}/account/pending-approval";
+        var greeting = Greeting(customer.FullName);
+        var html = Layout(
+            app.StoreName,
+            subject,
+            $"""
+            <p>{greeting}</p>
+            <p>Recebemos sua solicitação de cadastro. Ela está <strong>em análise</strong> pela nossa equipe.</p>
+            <p>Não há prazo fixo para a resposta. Você pode acompanhar o status após entrar na conta.</p>
+            {Cta(pendingLink, "Ver status do cadastro")}
+            {LinkFallback(loginLink)}
+            """);
+        var text = $"{greeting}\n\nRecebemos sua solicitação. Cadastro em análise.\n{pendingLink}\n";
+        return (subject, html, text);
+    }
+
+    public static (string Subject, string Html, string Text) CustomerApproved(
+        PublicAppOptions app,
+        CustomerApprovalEmailRequest customer)
+    {
+        var subject = "Seu acesso foi aprovado";
+        var loginLink = $"{app.StorefrontBaseUrl}/login";
+        var greeting = Greeting(customer.FullName);
+        var html = Layout(
+            app.StoreName,
+            subject,
+            $"""
+            <p>{greeting}</p>
+            <p>Seu cadastro foi aprovado. Você já pode entrar e comprar.</p>
+            {Cta(loginLink, "Entrar")}
+            {LinkFallback(loginLink)}
+            """);
+        var text = $"{greeting}\n\nSeu acesso foi aprovado.\n{loginLink}\n";
+        return (subject, html, text);
+    }
+
+    public static (string Subject, string Html, string Text) CustomerRejected(
+        PublicAppOptions app,
+        CustomerApprovalEmailRequest customer)
+    {
+        var subject = "Atualização sobre seu cadastro";
+        var greeting = Greeting(customer.FullName);
+        var html = Layout(
+            app.StoreName,
+            subject,
+            $"""
+            <p>{greeting}</p>
+            <p>Seu cadastro não foi aprovado neste momento.</p>
+            <p>Fale com nossa equipe se precisar de mais informações.</p>
+            """);
+        var text = $"{greeting}\n\nSeu cadastro não foi aprovado neste momento. Fale com nossa equipe.\n";
+        return (subject, html, text);
+    }
+
+    public static (string Subject, string Html, string Text) CustomerSuspended(
+        PublicAppOptions app,
+        CustomerApprovalEmailRequest customer)
+    {
+        var subject = "Atualização sobre seu acesso";
+        var greeting = Greeting(customer.FullName);
+        var html = Layout(
+            app.StoreName,
+            subject,
+            $"""
+            <p>{greeting}</p>
+            <p>Seu acesso está temporariamente bloqueado.</p>
+            <p>Fale com nossa equipe para mais informações.</p>
+            """);
+        var text = $"{greeting}\n\nSeu acesso está temporariamente bloqueado. Fale com nossa equipe.\n";
+        return (subject, html, text);
+    }
+
     public static string BuildOrderLink(PublicAppOptions app, OrderEmailNotificationRequest order)
     {
-        var baseUrl = TrimBase(app.BaseUrl);
+        var baseUrl = app.StorefrontBaseUrl;
         if (order.CustomerUserId is not null)
             return $"{baseUrl}/account/orders/{order.OrderId:D}";
 
@@ -212,8 +314,6 @@ public static class TransactionalEmailTemplates
            <p style="color:#888;font-size:12px">Este é um e-mail transacional automático. Não responda a esta mensagem se o endereço for no-reply.</p>
            </body></html>
            """;
-
-    private static string TrimBase(string baseUrl) => (baseUrl ?? "").Trim().TrimEnd('/');
 
     private static string Escape(string? value) => WebUtility.HtmlEncode(value ?? "");
 }

@@ -24,6 +24,19 @@ public static class DependencyInjection
         services.Configure<OrderEmailIntentDispatcherOptions>(
             configuration.GetSection(OrderEmailIntentDispatcherOptions.SectionName));
         services.Configure<PublicAppOptions>(configuration.GetSection(PublicAppOptions.SectionName));
+        services.Configure<AdminNotificationsOptions>(configuration.GetSection(AdminNotificationsOptions.SectionName));
+        services.PostConfigure<PublicAppOptions>(opts =>
+        {
+            var urls = configuration.GetSection("AppUrls");
+            var storefront = urls["StorefrontBaseUrl"];
+            var admin = urls["AdminBaseUrl"];
+            if (!string.IsNullOrWhiteSpace(storefront))
+                opts.BaseUrl = storefront.Trim();
+            if (!string.IsNullOrWhiteSpace(admin))
+                opts.AdminBaseUrl = admin.Trim();
+            if (string.IsNullOrWhiteSpace(opts.AdminBaseUrl))
+                opts.AdminBaseUrl = opts.BaseUrl;
+        });
 
         services.AddDbContext<NotificationsDbContext>(opt =>
         {
@@ -57,6 +70,10 @@ public static class DependencyInjection
         // Override Identity logging stub + Orders null notifier when Notifications is registered last.
         services.AddScoped<IIdentityEmailSender, OutboxIdentityEmailSender>();
         services.AddScoped<IOrderEmailNotifier, OrderEmailNotifier>();
+        services.AddScoped<OutboxCustomerAccessNotifier>();
+        services.AddScoped<ICustomerAccessNotifier>(sp => sp.GetRequiredService<OutboxCustomerAccessNotifier>());
+        services.AddScoped<ICustomerPendingApprovalNotifier>(sp =>
+            sp.GetRequiredService<OutboxCustomerAccessNotifier>());
 
         return services;
     }

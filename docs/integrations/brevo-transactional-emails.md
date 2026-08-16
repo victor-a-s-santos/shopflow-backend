@@ -1,6 +1,6 @@
 # Brevo — e-mails transacionais
 
-> 2026-08-02 — MVP com templates HTML no código + outbox/worker.
+> 2026-08-16 — EMAIL-001 (pedido/auth) + Fase 3 (aprovação de cadastro). Templates HTML no código + outbox/worker.
 
 ## Escopo
 
@@ -8,14 +8,23 @@ Envia e-mails **transacionais** via Brevo Transactional Email API (`POST /v3/smt
 
 | Evento | Quando | IdempotencyKey |
 |--------|--------|----------------|
-| Confirmar cadastro | register customer | `customer:confirm-email:{hash}` |
+| Confirmar e-mail | register customer | `customer:confirm-email:{hash}` |
 | Redefinir senha | forgot password | `customer:reset-password:{hash}` |
+| Cadastro pendente (admin) | register Closed/Pending | `customer:{id}:approval-request-admin` |
+| Cadastro recebido | register Closed/Pending | `customer:{id}:registration-received` |
+| Acesso aprovado | approve / reactivate | `customer:{id}:approved:{utcTicks}` |
+| Cadastro recusado | reject | `customer:{id}:rejected:{utcTicks}` |
+| Acesso suspenso | suspend | `customer:{id}:suspended:{utcTicks}` |
 | Novo pedido | order created | `order:{orderId}:created` |
 | Pagamento confirmado | order Paid | `order:{orderId}:paid` |
-| Pedido enviado | fulfillment Shipped (individual ou remessa) | `order:{orderId}:shipped` |
-| Pedido entregue | fulfillment Delivered | `order:{orderId}:delivered` |
+| Pedido enviado | fulfillment Shipped (individual **ou** remessa) | `order:{orderId}:shipped` |
+| Pedido entregue | fulfillment Delivered (individual **ou** remessa) | `order:{orderId}:delivered` |
 
-Não inclui: marketing, newsletter, SMS, WhatsApp Business, chat.
+Remessa (`DeliveryBatch`) **não** gera `batch-shipped:{batchId}`. O dispatcher já cria **uma intent por pedido** nas mesmas keys `shipped`/`delivered` — um e-mail extra por remessa duplicaria envio.
+
+Aprovação: `docs/customer/customer-approval-emails.md`. Pedidos: `docs/orders/order-emails.md`. Smoke: `docs/qa/BREVO-TRANSACTIONAL-EMAILS-SMOKE.md`.
+
+Não inclui: marketing, newsletter, SMS, WhatsApp Business, chat, notification center, frontend.
 
 ## Arquitetura
 
@@ -24,6 +33,7 @@ Não inclui: marketing, newsletter, SMS, WhatsApp Business, chat.
 - `ITransactionalEmailSender` → `BrevoTransactionalEmailSender` (HttpClient)
 - Worker `EmailOutboxWorker` processa outbox com `SKIP LOCKED`, retry/backoff e reclaim de `Processing` órfão
 - Auth: `OutboxIdentityEmailSender` (pós-commit/best-effort; **não** usa `email_intents`)
+- Aprovação: `OutboxCustomerAccessNotifier` → outbox (pós-commit/best-effort; **não** usa `email_intents`)
 - `IOrderEmailNotifier` permanece registrado por compatibilidade; o ciclo de pedido **não** depende mais de enqueue pós-commit
 
 Falha Brevo **não** quebra checkout/pedido/auth (intent + outbox + retries no worker).
@@ -34,13 +44,17 @@ Não há `TransactionScope` nem transação compartilhada entre DbContexts. Rabb
 
 ```
 PublicApp__BaseUrl=https://sua-loja.com.br
+PublicApp__AdminBaseUrl=https://admin.sua-loja.com.br
 PublicApp__StoreName=Vip Assessoria
+
+AdminNotifications__ApprovalRequestsEmail=ops@seudominio.com.br
 
 Brevo__Enabled=true
 Brevo__ApiKey=...
 Brevo__SenderEmail=no-reply@seudominio.com.br
-Brevo__SenderName=Vip Assessoria
+Brevo__SenderName=VIP Assessoria Digital
 Brevo__ReplyToEmail=atendimento@seudominio.com.br
+Brevo__ReplyToName=Atendimento
 Brevo__SandboxMode=true
 Brevo__TimeoutSeconds=10
 
@@ -89,10 +103,13 @@ Páginas auth sugeridas: `/confirm-email`, `/reset-password` (query `email` + `t
 2. Configurar sender verificado no Brevo
 3. `Brevo__Enabled=true` + ApiKey **somente na VPS** (sandbox primeiro)
 4. Worker rodando (`OrderEmailIntentDispatcherWorker` + `EmailOutboxWorker`)
-5. Registrar cliente → e-mail confirmação
+5. Registrar cliente Closed → e-mails admin + “cadastro recebido”; Open → só confirmação de e-mail
 6. Forgot password → e-mail reset (API sempre mensagem genérica)
-7. Criar pedido Pix → intent created → e-mail “Recebemos seu pedido”
-8. Webhook Paid → intent paid → e-mail pagamento (AlreadyPaid também repara intent)
-9. Ship/Deliver (pedido ou remessa) → e-mails por pedido
-10. Desligar Brevo / ApiKey ausente → outbox permanece `Pending` com erro de configuração (recuperável); API segue OK
-11. Não logar ApiKey, guest token, reset token ou HTML completo
+7. Aprovar / recusar / suspender → e-mail do cliente **sem** motivo interno
+8. Criar pedido Pix → intent created → e-mail “Recebemos seu pedido”
+9. Webhook Paid → intent paid → e-mail pagamento (AlreadyPaid também repara intent)
+10. Ship/Deliver (pedido ou remessa) → e-mails por pedido (`order:{id}:shipped|delivered`, sem key de batch)
+11. Desligar Brevo / ApiKey ausente → outbox permanece `Pending` com erro de configuração (recuperável); API segue OK
+12. Não logar ApiKey, guest token, reset token ou HTML completo
+
+Produção exige sender verificado no Brevo e `Brevo__SandboxMode=false`.

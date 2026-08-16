@@ -1,8 +1,8 @@
-# Store access e aprovação de clientes — Fase 1 (backend)
+# Store access e aprovação de clientes — Fase 1 (backend) + Fase 3 (e-mails)
 
-Implementação da Fase 1 do ADR `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md`.
+Implementação da Fase 1 do ADR `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md` e da Fase 3 (Brevo/outbox).
 
-Não inclui frontend (Fase 2), login visual unificado, nem e-mails Brevo de aprovação (Fase 3).
+Não inclui frontend (Fase 2) nem login visual unificado.
 
 Detalhes por área:
 
@@ -73,7 +73,7 @@ Loja `Closed` (ou `PublicCatalogApprovedCheckout`) força cadastro `Pending` mes
 
 Cadastro **não** emite cookie. Login com senha correta emite `CustomerCookie` mesmo se pendente/recusado/suspenso. Catálogo privado e checkout continuam bloqueados no backend.
 
-Hook `CustomerRegisteredPendingApproval` (log). Brevo = Fase 3.
+`ICustomerAccessNotifier` enfileira e-mails de pendência/aprovação no outbox Brevo (`docs/customer/customer-approval-emails.md`). Falha de e-mail não quebra o cadastro.
 
 ### Codes (ProblemDetails `code`)
 
