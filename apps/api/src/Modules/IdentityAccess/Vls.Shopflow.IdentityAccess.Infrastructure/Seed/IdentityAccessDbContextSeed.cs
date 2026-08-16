@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
+using Vls.Shopflow.IdentityAccess.Domain.Enums;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Identity;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Options;
 
@@ -71,7 +72,9 @@ public static class IdentityAccessDbContextSeed
             FullName = name.Trim(),
             IsStaff = true,
             IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            AccessStatus = CustomerAccessStatus.Approved,
+            ApprovedAt = DateTimeOffset.UtcNow
         };
 
         var result = await userManager.CreateAsync(user, password);

@@ -1,6 +1,7 @@
 using MediatR;
 using Vls.Shopflow.CartCheckout.Application.Commands;
 using Vls.Shopflow.CartCheckout.Application.Queries;
+using Vls.Shopflow.IdentityAccess.Application.Interfaces;
 
 namespace Vls.Shopflow.HttpApi.Endpoints;
 
@@ -11,10 +12,18 @@ public static class CheckoutEndpoints
         var checkout = group.MapGroup("/checkout").WithTags("Checkout");
 
         checkout.MapPost("/sessions", async (
+            HttpContext ctx,
             ISender sender,
+            IStoreAccessPolicy storeAccess,
+            ICurrentCustomerAccessor currentCustomer,
             CreateCheckoutSessionRequest request,
             CancellationToken ct) =>
         {
+            var denied = await StoreAccessHttp.EnsureCheckoutAllowedAsync(
+                ctx, storeAccess, currentCustomer, ct);
+            if (denied is not null)
+                return denied;
+
             var result = await sender.Send(
                 new CreateCheckoutSessionCommand(
                     new CustomerInput(request.Customer.FullName, request.Customer.Email, request.Customer.Phone),

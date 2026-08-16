@@ -323,6 +323,44 @@ app.Use(async (ctx, next) =>
 
     }
 
+    catch (Vls.Shopflow.IdentityAccess.Domain.Exceptions.StoreAccessDeniedException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            ex.StatusCode,
+            ex.StatusCode == StatusCodes.Status401Unauthorized ? "Unauthorized" : "Forbidden",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = ex.StatusCode;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.IdentityAccess.Domain.Exceptions.CustomerApprovalException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            ex.StatusCode,
+            ex.StatusCode == StatusCodes.Status409Conflict ? "Conflict" : "Bad Request",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = ex.StatusCode;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
     catch (Vls.Shopflow.Catalog.Domain.Exceptions.CatalogConflictException ex)
 
     {
@@ -1090,6 +1128,8 @@ app.MapGroup("/api").MapAdminAuthEndpoints();
 
 app.MapGroup("/api").MapCustomerAuthEndpoints();
 
+app.MapGroup("/api").MapStoreAccessEndpoints();
+
 app.MapGroup("/api").MapCatalogEndpoints();
 
 app.MapGroup("/api").MapAdminCatalogEndpoints();
@@ -1101,6 +1141,8 @@ app.MapGroup("/api").MapCheckoutEndpoints();
 app.MapGroup("/api").MapOrdersEndpoints();
 
 app.MapGroup("/api").MapAdminOrdersEndpoints();
+
+app.MapGroup("/api").MapAdminCustomersEndpoints();
 
 app.MapGroup("/api").MapAdminDeliveryBatchesEndpoints();
 

@@ -162,6 +162,25 @@ namespace Vls.Shopflow.IdentityAccess.Infrastructure.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("AccessDecidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("AccessDecidedByAdminUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessDecisionReason")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTimeOffset?>("AccessRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("AccessStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -230,6 +249,8 @@ namespace Vls.Shopflow.IdentityAccess.Infrastructure.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("IsStaff", "AccessStatus", "AccessRequestedAt");
 
                     b.ToTable("users", "identity");
                 });

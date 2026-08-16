@@ -7,7 +7,7 @@
 
 Shopflow é um e-commerce modular em monorepo: backend .NET (monólito modular) + frontend React (Vite). O foco atual é operação de catálogo/estoque no admin, vitrine funcional, carrinho local e checkout integrado com sessão real (`CartCheckout`). O módulo **Orders** backend MVP cria pedidos `PendingPayment` a partir de sessões de checkout — **sem integração frontend ainda**.
 
-**Decisão de produto fixa:** checkout como convidado é permitido e prioritário. Login/cadastro são opcionais e preparados apenas visualmente.
+**Decisão de produto (ADR):** loja configurável via `StoreAccess:Mode`. Cliente atual (TESTE/HML/PROD) = `PrivateCatalogApprovedOnly` + aprovação administrativa + `Checkout:AllowGuestCheckout=false`. Development/testes de regressão permanecem com catálogo público e guest. Ver `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md`.
 
 ---
 
@@ -77,7 +77,7 @@ Upload de imagens: **Cloudflare R2** (S3-compatible) quando `Storage__Provider=C
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |
 | **Cart (frontend)** | CRUD local por `skuId`, drawer, persistência | Sincronização com backend (não previsto ainda) |
-| **IdentityAccess (backend)** | Admin + Customer auth, CSRF, policies `Backoffice`/`Customer`, 30 testes | Frontend customer auth; Account; guest order token |
+| **IdentityAccess (backend)** | Admin + Customer auth, CSRF, policies `Backoffice`/`Customer`, **StoreAccessMode + CustomerAccessStatus (Fase 1)** | Frontend Fase 2 (guards, login unificado, tela de aprovações); e-mails Brevo Fase 3 |
 | **Admin Dashboard** | Contagem real de produtos | Pedidos (156) e atividade recente são **hardcoded/fake** |
 
 ### Visual-only (frontend preparado, backend parcial)
