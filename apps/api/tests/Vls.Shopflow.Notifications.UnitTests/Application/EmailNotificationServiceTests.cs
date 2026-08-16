@@ -61,7 +61,7 @@ public sealed class EmailNotificationServiceTests
     }
 
     [Fact]
-    public async Task EmailOutboxProcessor_MarksSkipped_WhenBrevoDisabled()
+    public async Task EmailOutboxProcessor_ReleasesToPending_WhenBrevoDisabled()
     {
         var message = EmailOutboxMessage.Create(
             EmailNotificationType.OrderCreated,
@@ -83,13 +83,88 @@ public sealed class EmailNotificationServiceTests
         var sut = new EmailOutboxProcessor(
             outbox.Object,
             sender.Object,
-            Options.Create(new EmailOutboxOptions { Enabled = true, MaxAttempts = 5 }),
+            Options.Create(new EmailOutboxOptions { Enabled = true, MaxAttempts = 5, IntervalSeconds = 15 }),
             Options.Create(new BrevoOptions { Enabled = false }),
             NullLogger<EmailOutboxProcessor>.Instance);
 
         await sut.ProcessAsync(CancellationToken.None);
 
-        message.Status.Should().Be(EmailOutboxStatus.Skipped);
+        message.Status.Should().Be(EmailOutboxStatus.Pending);
+        message.Attempts.Should().Be(0);
+        message.ProcessingStartedAt.Should().BeNull();
+        message.SentAt.Should().BeNull();
+        message.LastError.Should().Be("Brevo disabled (Brevo__Enabled=false).");
+        message.NextAttemptAt.Should().BeAfter(DateTimeOffset.UtcNow);
+        sender.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task EmailOutboxProcessor_ReleasesToPending_WhenApiKeyMissing()
+    {
+        var message = EmailOutboxMessage.Create(
+            EmailNotificationType.OrderCreated,
+            "a@b.com",
+            "A",
+            "Assunto",
+            "<p>hi</p>",
+            "hi",
+            "order:x:created-nokey");
+        message.MarkProcessing();
+
+        var outbox = new Mock<IEmailOutboxRepository>();
+        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([message]);
+        outbox.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var sender = new Mock<ITransactionalEmailSender>(MockBehavior.Strict);
+
+        var sut = new EmailOutboxProcessor(
+            outbox.Object,
+            sender.Object,
+            Options.Create(new EmailOutboxOptions { Enabled = true, IntervalSeconds = 15 }),
+            Options.Create(new BrevoOptions { Enabled = true, ApiKey = " ", SenderEmail = "noreply@test.com" }),
+            NullLogger<EmailOutboxProcessor>.Instance);
+
+        await sut.ProcessAsync(CancellationToken.None);
+
+        message.Status.Should().Be(EmailOutboxStatus.Pending);
+        message.Attempts.Should().Be(0);
+        message.LastError.Should().Be("Brevo ApiKey is not configured.");
+        sender.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task EmailOutboxProcessor_ReleasesToPending_WhenSenderEmailMissing()
+    {
+        var message = EmailOutboxMessage.Create(
+            EmailNotificationType.OrderCreated,
+            "a@b.com",
+            "A",
+            "Assunto",
+            "<p>hi</p>",
+            "hi",
+            "order:x:created-nosender");
+        message.MarkProcessing();
+
+        var outbox = new Mock<IEmailOutboxRepository>();
+        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([message]);
+        outbox.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var sender = new Mock<ITransactionalEmailSender>(MockBehavior.Strict);
+
+        var sut = new EmailOutboxProcessor(
+            outbox.Object,
+            sender.Object,
+            Options.Create(new EmailOutboxOptions { Enabled = true, IntervalSeconds = 15 }),
+            Options.Create(new BrevoOptions { Enabled = true, ApiKey = "k", SenderEmail = "" }),
+            NullLogger<EmailOutboxProcessor>.Instance);
+
+        await sut.ProcessAsync(CancellationToken.None);
+
+        message.Status.Should().Be(EmailOutboxStatus.Pending);
+        message.Attempts.Should().Be(0);
+        message.LastError.Should().Be("Brevo SenderEmail is not configured.");
         sender.VerifyNoOtherCalls();
     }
 
