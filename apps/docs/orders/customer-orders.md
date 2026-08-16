@@ -15,7 +15,7 @@
 
 ### Consulta pública (`/api/orders/public/{orderNumber}`)
 
-Credencial: header `X-ORDER-ACCESS-TOKEN` (preferencial) **ou** query `?token=` (útil em links de e-mail).
+Credencial: header `X-ORDER-ACCESS-TOKEN` (preferencial), query `?t=` (links de e-mail EMAIL-001) ou `?token=` (alias legado).
 
 **Risco da query string:** tokens podem aparecer em logs de proxy, histórico do browser e `Referer`. Mitigações: rate limit por IP, token de alta entropia armazenado só como hash, resposta idêntica para número inexistente e token inválido (`INVALID_GUEST_ORDER_TOKEN`), GUID sozinho **não** autoriza acesso público.
 

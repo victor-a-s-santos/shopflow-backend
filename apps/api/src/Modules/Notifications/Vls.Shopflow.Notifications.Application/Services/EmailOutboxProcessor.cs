@@ -28,19 +28,26 @@ public sealed class EmailOutboxProcessor(
         if (messages.Count == 0)
             return;
 
-        var brevoEnabled = brevoOptions.Value.Enabled
-                           && !string.IsNullOrWhiteSpace(brevoOptions.Value.ApiKey)
-                           && !string.IsNullOrWhiteSpace(brevoOptions.Value.SenderEmail);
+        var brevo = brevoOptions.Value;
+        var brevoEnabled = brevo.Enabled
+                           && !string.IsNullOrWhiteSpace(brevo.ApiKey)
+                           && !string.IsNullOrWhiteSpace(brevo.SenderEmail);
+        var configurationRetryDelay = TimeSpan.FromSeconds(
+            settings.IntervalSeconds <= 0 ? 15 : settings.IntervalSeconds);
 
         foreach (var message in messages)
         {
             if (!brevoEnabled)
             {
-                message.MarkSkipped("Brevo disabled or missing ApiKey/SenderEmail.");
-                logger.LogInformation(
-                    "Email outbox skipped Type={Type} OutboxId={OutboxId} (Brevo disabled)",
+                var configError = ResolveBrevoConfigurationError(brevo);
+                message.ReleaseForConfigurationRetry(
+                    configError,
+                    DateTimeOffset.UtcNow.Add(configurationRetryDelay));
+                logger.LogWarning(
+                    "Email outbox waiting for Brevo configuration Type={Type} OutboxId={OutboxId} NextAttemptAt={NextAttemptAt}",
                     message.Type,
-                    message.Id);
+                    message.Id,
+                    message.NextAttemptAt);
                 continue;
             }
 
@@ -120,5 +127,14 @@ public sealed class EmailOutboxProcessor(
         }
 
         await outbox.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string ResolveBrevoConfigurationError(BrevoOptions brevo)
+    {
+        if (!brevo.Enabled)
+            return "Brevo disabled (Brevo__Enabled=false).";
+        if (string.IsNullOrWhiteSpace(brevo.ApiKey))
+            return "Brevo ApiKey is not configured.";
+        return "Brevo SenderEmail is not configured.";
     }
 }

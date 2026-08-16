@@ -55,7 +55,9 @@ OrderEmailIntentDispatcher__IntervalSeconds=15
 OrderEmailIntentDispatcher__BatchSize=20
 ```
 
-Com `Brevo__Enabled=false` (ou sem ApiKey/Sender), o worker marca mensagens como `Skipped`.
+Com `Brevo__Enabled=false` (ou sem ApiKey/Sender), o worker **não** marca `Skipped`. A mensagem volta para `Pending` com `LastError` de configuração, `Attempts` inalterado e `NextAttemptAt` adiado (~`EmailOutbox__IntervalSeconds`) para retry quando a config existir. `Skipped` fica reservado para um “não enviar” consciente, não para falha de setup.
+
+`EmailOutbox__Enabled=false` nem chega a claimar: as rows permanecem `Pending`. HTTP 4xx da Brevo (ex.: 401 de chave inválida) continua `Failed` permanente — isso não é “config ausente”.
 
 ## Templates
 
@@ -69,7 +71,9 @@ TemplateId no painel Brevo: não usado ainda (campo reservado para evolução).
 | Customer logado | `{PublicApp}/account/orders/{orderId}` |
 | Guest | `{PublicApp}/pedido/{orderNumber}?t={guestAccessToken}` |
 
-Token guest só no e-mail do **novo pedido** (momento em que o raw token existe). E-mails posteriores de guest podem omitir `?t=` se o token não estiver disponível — FE deve aceitar `?t=` no tracking público (pendência se ainda não lê query).
+Token guest só no e-mail do **novo pedido** (momento em que o raw token existe). E-mails posteriores de guest podem omitir `?t=` se o token não estiver disponível.
+
+O FE **precisa** hidratar `?t=` na rota `/pedido/:orderNumber` e chamar `GET /api/orders/public/{orderNumber}` com header `X-ORDER-ACCESS-TOKEN`. Contrato: `docs/features/EMAIL-002-guest-order-link-validation.md`.
 
 Páginas auth sugeridas: `/confirm-email`, `/reset-password` (query `email` + `token`).
 
@@ -90,5 +94,5 @@ Páginas auth sugeridas: `/confirm-email`, `/reset-password` (query `email` + `t
 7. Criar pedido Pix → intent created → e-mail “Recebemos seu pedido”
 8. Webhook Paid → intent paid → e-mail pagamento (AlreadyPaid também repara intent)
 9. Ship/Deliver (pedido ou remessa) → e-mails por pedido
-10. Desligar Brevo → outbox `Skipped`, API segue OK
+10. Desligar Brevo / ApiKey ausente → outbox permanece `Pending` com erro de configuração (recuperável); API segue OK
 11. Não logar ApiKey, guest token, reset token ou HTML completo

@@ -10,7 +10,7 @@ public sealed class BrevoOptions
     public string SenderName { get; set; } = "Vip Assessoria";
     public string SenderEmail { get; set; } = "";
     public string? ReplyToEmail { get; set; }
-    /// <summary>When true, still calls Brevo but tags sandbox; when provider disabled, outbox skips send.</summary>
+    /// <summary>When true, still calls Brevo but tags sandbox; when provider is disabled or unconfigured, outbox stays Pending for retry.</summary>
     public bool SandboxMode { get; set; } = true;
     public int TimeoutSeconds { get; set; } = 10;
 }

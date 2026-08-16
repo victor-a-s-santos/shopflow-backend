@@ -1,0 +1,269 @@
+# Temporary TESTE-only validation for EMAIL-001 Test B (real delivery).
+# Do not merge. Does not rsync, rebuild API, or touch HML/PROD.
+name: TESTE Brevo sandbox validate
+
+on:
+  push:
+    branches:
+      - cursor/teste-brevo-sent-8095
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shopflow-teste-brevo-validate
+  cancel-in-progress: false
+
+jobs:
+  validate-delivery:
+    name: Test B real delivery + outbox Sent
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      REMOTE_DEPLOY_DIR: /opt/shopflow/app/deploy
+    steps:
+      - name: Setup SSH
+        env:
+          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$VPS_SSH_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Disable sandbox and recreate worker-test
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path(".env.test")
+          text = p.read_text()
+          pat = re.compile(r"^Brevo__SandboxMode=.*$", re.M)
+          line = "Brevo__SandboxMode=false"
+          if pat.search(text):
+              text = pat.sub(line, text, count=1)
+          else:
+              text = text.rstrip() + "\n" + line + "\n"
+          p.write_text(text)
+          print("Brevo__SandboxMode=false written (value only)")
+          PY
+
+          grep -E '^Brevo__SandboxMode=' .env.test
+
+          echo "=== recreate worker-test ==="
+          docker compose up -d --force-recreate --no-deps worker-test
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if docker compose exec -T worker-test sh -c 'echo ok' </dev/null >/dev/null 2>&1; then
+              echo "worker ready attempt $i"
+              break
+            fi
+            echo "waiting worker $i"
+            sleep 3
+          done
+
+          echo "=== docker compose ps worker-test ==="
+          docker compose ps worker-test
+
+          echo "=== container env (no secrets) ==="
+          docker compose exec -T worker-test sh -c '
+          echo "Enabled=$Brevo__Enabled"
+          echo "Sandbox=$Brevo__SandboxMode"
+          echo "Sender=$Brevo__SenderEmail"
+          if [ -n "$Brevo__ApiKey" ]; then echo "ApiKey=SET"; else echo "ApiKey=MISSING"; fi
+          ' </dev/null
+
+          SANDBOX="$(docker compose exec -T worker-test sh -c 'printf %s "$Brevo__SandboxMode"' </dev/null)"
+          APIKEY_STATE="$(docker compose exec -T worker-test sh -c 'if [ -n "$Brevo__ApiKey" ]; then echo SET; else echo MISSING; fi' </dev/null)"
+          echo "SANDBOX=$SANDBOX"
+          echo "APIKEY_STATE=$APIKEY_STATE"
+          case "$SANDBOX" in
+            false|False|FALSE) ;;
+            *) echo "FAIL: SandboxMode is '$SANDBOX' expected false"; exit 1 ;;
+          esac
+          if [ "$APIKEY_STATE" != "SET" ]; then
+            echo "Brevo__ApiKey is not present in worker-test."
+            exit 1
+          fi
+
+          date -u +%Y-%m-%dT%H:%M:%SZ > /tmp/shopflow-email-follow-since
+          echo "log_since=$(cat /tmp/shopflow-email-follow-since)"
+          EOF
+
+      - name: Create new TESTE guest order
+        id: order
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import json, urllib.request, urllib.error, pathlib
+
+          base = "https://api-teste.vipassessoriadigital.com.br"
+
+          def get(url):
+              with urllib.request.urlopen(urllib.request.Request(url), timeout=30) as r:
+                  return json.load(r)
+
+          def post(url, payload):
+              data = json.dumps(payload).encode()
+              req = urllib.request.Request(
+                  url, data=data, method="POST",
+                  headers={"Content-Type": "application/json"},
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      body = r.read()
+                      return json.loads(body) if body else None, r.status
+              except urllib.error.HTTPError as e:
+                  err = e.read().decode("utf-8", "replace")
+                  print("HTTP", e.code, url)
+                  print(err[:800])
+                  raise
+
+          lst = get(base + "/api/catalog/products?page=1&pageSize=16")
+          sku_id = None
+          qty = 1
+          for p in lst.get("items") or []:
+              detail = get(base + f"/api/catalog/products/{p['id']}")
+              for s in detail.get("skus") or []:
+                  if s.get("isActive"):
+                      sku_id = s["id"]
+                      rule = s.get("salesRule") or {}
+                      qty = int(rule.get("minimumQuantity") or 1)
+                      print("using_product", p.get("slug"), "sku", sku_id, "qty", qty)
+                      break
+              if sku_id:
+                  break
+          if not sku_id:
+              raise SystemExit("no active sku")
+
+          checkout_body = {
+              "customer": {
+                  "fullName": "EMAIL-001 Teste B Entrega",
+                  "email": "victor.a.santanna@gmail.com",
+                  "phone": "11999990004",
+              },
+              "address": {
+                  "zipCode": "01310100",
+                  "street": "Avenida Paulista",
+                  "number": "1000",
+                  "complement": "EMAIL-001-TESTB",
+                  "neighborhood": "Bela Vista",
+                  "city": "Sao Paulo",
+                  "state": "SP",
+              },
+              "items": [{"skuId": sku_id, "quantity": qty}],
+              "preferredDeliveryMethod": "Carrier",
+          }
+          session, status = post(base + "/api/checkout/sessions", checkout_body)
+          print("checkout_status", status)
+          sid = session.get("checkoutSessionId") or session.get("id")
+          print("checkoutSessionId", sid)
+
+          order, status = post(base + "/api/orders/from-checkout-session", {"checkoutSessionId": sid})
+          order_id = order.get("orderId") or order.get("id")
+          order_number = order.get("orderNumber")
+          print("order_status", status)
+          print("orderId", order_id)
+          print("orderNumber", order_number)
+          pathlib.Path("/tmp/shopflow-order.env").write_text(
+              f"ORDER_ID={order_id}\nORDER_NUMBER={order_number}\n"
+          )
+          PY
+          cat /tmp/shopflow-order.env >> "$GITHUB_OUTPUT"
+          cat /tmp/shopflow-order.env >> "$GITHUB_ENV"
+
+      - name: Wait and validate intent + outbox Sent
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          ORDER_ID: ${{ steps.order.outputs.ORDER_ID }}
+          ORDER_NUMBER: ${{ steps.order.outputs.ORDER_NUMBER }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ORDER_ID:-}" ]]; then
+            echo "ORDER_ID missing"
+            exit 1
+          fi
+          echo "Validating order ${ORDER_NUMBER} (${ORDER_ID})"
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' ORDER_ID='${ORDER_ID}' ORDER_NUMBER='${ORDER_NUMBER}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+          echo "waiting 40s for dispatcher + outbox + Brevo..."
+          sleep 40
+
+          SINCE="2m"
+          if [[ -f /tmp/shopflow-email-follow-since ]]; then
+            SINCE="$(cat /tmp/shopflow-email-follow-since)"
+          fi
+          echo "=== worker logs since ${SINCE} (filtered) ==="
+          docker compose logs --since "$SINCE" worker-test 2>&1 \
+            | grep -Eiv 'apikey|token=|password|secret|guestaccess|htmlbody' \
+            | grep -Ei 'email|brevo|outbox|intent|sent|skip|failed|error|provider|401|sandbox' || true
+
+          if docker compose logs --since "$SINCE" worker-test 2>&1 | grep -F 'Brevo SandboxMode=true'; then
+            echo "FAIL: worker still logged SandboxMode=true"
+            exit 1
+          fi
+
+          KEY="order:${ORDER_ID}:created"
+
+          echo "=== proof order outbox ==="
+          docker compose exec -T postgres psql -U shopflow -d shopflow_test </dev/null \
+            -c "SELECT \"Id\", \"Type\", \"IdempotencyKey\", \"Status\", \"Attempts\", \"ProviderMessageId\", \"LastError\", \"CreatedAt\", \"SentAt\" FROM notifications.email_outbox WHERE \"IdempotencyKey\" = '${KEY}';"
+
+          echo "=== proof order intent ==="
+          docker compose exec -T postgres psql -U shopflow -d shopflow_test </dev/null \
+            -c "SELECT \"OrderId\", \"Type\", \"IdempotencyKey\", \"Status\", \"CreatedAt\", \"DispatchedAt\" FROM orders.email_intents WHERE \"OrderId\" = '${ORDER_ID}';"
+
+          echo "=== outbox status counts ==="
+          docker compose exec -T postgres psql -U shopflow -d shopflow_test </dev/null \
+            -c "SELECT \"Status\", count(*) FROM notifications.email_outbox GROUP BY 1 ORDER BY 1;"
+
+          PROOF="$(docker compose exec -T postgres psql -U shopflow -d shopflow_test -t -A -F '|' </dev/null \
+            -c "SELECT \"Status\", \"Attempts\", COALESCE(\"ProviderMessageId\",''), COALESCE(\"LastError\",'') FROM notifications.email_outbox WHERE \"IdempotencyKey\" = '${KEY}';")"
+          echo "proof_row=${PROOF}"
+          if [[ -z "$PROOF" ]]; then
+            echo "FAIL: outbox row missing for ${KEY}"
+            exit 1
+          fi
+          STATUS="$(echo "$PROOF" | cut -d'|' -f1)"
+          PROVIDER_ID="$(echo "$PROOF" | cut -d'|' -f3)"
+          LAST_ERROR="$(echo "$PROOF" | cut -d'|' -f4)"
+          INTENT_STATUS="$(docker compose exec -T postgres psql -U shopflow -d shopflow_test -t -A </dev/null \
+            -c "SELECT \"Status\" FROM orders.email_intents WHERE \"OrderId\" = '${ORDER_ID}' AND \"Type\" = 'OrderCreated';")"
+          echo "intent_status=${INTENT_STATUS}"
+          FAIL=0
+          if [[ "$STATUS" != "Sent" ]]; then
+            echo "FAIL: outbox Status=${STATUS} expected Sent"
+            FAIL=1
+          fi
+          if [[ -z "$PROVIDER_ID" ]]; then
+            echo "FAIL: ProviderMessageId empty"
+            FAIL=1
+          fi
+          if [[ -n "$LAST_ERROR" ]]; then
+            echo "FAIL: LastError is not null"
+            FAIL=1
+          fi
+          if [[ "$INTENT_STATUS" != "Dispatched" ]]; then
+            echo "FAIL: intent Status=${INTENT_STATUS} expected Dispatched"
+            FAIL=1
+          fi
+          if [[ "$FAIL" -ne 0 ]]; then
+            exit 1
+          fi
+          echo "PASS: Test B OrderCreated intent Dispatched and outbox Sent (sandbox off)"
+          EOF
