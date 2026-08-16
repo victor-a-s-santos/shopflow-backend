@@ -40,7 +40,7 @@ Não reprocessar outbox `Skipped` antigos. Não reemitir `guestAccessToken` em G
 
 ## Frontend (repositório `apps/web` / Cloudflare Pages — fora deste backend)
 
-Prompt operacional: [`docs/prompts/features/EMAIL-002-guest-order-link-frontend-cursor.md`](../prompts/features/EMAIL-002-guest-order-link-frontend-cursor.md)
+Prompt operacional: [`docs/prompts/features/EMAIL-002-guest-order-link-validation.md`](../prompts/features/EMAIL-002-guest-order-link-validation.md)
 
 Contrato mínimo da página `/pedido/:orderNumber`:
 
