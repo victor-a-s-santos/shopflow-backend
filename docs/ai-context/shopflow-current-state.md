@@ -73,7 +73,7 @@ Upload de imagens: **Cloudflare R2** (S3-compatible) quando `Storage__Provider=C
 | **CartCheckout (frontend)** | UI 4 etapas, `POST /api/checkout/sessions`, reserva real, cria pedido + Pix Pending | Shipping |
 | **Orders (backend)** | create + guest status; `orderNumber`; Admin/Customer orders; **guest claim** create-account/claim com codes oficiais + Identity password errors; Paid via Pix | Frontend pós-Pix (conta opcional), “Meus pedidos”, claim UI |
 | **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API**; webhook via **mercadopago-sdk** + oráculo manual; `SendNotificationUrlInOrderCreate` (painel vs payload); reconciliação Worker `GET /v1/orders` (fallback); Paid só `processed`/`accredited` | Frontend QR |
-| **Notifications / Brevo** | Outbox `notifications.email_outbox` + `EmailOutboxWorker` + templates HTML PT-BR; auth + order/paid/ship/deliver | Config HML ApiKey; FE deep-links |
+| **Notifications / Brevo** | `orders.email_intents` + dispatcher + outbox `notifications.email_outbox` + `EmailOutboxWorker` + templates HTML PT-BR; auth confirm/reset pós-commit; order/paid/ship/deliver | Validar em TESTE com Brevo sandbox + ApiKey na VPS; FE deep-links |
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |
 | **Cart (frontend)** | CRUD local por `skuId`, drawer, persistência | Sincronização com backend (não previsto ainda) |

@@ -21,10 +21,9 @@ public sealed class EmailNotificationServiceTests
         var outbox = new Mock<IEmailOutboxRepository>();
         outbox.Setup(x => x.ExistsByIdempotencyKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
-        outbox.Setup(x => x.AddAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()))
+        outbox.Setup(x => x.TryAddNewAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()))
             .Callback<EmailOutboxMessage, CancellationToken>((m, _) => saved = m)
-            .Returns(Task.CompletedTask);
-        outbox.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+            .ReturnsAsync(true);
 
         var sut = new EmailNotificationService(
             outbox.Object,
@@ -58,7 +57,7 @@ public sealed class EmailNotificationServiceTests
             new OrderEmailNotificationRequest(Guid.NewGuid(), 2, "a@b.com", "A", 10m),
             CancellationToken.None);
 
-        outbox.Verify(x => x.AddAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+        outbox.Verify(x => x.TryAddNewAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -75,7 +74,7 @@ public sealed class EmailNotificationServiceTests
         message.MarkProcessing();
 
         var outbox = new Mock<IEmailOutboxRepository>();
-        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([message]);
         outbox.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
@@ -108,7 +107,7 @@ public sealed class EmailNotificationServiceTests
         message.MarkProcessing();
 
         var outbox = new Mock<IEmailOutboxRepository>();
-        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([message]);
         outbox.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
@@ -149,7 +148,7 @@ public sealed class EmailNotificationServiceTests
         // Actually MarkRetry already set Attempts=1. With MaxAttempts=1: Attempts+1=2 < 1? false → Failed
 
         var outbox = new Mock<IEmailOutboxRepository>();
-        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([message]);
         outbox.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
@@ -160,12 +159,54 @@ public sealed class EmailNotificationServiceTests
         var sut = new EmailOutboxProcessor(
             outbox.Object,
             sender.Object,
-            Options.Create(new EmailOutboxOptions { Enabled = true, MaxAttempts = 1 }),
+            Options.Create(new EmailOutboxOptions { Enabled = true, MaxAttempts = 1, ProcessingTimeoutSeconds = 120 }),
             Options.Create(new BrevoOptions { Enabled = true, ApiKey = "k", SenderEmail = "a@b.com" }),
             NullLogger<EmailOutboxProcessor>.Instance);
 
         await sut.ProcessAsync(CancellationToken.None);
 
         message.Status.Should().Be(EmailOutboxStatus.Failed);
+    }
+
+    [Fact]
+    public async Task Enqueue_WhenTryAddReturnsFalse_TreatsAsIdempotentSuccess()
+    {
+        var outbox = new Mock<IEmailOutboxRepository>();
+        outbox.Setup(x => x.ExistsByIdempotencyKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        outbox.Setup(x => x.TryAddNewAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var sut = new EmailNotificationService(
+            outbox.Object,
+            Options.Create(new PublicAppOptions { BaseUrl = "https://loja.test" }),
+            NullLogger<EmailNotificationService>.Instance);
+
+        var act = () => sut.EnqueuePaymentConfirmedAsync(
+            new OrderEmailNotificationRequest(Guid.NewGuid(), 2, "a@b.com", "A", 10m),
+            CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task EmailOutboxProcessor_PassesProcessingTimeoutToClaim()
+    {
+        TimeSpan? captured = null;
+        var outbox = new Mock<IEmailOutboxRepository>();
+        outbox.Setup(x => x.ClaimPendingBatchAsync(It.IsAny<int>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Callback<int, TimeSpan, CancellationToken>((_, timeout, _) => captured = timeout)
+            .ReturnsAsync([]);
+
+        var sut = new EmailOutboxProcessor(
+            outbox.Object,
+            Mock.Of<ITransactionalEmailSender>(),
+            Options.Create(new EmailOutboxOptions { Enabled = true, ProcessingTimeoutSeconds = 90 }),
+            Options.Create(new BrevoOptions { Enabled = true, ApiKey = "k", SenderEmail = "a@b.com" }),
+            NullLogger<EmailOutboxProcessor>.Instance);
+
+        await sut.ProcessAsync(CancellationToken.None);
+
+        captured.Should().Be(TimeSpan.FromSeconds(90));
     }
 }

@@ -21,7 +21,9 @@ public sealed class EmailOutboxProcessor(
 
         var batchSize = Math.Clamp(settings.BatchSize <= 0 ? 20 : settings.BatchSize, 1, 100);
         var maxAttempts = Math.Max(1, settings.MaxAttempts);
-        var messages = await outbox.ClaimPendingBatchAsync(batchSize, cancellationToken);
+        var processingTimeout = TimeSpan.FromSeconds(
+            settings.ProcessingTimeoutSeconds <= 0 ? 120 : settings.ProcessingTimeoutSeconds);
+        var messages = await outbox.ClaimPendingBatchAsync(batchSize, processingTimeout, cancellationToken);
 
         if (messages.Count == 0)
             return;
@@ -44,6 +46,7 @@ public sealed class EmailOutboxProcessor(
 
             try
             {
+                var started = DateTimeOffset.UtcNow;
                 var result = await sender.SendAsync(
                     new TransactionalEmailMessage(
                         message.RecipientEmail,
@@ -52,15 +55,21 @@ public sealed class EmailOutboxProcessor(
                         message.HtmlBody,
                         message.TextBody),
                     cancellationToken);
+                var durationMs = (DateTimeOffset.UtcNow - started).TotalMilliseconds;
 
                 if (result.Succeeded)
                 {
                     message.MarkSent(result.ProviderMessageId);
                     logger.LogInformation(
-                        "Email outbox sent Type={Type} OutboxId={OutboxId} ProviderMessageId={ProviderMessageId}",
+                        "Email outbox sent Type={Type} OutboxId={OutboxId} IdempotencyKey={IdempotencyKey} Provider={Provider} ProviderMessageId={ProviderMessageId} Attempt={Attempt} DurationMs={DurationMs} Result={Result}",
                         message.Type,
                         message.Id,
-                        result.ProviderMessageId);
+                        message.IdempotencyKey,
+                        "Brevo",
+                        result.ProviderMessageId,
+                        message.Attempts,
+                        durationMs,
+                        "Sent");
                     continue;
                 }
 

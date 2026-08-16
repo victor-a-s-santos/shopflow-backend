@@ -6,8 +6,11 @@ using Vls.Shopflow.CartCheckout.Infrastructure;
 using Vls.Shopflow.Orders.Application.CommandHandlers;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.Interfaces;
+using Vls.Shopflow.Orders.Application.Models;
 using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.QueryHandlers;
+using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Domain.Enums;
 using Vls.Shopflow.Orders.Domain.Exceptions;
 using Vls.Shopflow.Orders.Infrastructure;
 using Vls.Shopflow.Orders.Infrastructure.Repositories;
@@ -118,7 +121,7 @@ public sealed class CreateOrderFromCheckoutSessionIntegrationTests
                 hasher,
                 unitOfWork,
                 options,
-                new Vls.Shopflow.Orders.Infrastructure.Services.NullOrderEmailNotifier(),
+                new OrderEmailIntentRepository(ordersDb),
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance),
             new GetOrderByIdQueryHandler(orderRepository),
             new GetGuestOrderStatusQueryHandler(
@@ -200,6 +203,82 @@ public sealed class CreateOrderFromCheckoutSessionIntegrationTests
             new GetGuestOrderStatusQuery(created.OrderId, "wrong-token"),
             CancellationToken.None);
         await denied.Should().ThrowAsync<GuestOrderAccessDeniedException>();
+    }
+
+    [Fact]
+    public async Task CreateOrderFromCheckoutSession_PersistsExactlyOneCreatedIntent()
+    {
+        if (!await CanConnectAsync())
+            return;
+
+        var sessionId = await SeedPendingCheckoutSessionAsync();
+
+        await using var ordersDb = CreateOrdersContext();
+        await ordersDb.Database.MigrateAsync();
+        await using var cartCheckoutDb = CreateCartCheckoutContext();
+        var (createHandler, _, _, _) = CreateHandlers(ordersDb, cartCheckoutDb);
+
+        var created = await createHandler.Handle(
+            new CreateOrderFromCheckoutSessionCommand(sessionId),
+            CancellationToken.None);
+
+        var intents = await ordersDb.EmailIntents
+            .AsNoTracking()
+            .Where(i => i.OrderId == created.OrderId)
+            .ToListAsync();
+
+        intents.Should().ContainSingle();
+        intents[0].Type.Should().Be(OrderEmailIntentType.OrderCreated);
+        intents[0].Status.Should().Be(OrderEmailIntentStatus.Pending);
+        intents[0].IdempotencyKey.Should().Be($"order:{created.OrderId:D}:created");
+
+        var payload = OrderEmailIntentPayloadJson.Deserialize(intents[0].PayloadJson);
+        payload.CustomerEmail.Should().Be("integracao@shopflow.test");
+        payload.CustomerName.Should().Be("Cliente Integração");
+        payload.GuestAccessToken.Should().NotBeNullOrWhiteSpace();
+        payload.GuestAccessToken!.Length.Should().BeGreaterThan(8);
+        intents[0].PayloadJson.Should().NotContain("<html");
+    }
+
+    [Fact]
+    public async Task CreateOrderFromCheckoutSession_WhenSaveChangesFails_DoesNotPersistOrderOrIntent()
+    {
+        if (!await CanConnectAsync())
+            return;
+
+        var sessionId = await SeedPendingCheckoutSessionAsync();
+
+        await using var ordersDb = CreateOrdersContext();
+        await ordersDb.Database.MigrateAsync();
+        await using var cartCheckoutDb = CreateCartCheckoutContext();
+
+        var throwingUow = new ThrowingOrdersUnitOfWork();
+        var handler = new CreateOrderFromCheckoutSessionCommandHandler(
+            new CheckoutSessionReader(cartCheckoutDb),
+            new OrderRepository(ordersDb),
+            new PostgresOrderNumberGenerator(ordersDb),
+            new GuestOrderAccessTokenRepository(ordersDb),
+            new GuestOrderAccessTokenHasher(Options.Create(GuestOptions)),
+            throwingUow,
+            Options.Create(GuestOptions),
+            new OrderEmailIntentRepository(ordersDb),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
+
+        var act = () => handler.Handle(
+            new CreateOrderFromCheckoutSessionCommand(sessionId),
+            CancellationToken.None);
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        var trackedOrder = ordersDb.Orders.Local.Single(o => o.CheckoutSessionId == sessionId);
+        await using var verify = CreateOrdersContext();
+        (await verify.Orders.AnyAsync(o => o.Id == trackedOrder.Id)).Should().BeFalse();
+        (await verify.EmailIntents.AnyAsync(i => i.OrderId == trackedOrder.Id)).Should().BeFalse();
+    }
+
+    private sealed class ThrowingOrdersUnitOfWork : IOrdersUnitOfWork
+    {
+        public Task<int> SaveChangesAsync(CancellationToken ct = default)
+            => throw new InvalidOperationException("db down");
     }
 
     [Fact]

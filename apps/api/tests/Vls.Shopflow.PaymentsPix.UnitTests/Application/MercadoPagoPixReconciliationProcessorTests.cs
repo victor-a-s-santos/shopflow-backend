@@ -274,7 +274,6 @@ public sealed class MercadoPagoPixReconciliationProcessorTests
             reservationReader.Object,
             confirmer.Object,
             uow.Object,
-            Mock.Of<Vls.Shopflow.Orders.Application.Interfaces.IOrderEmailNotifier>(),
             NullLogger<MercadoPagoPixPaidTransitionService>.Instance);
 
         var result = await sut.ApplyPaidAsync(payment, mpOrder, CancellationToken.None);
@@ -283,6 +282,43 @@ public sealed class MercadoPagoPixReconciliationProcessorTests
         result.Outcome.Should().Be("Paid");
         payment.Status.Should().Be(PixPaymentStatus.Paid);
         confirmer.Verify(x => x.ConfirmAsync(reservationId, It.IsAny<CancellationToken>()), Times.Once);
+        orderWriter.Verify(
+            x => x.MarkAsPaidAsync(orderId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ApplyPaidAsync_WhenAlreadyPaid_StillCallsMarkAsPaidForIntentRepair()
+    {
+        var orderId = Guid.NewGuid();
+        var checkoutSessionId = Guid.NewGuid();
+        const string providerOrderId = "ORD01ALREADYPAID";
+        var payment = CreatePendingMercadoPago(orderId, 25m, providerOrderId);
+        payment.MarkAsPaid("processed", "accredited", "processed", "accredited", DateTimeOffset.UtcNow, providerOrderId, "tx-1");
+        var mpOrder = Lookup(providerOrderId, "processed", "accredited", orderId, 25m,
+            txStatus: "processed", txDetail: "accredited");
+
+        var orderWriter = new Mock<IOrderPaidWriter>();
+        orderWriter.Setup(x => x.GetAsync(orderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrderPaidWriteResult(true, true, false, "Paid", checkoutSessionId));
+        orderWriter.Setup(x => x.MarkAsPaidAsync(orderId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OrderPaidWriteResult(true, true, false, "Paid", checkoutSessionId));
+
+        var reservationReader = new Mock<ICheckoutReservationIdsReader>();
+        reservationReader.Setup(x => x.GetReservationIdsByCheckoutSessionAsync(checkoutSessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var sut = new MercadoPagoPixPaidTransitionService(
+            orderWriter.Object,
+            reservationReader.Object,
+            Mock.Of<IInventoryReservationConfirmer>(),
+            MockUow().Object,
+            NullLogger<MercadoPagoPixPaidTransitionService>.Instance);
+
+        var result = await sut.ApplyPaidAsync(payment, mpOrder, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.Outcome.Should().Be("AlreadyPaid");
         orderWriter.Verify(
             x => x.MarkAsPaidAsync(orderId, It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()),
             Times.Once);

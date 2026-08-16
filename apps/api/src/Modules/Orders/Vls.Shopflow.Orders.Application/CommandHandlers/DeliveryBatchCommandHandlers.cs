@@ -106,7 +106,7 @@ public sealed class ShipDeliveryBatchCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
     IOrdersUnitOfWork unitOfWork,
-    IOrderEmailNotifier orderEmailNotifier)
+    IOrderEmailIntentRepository emailIntents)
     : IRequestHandler<ShipDeliveryBatchCommand, DeliveryBatchDetailDto>
 {
     public async Task<DeliveryBatchDetailDto> Handle(
@@ -155,16 +155,14 @@ public sealed class ShipDeliveryBatchCommandHandler(
         var shipMethod = batch.DeliveryMethod;
         var tracking = batch.TrackingCode;
         foreach (var order in orders)
-            order.MarkAsShipped(command.AdminId, shipMethod, tracking, internalNote: null);
-
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        foreach (var order in orders)
         {
-            await orderEmailNotifier.NotifyOrderShippedAsync(
-                OrderEmailNotifyMapper.FromOrder(order),
+            order.MarkAsShipped(command.AdminId, shipMethod, tracking, internalNote: null);
+            await emailIntents.EnsurePendingAsync(
+                OrderEmailIntentFactory.PendingFromOrder(order, OrderEmailIntentType.OrderShipped),
                 cancellationToken);
         }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var payments = await pixPaymentReader.GetLatestByOrderIdsAsync(orderIds, cancellationToken);
         var paymentStatuses = payments.ToDictionary(kv => kv.Key, kv => (string?)kv.Value.Status);
@@ -177,7 +175,7 @@ public sealed class DeliverDeliveryBatchCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
     IOrdersUnitOfWork unitOfWork,
-    IOrderEmailNotifier orderEmailNotifier)
+    IOrderEmailIntentRepository emailIntents)
     : IRequestHandler<DeliverDeliveryBatchCommand, DeliveryBatchDetailDto>
 {
     public async Task<DeliveryBatchDetailDto> Handle(
@@ -210,16 +208,14 @@ public sealed class DeliverDeliveryBatchCommandHandler(
         batch.MarkAsDelivered(command.AdminId, command.InternalNote);
 
         foreach (var order in orders)
-            order.MarkAsDelivered(command.AdminId, internalNote: null);
-
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        foreach (var order in orders)
         {
-            await orderEmailNotifier.NotifyOrderDeliveredAsync(
-                OrderEmailNotifyMapper.FromOrder(order),
+            order.MarkAsDelivered(command.AdminId, internalNote: null);
+            await emailIntents.EnsurePendingAsync(
+                OrderEmailIntentFactory.PendingFromOrder(order, OrderEmailIntentType.OrderDelivered),
                 cancellationToken);
         }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var payments = await pixPaymentReader.GetLatestByOrderIdsAsync(orderIds, cancellationToken);
         var paymentStatuses = payments.ToDictionary(kv => kv.Key, kv => (string?)kv.Value.Status);

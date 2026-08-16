@@ -316,8 +316,16 @@ public sealed class CustomerPasswordService(
             && await userManager.IsInRoleAsync(user, AuthRoles.Customer))
         {
             var token = await userManager.GeneratePasswordResetTokenAsync(user);
-            await emailSender.SendPasswordResetAsync(normalizedEmail, token, cancellationToken);
-            logger.LogInformation("Password reset token generated for customer {Email}.", normalizedEmail);
+            try
+            {
+                await emailSender.SendPasswordResetAsync(normalizedEmail, token, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to enqueue password reset email.");
+            }
+
+            logger.LogInformation("Password reset requested for a matching customer account.");
         }
 
         return new GenericMessageResult(ForgotPasswordMessage);

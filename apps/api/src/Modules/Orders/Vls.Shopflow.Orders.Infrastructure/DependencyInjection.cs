@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<IDeliveryBatchReadModel, DeliveryBatchReadModel>();
         services.AddScoped<IAdminOrderReadModel, AdminOrderReadModel>();
         services.AddScoped<ICustomerOrderReadModel, CustomerOrderReadModel>();
+        services.AddScoped<IOrderEmailIntentRepository, OrderEmailIntentRepository>();
         services.AddScoped<IGuestOrderAccessTokenRepository, GuestOrderAccessTokenRepository>();
         services.AddScoped<IGuestOrderAccessGate, GuestOrderAccessGate>();
         services.AddScoped<ICheckoutSessionReader, CheckoutSessionReader>();

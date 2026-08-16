@@ -87,7 +87,7 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
                 TokenTtlDays = 30,
                 TokenHashSecret = "test-secret"
             }),
-            Mock.Of<IOrderEmailNotifier>(),
+            Mock.Of<IOrderEmailIntentRepository>(),
             NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
     }
 

@@ -27,9 +27,11 @@ internal sealed class EmailOutboxMessageMap : IEntityTypeConfiguration<EmailOutb
         map.Property(x => x.CreatedAt).IsRequired();
         map.Property(x => x.SentAt);
         map.Property(x => x.NextAttemptAt).IsRequired();
+        map.Property(x => x.ProcessingStartedAt);
 
         map.HasIndex(x => x.IdempotencyKey).IsUnique();
         map.HasIndex(x => new { x.Status, x.NextAttemptAt });
+        map.HasIndex(x => new { x.Status, x.ProcessingStartedAt });
 
         map.Ignore("_events");
         map.Ignore(x => x.DomainEvents);

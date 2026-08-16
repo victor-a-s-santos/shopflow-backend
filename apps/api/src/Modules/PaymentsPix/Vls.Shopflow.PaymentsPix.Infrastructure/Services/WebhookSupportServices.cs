@@ -1,13 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Vls.Shopflow.CartCheckout.Infrastructure;
 using Vls.Shopflow.Inventory.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Enums;
 using Vls.Shopflow.Orders.Infrastructure;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
 
 namespace Vls.Shopflow.PaymentsPix.Infrastructure.Services;
 
-public sealed class OrderPaidWriter(OrdersDbContext ordersDb) : IOrderPaidWriter
+public sealed class OrderPaidWriter(
+    OrdersDbContext ordersDb,
+    IOrderEmailIntentRepository emailIntents) : IOrderPaidWriter
 {
     public async Task<OrderPaidWriteResult> GetAsync(Guid orderId, CancellationToken cancellationToken)
     {
@@ -31,12 +34,21 @@ public sealed class OrderPaidWriter(OrdersDbContext ordersDb) : IOrderPaidWriter
             return new OrderPaidWriteResult(false, false, false, null, null);
 
         if (order.Status == OrderStatus.Paid)
+        {
+            await emailIntents.EnsurePendingAsync(
+                OrderEmailIntentFactory.PendingFromOrder(order, OrderEmailIntentType.PaymentConfirmed),
+                cancellationToken);
+            await ordersDb.SaveChangesAsync(cancellationToken);
             return ToResult(order, alreadyPaid: true, markedPaid: false);
+        }
 
         if (order.Status != OrderStatus.PendingPayment)
             return ToResult(order, alreadyPaid: false, markedPaid: false);
 
         order.MarkAsPaid(paidAt);
+        await emailIntents.EnsurePendingAsync(
+            OrderEmailIntentFactory.PendingFromOrder(order, OrderEmailIntentType.PaymentConfirmed),
+            cancellationToken);
         await ordersDb.SaveChangesAsync(cancellationToken);
 
         return ToResult(order, alreadyPaid: false, markedPaid: true);

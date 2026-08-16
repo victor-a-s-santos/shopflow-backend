@@ -8,4 +8,5 @@ public sealed class EmailOutboxOptions
     public int IntervalSeconds { get; set; } = 15;
     public int BatchSize { get; set; } = 20;
     public int MaxAttempts { get; set; } = 8;
+    public int ProcessingTimeoutSeconds { get; set; } = 120;
 }

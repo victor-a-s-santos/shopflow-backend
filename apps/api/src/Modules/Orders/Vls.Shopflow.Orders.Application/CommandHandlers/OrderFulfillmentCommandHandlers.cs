@@ -14,7 +14,7 @@ public sealed class ShipOrderFulfillmentCommandHandler(
     IAdminOrderPixPaymentReader pixPaymentReader,
     IDeliveryBatchRepository batchRepository,
     IOrdersUnitOfWork unitOfWork,
-    IOrderEmailNotifier orderEmailNotifier)
+    IOrderEmailIntentRepository emailIntents)
     : IRequestHandler<ShipOrderFulfillmentCommand, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -37,11 +37,11 @@ public sealed class ShipOrderFulfillmentCommandHandler(
             command.TrackingCode,
             command.InternalNote);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        await orderEmailNotifier.NotifyOrderShippedAsync(
-            OrderEmailNotifyMapper.FromOrder(order),
+        await emailIntents.EnsurePendingAsync(
+            OrderEmailIntentFactory.PendingFromOrder(order, OrderEmailIntentType.OrderShipped),
             cancellationToken);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
         var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);
@@ -58,7 +58,7 @@ public sealed class DeliverOrderFulfillmentCommandHandler(
     IAdminOrderPixPaymentReader pixPaymentReader,
     IDeliveryBatchRepository batchRepository,
     IOrdersUnitOfWork unitOfWork,
-    IOrderEmailNotifier orderEmailNotifier)
+    IOrderEmailIntentRepository emailIntents)
     : IRequestHandler<DeliverOrderFulfillmentCommand, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -70,11 +70,11 @@ public sealed class DeliverOrderFulfillmentCommandHandler(
 
         order.MarkAsDelivered(command.AdminId, command.InternalNote);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-
-        await orderEmailNotifier.NotifyOrderDeliveredAsync(
-            OrderEmailNotifyMapper.FromOrder(order),
+        await emailIntents.EnsurePendingAsync(
+            OrderEmailIntentFactory.PendingFromOrder(order, OrderEmailIntentType.OrderDelivered),
             cancellationToken);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
         var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);

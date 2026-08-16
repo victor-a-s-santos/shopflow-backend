@@ -1,11 +1,13 @@
 # E-mails de pedido
 
-Ver contrato completo em `docs/integrations/brevo-transactional-emails.md`.
+Ver contrato completo em `docs/integrations/brevo-transactional-emails.md` e arquitetura em `docs/features/EMAIL-001-transactional-email-outbox-brevo.md`.
 
 Resumo:
 
-- **Criado** → após `CreateOrderFromCheckoutSession` (inclui link guest com token se emitido)
-- **Pago** → após transição Paid (webhook/reconciliação Mercado Pago)
-- **Enviado / Entregue** → ship/deliver individual **ou** por pedido dentro de DeliveryBatch (sem vazar batch interno)
+- **Criado** → intent `orders.email_intents` no mesmo `SaveChanges` de `CreateOrderFromCheckoutSession` (payload pode incluir guest token raw)
+- **Pago** → intent no mesmo `SaveChanges` de `Order.Paid` (`OrderPaidWriter`; `AlreadyPaid` repara se a intent faltava)
+- **Enviado / Entregue** → intent por pedido no ship/deliver individual ou na remessa
 
-Idempotência: `order:{orderId}:created|paid|shipped|delivered`.
+O Worker (`OrderEmailIntentDispatcherWorker`) copia intents `Pending` para `notifications.email_outbox`. A Brevo só é chamada pelo `EmailOutboxWorker`.
+
+Idempotência: `order:{orderId:D}:created|paid|shipped|delivered`.

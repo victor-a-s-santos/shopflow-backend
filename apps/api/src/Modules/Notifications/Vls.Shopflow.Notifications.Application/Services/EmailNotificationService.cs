@@ -149,8 +149,15 @@ public sealed class EmailNotificationService(
             text,
             idempotencyKey);
 
-        await outbox.AddAsync(message, cancellationToken);
-        await outbox.SaveChangesAsync(cancellationToken);
+        var inserted = await outbox.TryAddNewAsync(message, cancellationToken);
+        if (!inserted)
+        {
+            logger.LogInformation(
+                "Email outbox idempotent insert Type={Type} IdempotencyKey={IdempotencyKey}",
+                type,
+                idempotencyKey);
+            return;
+        }
 
         logger.LogInformation(
             "Email outbox enqueued Type={Type} OutboxId={OutboxId} IdempotencyKey={IdempotencyKey}",

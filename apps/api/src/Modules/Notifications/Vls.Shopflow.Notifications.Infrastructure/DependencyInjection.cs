@@ -21,6 +21,8 @@ public static class DependencyInjection
     {
         services.Configure<BrevoOptions>(configuration.GetSection(BrevoOptions.SectionName));
         services.Configure<EmailOutboxOptions>(configuration.GetSection(EmailOutboxOptions.SectionName));
+        services.Configure<OrderEmailIntentDispatcherOptions>(
+            configuration.GetSection(OrderEmailIntentDispatcherOptions.SectionName));
         services.Configure<PublicAppOptions>(configuration.GetSection(PublicAppOptions.SectionName));
 
         services.AddDbContext<NotificationsDbContext>(opt =>
@@ -50,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailOutboxRepository, EmailOutboxRepository>();
         services.AddScoped<IEmailNotificationService, EmailNotificationService>();
         services.AddScoped<IEmailOutboxProcessor, EmailOutboxProcessor>();
+        services.AddScoped<IOrderEmailIntentDispatcher, OrderEmailIntentDispatcher>();
 
         // Override Identity logging stub + Orders null notifier when Notifications is registered last.
         services.AddScoped<IIdentityEmailSender, OutboxIdentityEmailSender>();

@@ -10,6 +10,7 @@ public sealed class OrdersDbContext : DbContext
     public DbSet<GuestOrderAccessToken> GuestOrderAccessTokens => Set<GuestOrderAccessToken>();
     public DbSet<DeliveryBatch> DeliveryBatches => Set<DeliveryBatch>();
     public DbSet<DeliveryBatchOrder> DeliveryBatchOrders => Set<DeliveryBatchOrder>();
+    public DbSet<OrderEmailIntent> EmailIntents => Set<OrderEmailIntent>();
 
     public OrdersDbContext(DbContextOptions<OrdersDbContext> options) : base(options) { }
 

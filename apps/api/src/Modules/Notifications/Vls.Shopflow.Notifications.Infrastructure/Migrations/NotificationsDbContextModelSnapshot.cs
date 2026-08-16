@@ -53,6 +53,9 @@ namespace Vls.Shopflow.Notifications.Infrastructure.Migrations
                     b.Property<string>("PayloadJson")
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("ProcessingStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ProviderMessageId")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -93,6 +96,8 @@ namespace Vls.Shopflow.Notifications.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("Status", "NextAttemptAt");
+
+                    b.HasIndex("Status", "ProcessingStartedAt");
 
                     b.ToTable("email_outbox", "notifications");
                 });

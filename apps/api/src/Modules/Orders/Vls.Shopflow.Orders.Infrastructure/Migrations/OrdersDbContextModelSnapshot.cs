@@ -136,6 +136,51 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                     b.ToTable("delivery_batch_orders", "orders");
                 });
 
+            modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.OrderEmailIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DispatchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "Type");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("email_intents", "orders");
+                });
+
             modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.GuestOrderAccessToken", b =>
                 {
                     b.Property<Guid>("Id")

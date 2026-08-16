@@ -107,7 +107,7 @@ public sealed class DeliveryBatchCommandHandlerTests
 
         var uow = new Mock<IOrdersUnitOfWork>();
         var sut = new ShipDeliveryBatchCommandHandler(
-            batchRepo.Object, orderRepo.Object, paymentReader.Object, uow.Object, Mock.Of<IOrderEmailNotifier>());
+            batchRepo.Object, orderRepo.Object, paymentReader.Object, uow.Object, Mock.Of<IOrderEmailIntentRepository>());
 
         var result = await sut.Handle(
             new ShipDeliveryBatchCommand(batch.Id, Guid.NewGuid(), "Correios", "BR1", "Nota remessa"),
@@ -145,7 +145,7 @@ public sealed class DeliveryBatchCommandHandlerTests
             orderRepo.Object,
             Mock.Of<IAdminOrderPixPaymentReader>(),
             Mock.Of<IOrdersUnitOfWork>(),
-            Mock.Of<IOrderEmailNotifier>());
+            Mock.Of<IOrderEmailIntentRepository>());
 
         var act = () => sut.Handle(
             new DeliverDeliveryBatchCommand(batch.Id, Guid.NewGuid()),
@@ -179,7 +179,7 @@ public sealed class DeliveryBatchCommandHandlerTests
             .ReturnsAsync(new Dictionary<Guid, AdminOrderPaymentSummaryDto>());
 
         var sut = new DeliverDeliveryBatchCommandHandler(
-            batchRepo.Object, orderRepo.Object, paymentReader.Object, Mock.Of<IOrdersUnitOfWork>(), Mock.Of<IOrderEmailNotifier>());
+            batchRepo.Object, orderRepo.Object, paymentReader.Object, Mock.Of<IOrdersUnitOfWork>(), Mock.Of<IOrderEmailIntentRepository>());
 
         var result = await sut.Handle(
             new DeliverDeliveryBatchCommand(batch.Id, Guid.NewGuid()),

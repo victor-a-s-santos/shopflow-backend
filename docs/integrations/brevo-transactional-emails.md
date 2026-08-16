@@ -19,14 +19,16 @@ Não inclui: marketing, newsletter, SMS, WhatsApp Business, chat.
 
 ## Arquitetura
 
+- Pedidos: fato de negócio + `orders.email_intents` no mesmo `OrdersDbContext.SaveChanges` (ver `docs/features/EMAIL-001-transactional-email-outbox-brevo.md`)
+- Worker `OrderEmailIntentDispatcherWorker` → `IEmailNotificationService` → `notifications.email_outbox`
 - `ITransactionalEmailSender` → `BrevoTransactionalEmailSender` (HttpClient)
-- `IEmailNotificationService` → render PT-BR + enqueue
-- Tabela `notifications.email_outbox`
-- Worker `EmailOutboxWorker` processa pending com retry/backoff
-- Auth: `OutboxIdentityEmailSender` substitui o stub de log
-- Orders: `IOrderEmailNotifier` (Null stub; real em Notifications)
+- Worker `EmailOutboxWorker` processa outbox com `SKIP LOCKED`, retry/backoff e reclaim de `Processing` órfão
+- Auth: `OutboxIdentityEmailSender` (pós-commit/best-effort; **não** usa `email_intents`)
+- `IOrderEmailNotifier` permanece registrado por compatibilidade; o ciclo de pedido **não** depende mais de enqueue pós-commit
 
-Falha Brevo **não** quebra checkout/pedido/auth (enqueue best-effort + retries no worker).
+Falha Brevo **não** quebra checkout/pedido/auth (intent + outbox + retries no worker).
+
+Não há `TransactionScope` nem transação compartilhada entre DbContexts. RabbitMQ/MassTransit estão adiados.
 
 ## Configuração
 
@@ -46,6 +48,11 @@ EmailOutbox__Enabled=true
 EmailOutbox__IntervalSeconds=15
 EmailOutbox__BatchSize=20
 EmailOutbox__MaxAttempts=8
+EmailOutbox__ProcessingTimeoutSeconds=120
+
+OrderEmailIntentDispatcher__Enabled=true
+OrderEmailIntentDispatcher__IntervalSeconds=15
+OrderEmailIntentDispatcher__BatchSize=20
 ```
 
 Com `Brevo__Enabled=false` (ou sem ApiKey/Sender), o worker marca mensagens como `Skipped`.
@@ -74,13 +81,14 @@ Páginas auth sugeridas: `/confirm-email`, `/reset-password` (query `email` + `t
 
 ## Checklist TESTE / produção
 
-1. Migrar schema `notifications`
+1. Migrar schemas `orders` (`email_intents`) e `notifications` (`ProcessingStartedAt`) — a API aplica no startup
 2. Configurar sender verificado no Brevo
-3. `Brevo__Enabled=true` + ApiKey
-4. Worker rodando (`EmailOutboxWorker`)
+3. `Brevo__Enabled=true` + ApiKey **somente na VPS** (sandbox primeiro)
+4. Worker rodando (`OrderEmailIntentDispatcherWorker` + `EmailOutboxWorker`)
 5. Registrar cliente → e-mail confirmação
-6. Forgot password → e-mail reset
-7. Criar pedido Pix → e-mail “Recebemos seu pedido”
-8. Webhook Paid → e-mail pagamento
+6. Forgot password → e-mail reset (API sempre mensagem genérica)
+7. Criar pedido Pix → intent created → e-mail “Recebemos seu pedido”
+8. Webhook Paid → intent paid → e-mail pagamento (AlreadyPaid também repara intent)
 9. Ship/Deliver (pedido ou remessa) → e-mails por pedido
 10. Desligar Brevo → outbox `Skipped`, API segue OK
+11. Não logar ApiKey, guest token, reset token ou HTML completo

@@ -23,7 +23,7 @@ public sealed class OrderFulfillmentCommandHandlerTests
             Mock.Of<IAdminOrderPixPaymentReader>(),
             MockBatchRepo(),
             Mock.Of<IOrdersUnitOfWork>(),
-            Mock.Of<IOrderEmailNotifier>());
+            Mock.Of<IOrderEmailIntentRepository>());
 
         var act = () => sut.Handle(
             new ShipOrderFulfillmentCommand(order.Id, Guid.NewGuid()),
@@ -43,7 +43,7 @@ public sealed class OrderFulfillmentCommandHandlerTests
             Mock.Of<IAdminOrderPixPaymentReader>(),
             MockBatchRepo(),
             Mock.Of<IOrdersUnitOfWork>(),
-            Mock.Of<IOrderEmailNotifier>());
+            Mock.Of<IOrderEmailIntentRepository>());
 
         var act = () => sut.Handle(
             new DeliverOrderFulfillmentCommand(order.Id, Guid.NewGuid()),
@@ -64,7 +64,7 @@ public sealed class OrderFulfillmentCommandHandlerTests
             Mock.Of<IAdminOrderPixPaymentReader>(),
             MockBatchRepo(),
             Mock.Of<IOrdersUnitOfWork>(),
-            Mock.Of<IOrderEmailNotifier>());
+            Mock.Of<IOrderEmailIntentRepository>());
 
         var act = () => sut.Handle(
             new ShipOrderFulfillmentCommand(Guid.NewGuid(), Guid.NewGuid()),
@@ -89,7 +89,7 @@ public sealed class OrderFulfillmentCommandHandlerTests
             paymentReader.Object,
             MockBatchRepo(),
             uow.Object,
-            Mock.Of<IOrderEmailNotifier>());
+            Mock.Of<IOrderEmailIntentRepository>());
         var result = await sut.Handle(
             new ShipOrderFulfillmentCommand(order.Id, Guid.NewGuid(), "Carrier", "T1"),
             CancellationToken.None);

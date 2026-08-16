@@ -27,6 +27,7 @@ public sealed class EmailOutboxMessage : Entity<Guid>
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? SentAt { get; private set; }
     public DateTimeOffset NextAttemptAt { get; private set; }
+    public DateTimeOffset? ProcessingStartedAt { get; private set; }
 
     private EmailOutboxMessage() { }
 
@@ -64,12 +65,17 @@ public sealed class EmailOutboxMessage : Entity<Guid>
         };
     }
 
-    public void MarkProcessing() => Status = EmailOutboxStatus.Processing;
+    public void MarkProcessing()
+    {
+        Status = EmailOutboxStatus.Processing;
+        ProcessingStartedAt = DateTimeOffset.UtcNow;
+    }
 
     public void MarkSent(string? providerMessageId)
     {
         Status = EmailOutboxStatus.Sent;
         SentAt = DateTimeOffset.UtcNow;
+        ProcessingStartedAt = null;
         ProviderMessageId = Truncate(providerMessageId, MaxProviderMessageIdLength);
         LastError = null;
     }
@@ -78,6 +84,7 @@ public sealed class EmailOutboxMessage : Entity<Guid>
     {
         Status = EmailOutboxStatus.Skipped;
         SentAt = DateTimeOffset.UtcNow;
+        ProcessingStartedAt = null;
         LastError = Truncate(reason, MaxLastErrorLength);
     }
 
@@ -85,6 +92,7 @@ public sealed class EmailOutboxMessage : Entity<Guid>
     {
         Attempts += 1;
         Status = EmailOutboxStatus.Pending;
+        ProcessingStartedAt = null;
         LastError = Truncate(error, MaxLastErrorLength);
         NextAttemptAt = nextAttemptAt;
     }
@@ -93,6 +101,7 @@ public sealed class EmailOutboxMessage : Entity<Guid>
     {
         Attempts += 1;
         Status = EmailOutboxStatus.Failed;
+        ProcessingStartedAt = null;
         LastError = Truncate(error, MaxLastErrorLength);
     }
 

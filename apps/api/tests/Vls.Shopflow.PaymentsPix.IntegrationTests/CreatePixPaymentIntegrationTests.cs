@@ -70,7 +70,7 @@ public sealed class CreatePixPaymentIntegrationTests
         return new PaymentsPixDbContext(options);
     }
 
-    private static async Task<Guid> SeedPendingOrderAsync()
+    internal static async Task<Guid> SeedPendingOrderAsync()
     {
         await using var cartDb = CreateCartCheckoutContext();
         await cartDb.Database.MigrateAsync();
@@ -125,7 +125,7 @@ public sealed class CreatePixPaymentIntegrationTests
                 TokenTtlDays = 30,
                 TokenHashSecret = "test-secret"
             }),
-            new Vls.Shopflow.Orders.Infrastructure.Services.NullOrderEmailNotifier(),
+            new OrderEmailIntentRepository(ordersDb),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
 
         var order = await createOrderHandler.Handle(

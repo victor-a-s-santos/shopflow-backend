@@ -1,6 +1,6 @@
 # Customer auth — e-mails
 
-Confirm e reset passam por `IIdentityEmailSender` → `OutboxIdentityEmailSender` → outbox Brevo.
+Confirm e reset passam por `IIdentityEmailSender` → `OutboxIdentityEmailSender` → outbox Brevo (pós-commit/best-effort; fora de `orders.email_intents`).
 
 | Fluxo | Assunto | Link sugerido |
 |-------|---------|---------------|
@@ -10,4 +10,4 @@ Confirm e reset passam por `IIdentityEmailSender` → `OutboxIdentityEmailSender
 Tokens **não** são logados em Information. Falha de enqueue não derruba o registro/forgot (log Error).
 
 Config: `PublicApp__BaseUrl`, `Brevo__*`, `EmailOutbox__*`.  
-Detalhes: `docs/integrations/brevo-transactional-emails.md`.
+Detalhes: `docs/integrations/brevo-transactional-emails.md`, `docs/features/EMAIL-001-transactional-email-outbox-brevo.md`.

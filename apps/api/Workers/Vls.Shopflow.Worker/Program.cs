@@ -22,6 +22,8 @@ builder.Services.Configure<MercadoPagoReconciliationOptions>(
     builder.Configuration.GetSection(MercadoPagoReconciliationOptions.SectionName));
 builder.Services.Configure<EmailOutboxOptions>(
     builder.Configuration.GetSection(EmailOutboxOptions.SectionName));
+builder.Services.Configure<OrderEmailIntentDispatcherOptions>(
+    builder.Configuration.GetSection(OrderEmailIntentDispatcherOptions.SectionName));
 
 builder.Services.AddInventoryModule(connectionString);
 builder.Services.AddCartCheckoutModule(connectionString);
@@ -33,6 +35,7 @@ builder.Services.AddExpirationInfrastructure();
 
 builder.Services.AddHostedService<PendingCheckoutExpirationWorker>();
 builder.Services.AddHostedService<MercadoPagoPixReconciliationWorker>();
+builder.Services.AddHostedService<OrderEmailIntentDispatcherWorker>();
 builder.Services.AddHostedService<EmailOutboxWorker>();
 
 var host = builder.Build();
