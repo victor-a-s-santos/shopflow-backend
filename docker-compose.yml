@@ -86,6 +86,20 @@ services:
       PostalCodeLookup__BaseUrl: ${PostalCodeLookup__BaseUrl:-https://viacep.com.br}
       PostalCodeLookup__TimeoutSeconds: ${PostalCodeLookup__TimeoutSeconds:-5}
       PostalCodeLookup__RateLimitPerMinute: ${PostalCodeLookup__RateLimitPerMinute:-60}
+      PublicApp__BaseUrl: ${PublicApp__BaseUrl:-http://localhost:5173}
+      PublicApp__AdminBaseUrl: ${PublicApp__AdminBaseUrl:-http://localhost:5173}
+      PublicApp__StoreName: ${PublicApp__StoreName:-Vip Assessoria}
+      AdminNotifications__ApprovalRequestsEmail: ${AdminNotifications__ApprovalRequestsEmail:-}
+      Brevo__Enabled: ${Brevo__Enabled:-false}
+      Brevo__BaseUrl: ${Brevo__BaseUrl:-https://api.brevo.com}
+      Brevo__ApiKey: ${Brevo__ApiKey:-}
+      Brevo__SenderName: ${Brevo__SenderName:-VIP Assessoria Digital}
+      Brevo__SenderEmail: ${Brevo__SenderEmail:-}
+      Brevo__ReplyToName: ${Brevo__ReplyToName:-Atendimento}
+      Brevo__ReplyToEmail: ${Brevo__ReplyToEmail:-}
+      Brevo__SandboxMode: ${Brevo__SandboxMode:-true}
+      Brevo__TimeoutSeconds: ${Brevo__TimeoutSeconds:-10}
+      EmailOutbox__Enabled: ${EmailOutbox__Enabled:-true}
     ports:
       - "5127:5127"
     volumes:
@@ -120,6 +134,26 @@ services:
       MercadoPagoReconciliation__IntervalSeconds: ${MercadoPagoReconciliation__IntervalSeconds:-60}
       MercadoPagoReconciliation__BatchSize: ${MercadoPagoReconciliation__BatchSize:-20}
       MercadoPagoReconciliation__MaxAgeMinutes: ${MercadoPagoReconciliation__MaxAgeMinutes:-180}
+      PublicApp__BaseUrl: ${PublicApp__BaseUrl:-http://localhost:5173}
+      PublicApp__AdminBaseUrl: ${PublicApp__AdminBaseUrl:-http://localhost:5173}
+      PublicApp__StoreName: ${PublicApp__StoreName:-Vip Assessoria}
+      Brevo__Enabled: ${Brevo__Enabled:-false}
+      Brevo__BaseUrl: ${Brevo__BaseUrl:-https://api.brevo.com}
+      Brevo__ApiKey: ${Brevo__ApiKey:-}
+      Brevo__SenderName: ${Brevo__SenderName:-VIP Assessoria Digital}
+      Brevo__SenderEmail: ${Brevo__SenderEmail:-}
+      Brevo__ReplyToName: ${Brevo__ReplyToName:-Atendimento}
+      Brevo__ReplyToEmail: ${Brevo__ReplyToEmail:-}
+      Brevo__SandboxMode: ${Brevo__SandboxMode:-true}
+      Brevo__TimeoutSeconds: ${Brevo__TimeoutSeconds:-10}
+      EmailOutbox__Enabled: ${EmailOutbox__Enabled:-true}
+      EmailOutbox__IntervalSeconds: ${EmailOutbox__IntervalSeconds:-15}
+      EmailOutbox__BatchSize: ${EmailOutbox__BatchSize:-20}
+      EmailOutbox__MaxAttempts: ${EmailOutbox__MaxAttempts:-8}
+      EmailOutbox__ProcessingTimeoutSeconds: ${EmailOutbox__ProcessingTimeoutSeconds:-120}
+      OrderEmailIntentDispatcher__Enabled: ${OrderEmailIntentDispatcher__Enabled:-true}
+      OrderEmailIntentDispatcher__IntervalSeconds: ${OrderEmailIntentDispatcher__IntervalSeconds:-15}
+      OrderEmailIntentDispatcher__BatchSize: ${OrderEmailIntentDispatcher__BatchSize:-20}
     restart: unless-stopped
 
 volumes:

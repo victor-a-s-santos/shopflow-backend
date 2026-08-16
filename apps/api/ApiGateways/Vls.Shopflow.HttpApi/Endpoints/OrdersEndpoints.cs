@@ -17,18 +17,26 @@ public static class OrdersEndpoints
         var orders = group.MapGroup("/orders").WithTags("Orders");
 
         orders.MapPost("/from-checkout-session", async (
+            HttpContext ctx,
             ISender sender,
+            IStoreAccessPolicy storeAccess,
             ICurrentCustomerAccessor currentCustomer,
             CreateOrderFromCheckoutSessionRequest request,
             CancellationToken ct) =>
         {
-            // Optional CustomerCookie only — never use Backoffice cookie as customer.
-            var customer = await currentCustomer.GetCurrentCustomerAsync(ct);
+            var (customer, denied) = await StoreAccessHttp.ResolveCheckoutCustomerAsync(
+                ctx, storeAccess, currentCustomer, ct);
+            if (denied is not null)
+                return denied;
+
+            if (storeAccess.RequireApprovedCustomerForCheckout && customer is null)
+                return StoreAccessHttp.Denied(ctx, storeAccess.EvaluateCheckout(null));
 
             var result = await sender.Send(
                 new CreateOrderFromCheckoutSessionCommand(
                     request.CheckoutSessionId,
-                    customer?.CustomerId),
+                    customer?.CustomerId,
+                    IssueGuestAccessToken: storeAccess.AllowGuestCheckout && customer is null),
                 ct);
 
             return Results.Created($"/api/orders/{result.OrderId}", result);

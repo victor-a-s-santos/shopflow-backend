@@ -445,6 +445,23 @@ public sealed class EndpointExposureIntegrationTests : IClassFixture<ShopflowWeb
     }
 
     [Fact]
+    public async Task StoreAccess_WithoutLogin_ReturnsDevelopmentPolicy()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/store/access");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("mode").GetString().Should().Be("Open");
+        body.GetProperty("storeAccessMode").GetString().Should().Be("PublicCatalogAndGuestCheckout");
+        body.GetProperty("allowGuest").GetBoolean().Should().BeTrue();
+        body.GetProperty("allowGuestCheckout").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Health_WithoutLogin_Returns200WithOkStatus()
     {
         if (!await _factory.CanConnectToDatabaseAsync())

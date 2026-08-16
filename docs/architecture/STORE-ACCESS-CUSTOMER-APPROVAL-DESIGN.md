@@ -2,7 +2,11 @@
 
 ## Status
 
-Proposto para implementação.
+Aceito. Fase 1 (backend) em implementação. Este documento **substitui** o rascunho Open/Closed publicado no PR #4.
+
+Este ADR **substitui**, para o cliente atual, a regra fixa de produto “checkout convidado permitido e prioritário” (`docs/prompts/00-project-context.md`). A capacidade técnica de convidado **não é apagada**; fica atrás de configuração.
+
+Relacionado: `docs/security/SEC-005-customer-identity-backend.md`, `docs/security/FE-SEC-003-admin-auth-separation.md`, `docs/cart-checkout.md`, `docs/orders.md`, `docs/features/EMAIL-001-transactional-email-outbox-brevo.md`.
 
 ## Contexto
 
@@ -20,13 +24,31 @@ Ao mesmo tempo, o produto deve continuar preparado para um futuro modelo SaaS, o
 
 Também foi levantada a possibilidade de unificar a experiência de login entre usuário comum e admin, evitando que o operador precise acessar uma URL separada como `/admin/login`.
 
+### Código atual (antes da Fase 1)
+
+| Área | Estado |
+|------|--------|
+| Vitrine / catálogo | Público (`GET /api/catalog/products`, etc.) |
+| Carrinho | `localStorage` no browser; sem API de carrinho |
+| Checkout / pedido | `POST /api/checkout/sessions` e `POST /api/orders/from-checkout-session` anônimos; cookie customer opcional |
+| Guest token | `guestAccessToken` one-shot + `GET /api/orders/public/{orderNumber}` (EMAIL-001/002) |
+| Customer auth | `/api/auth/customer/*`, cookie `CustomerCookie`, role `Customer` |
+| Admin auth | `/api/auth/admin/*`, cookie `Identity.Application`, `IsStaff` |
+| Cadastro customer | Cria `IsActive=true`, **não** loga automaticamente, login **sem** exigir e-mail confirmado |
+| `ShopflowUser` | `IsStaff`, `IsActive`, `EmailConfirmed` — **não** havia status de aprovação comercial |
+| Login FE | `/login` (customer) e `/admin/login` (staff) — fluxos e cookies separados (`FE-SEC-003`) |
+
+O modelo de negócio do cliente é **B2B (lojista/revendedor)**. Pedido guest e catálogo público não combinam com “só quem a operação conhece e aprova compra”.
+
 ## Decisão
 
 O Shopflow passará a suportar uma política configurável de acesso à loja.
 
 A loja atual usará o modo privado com aprovação administrativa.
 
-O login visual será unificado em uma rota pública única, mas a arquitetura interna de admin e customer continuará separada nesta fase para reduzir risco técnico e preservar segurança.
+O login visual será unificado em uma rota pública única **na Fase 2 (frontend)**, mas a arquitetura interna de admin e customer continuará separada nesta fase para reduzir risco técnico e preservar segurança.
+
+Nesta Fase 1 **não** se funde cookie, scheme, policy nem endpoint de login. `/admin/login` no frontend só deixa de ser a tela principal na Fase 2.
 
 ## Decisões principais
 
@@ -34,7 +56,7 @@ O login visual será unificado em uma rota pública única, mas a arquitetura in
 
 Criar configuração para definir como cada loja/ambiente controla o acesso.
 
-Modos sugeridos:
+Modos:
 
 ```text
 PublicCatalogAndGuestCheckout
@@ -49,7 +71,7 @@ Descrição:
 PublicCatalogAndGuestCheckout
 - catálogo público;
 - carrinho público;
-- checkout como convidado permitido;
+- checkout como convidado permitido (somente se Checkout:AllowGuestCheckout=true);
 - conta opcional.
 
 PublicCatalogLoginCheckout
@@ -67,7 +89,7 @@ PrivateCatalogApprovedOnly
 - catálogo, carrinho e checkout exigem cliente logado e aprovado.
 ```
 
-Para o cliente atual, o modo recomendado é:
+Para o cliente atual, o modo é:
 
 ```text
 PrivateCatalogApprovedOnly
@@ -79,6 +101,30 @@ Com isso:
 * visitante pode acessar login, cadastro, esqueci senha e páginas públicas permitidas;
 * cliente pendente não compra;
 * cliente aprovado compra normalmente.
+
+Contrato anônimo para o frontend:
+
+```text
+GET /api/store/access
+```
+
+Resposta (sem secrets):
+
+```json
+{
+  "mode": "Closed",
+  "storeAccessMode": "PrivateCatalogApprovedOnly",
+  "allowGuest": false,
+  "allowGuestCheckout": false,
+  "requireApprovedCustomerToBrowse": true,
+  "requireLoginForCheckout": true,
+  "requireApprovedCustomerForCheckout": true
+}
+```
+
+`mode` é o contrato curto (`Open` | `Closed`) para o frontend. `storeAccessMode` permanece o nome canônico de 4 modos deste ADR. `Closed` = `PrivateCatalogApprovedOnly`; qualquer outro modo = `Open`.
+
+A API de catálogo/checkout **não confia** só no FE.
 
 ### 2. Checkout convidado configurável
 
@@ -101,13 +147,14 @@ Regras:
 * novos pedidos como convidado ficam bloqueados;
 * endpoints legados de guest tracking podem permanecer para compatibilidade;
 * pedidos antigos sem CustomerUserId continuam legíveis conforme regras atuais;
-* novos pedidos devem exigir cliente aprovado quando a política da loja assim determinar.
+* novos pedidos devem exigir cliente aprovado quando a política da loja assim determinar;
+* novos pedidos **não** emitem `guestAccessToken` quando guest checkout estiver desligado ou o pedido já nascer vinculado a um customer.
 
 ### 3. CustomerAccessStatus
 
-Adicionar status de acesso ao cliente.
+Adicionar status de acesso ao cliente. **Não** reutilizar `EmailConfirmed`, `IsActive` nem `IsStaff`.
 
-Status sugeridos:
+Status:
 
 ```text
 PendingApproval
@@ -138,6 +185,8 @@ Suspended
 - não pode comprar até reativação.
 ```
 
+`IsActive=false` permanece como corte operacional (fraude, perda de senha em massa). Não mistura com pendência comercial.
+
 Clientes existentes devem ser migrados como:
 
 ```text
@@ -146,7 +195,20 @@ Approved
 
 para evitar quebra de operação.
 
-### 4. Login visual unificado
+Cadastro: status inicial **PendingApproval** quando `CustomerAccess:RequireApproval=true`. Continua **sem** login automático.
+
+Login/`/me` **retornam** o status. Cliente pendente/recusado/suspenso **pode autenticar** (senha correta + `IsActive`) para o frontend redirecionar às telas de estado. Compra e catálogo privado continuam bloqueados no backend.
+
+Ordem de login depois de localizar o usuário customer:
+
+1. Inexistente / staff / sem role `Customer` → mensagem **genérica** (não enumerar).
+2. Password falhou → genérica + lockout atual (5 / 15 min).
+3. `!IsActive` → genérica.
+4. Password ok + qualquer `CustomerAccessStatus` → emite `CustomerCookie` e devolve o DTO com `accessStatus`.
+
+Não exigir `EmailConfirmed` no login neste ADR (comportamento atual).
+
+### 4. Login visual unificado (Fase 2 — frontend)
 
 Criar uma experiência única de login:
 
@@ -160,7 +222,7 @@ ou, se o projeto preferir rotas em português:
 /entrar
 ```
 
-A rota `/admin/login` deve deixar de ser a tela principal de login e passar a redirecionar para o login único.
+A rota `/admin/login` deve deixar de ser a tela principal de login e passar a redirecionar para o login único **na Fase 2**.
 
 Após login, o frontend decide o destino:
 
@@ -172,9 +234,11 @@ Cliente recusado → /account/access-rejected
 Cliente suspenso → /account/access-suspended
 ```
 
+“Tela única” **não** significa um único `POST /api/auth/login` que escolhe o papel. Staff continua em `/api/auth/admin/*`. Customer continua em `/api/auth/customer/*`.
+
 ### 5. Manter `/admin/*` nesta fase
 
-Apesar do login visual ser unificado, as rotas administrativas continuam sob:
+Apesar do login visual ser unificado na Fase 2, as rotas administrativas continuam sob:
 
 ```text
 /admin/*
@@ -231,7 +295,7 @@ Mas isso fica fora do escopo atual.
 
 ### Cadastro
 
-Ao registrar novo usuário customer:
+Ao registrar novo usuário customer (quando `CustomerAccess:RequireApproval=true`):
 
 ```text
 AccessStatus = PendingApproval
@@ -240,7 +304,7 @@ AccessRequestedAt = now
 
 O cadastro não libera compra automaticamente.
 
-O backend deve disparar evento/notificação para aprovação administrativa.
+O backend deve disparar evento/notificação para aprovação administrativa (e-mail Brevo = Fase 3).
 
 ### Login/me
 
@@ -249,12 +313,13 @@ O endpoint de login ou `/me` deve retornar o status de acesso do cliente.
 Campos esperados no DTO customer:
 
 ```text
-accessStatus
-accessRequestedAt
+approvalStatus          (Pending | Approved | Rejected | Suspended)
+accessStatus            (PendingApproval | Approved | Rejected | Suspended — canônico)
+approvalRequestedAt / accessRequestedAt
 approvedAt
 ```
 
-O frontend usa esses campos para redirecionamento e bloqueio visual.
+`approvalStatus=Pending` é o alias público de `PendingApproval`. O frontend usa esses campos para redirecionamento e bloqueio visual.
 
 ### Checkout
 
@@ -273,21 +338,27 @@ CustomerCookie válido
 Customer AccessStatus = Approved
 ```
 
-Respostas sugeridas:
+Respostas:
 
 ```text
 401 — não logado
 403 — customer não aprovado
 ```
 
-Codes sugeridos:
+Codes:
 
 ```text
 CUSTOMER_LOGIN_REQUIRED
-CUSTOMER_ACCESS_NOT_APPROVED
+GUEST_CHECKOUT_DISABLED
+CUSTOMER_APPROVAL_PENDING
 CUSTOMER_ACCESS_REJECTED
 CUSTOMER_ACCESS_SUSPENDED
-GUEST_CHECKOUT_DISABLED
+CUSTOMER_ACCESS_NOT_APPROVED
+STORE_ACCESS_REQUIRES_LOGIN
+STORE_ACCESS_REQUIRES_APPROVAL
+CUSTOMER_APPROVAL_INVALID_STATUS
+CUSTOMER_APPROVAL_REASON_TOO_LONG
+CUSTOMER_NOT_FOUND
 ```
 
 ### Order creation
@@ -316,16 +387,7 @@ Quando o modo for:
 PrivateCatalogApprovedOnly
 ```
 
-os endpoints públicos de catálogo devem ser protegidos ou retornar somente uma resposta pública mínima, conforme decisão de implementação.
-
-Opções:
-
-```text
-A) Proteger endpoints de catálogo com CustomerCookie + Approved.
-B) Manter endpoints públicos, mas frontend bloqueia vitrine.
-```
-
-Recomendação:
+os endpoints públicos de catálogo devem ser protegidos. Recomendação adotada:
 
 ```text
 Proteger no backend os endpoints que expõem catálogo completo, preços e SKUs.
@@ -334,6 +396,8 @@ Proteger no backend os endpoints que expõem catálogo completo, preços e SKUs.
 O frontend não deve ser a única barreira.
 
 ## Regras de frontend
+
+(Fase 2 — não implementar neste PR de backend.)
 
 ### Cadastro
 
@@ -479,7 +543,7 @@ recusar cliente
 visualizar data da solicitação
 ```
 
-Funcionalidades recomendadas para o backend já suportar:
+Funcionalidades que o backend já deve suportar:
 
 ```text
 suspender cliente
@@ -489,7 +553,7 @@ registrar data/hora da ação
 registrar motivo de recusa/suspensão
 ```
 
-Notificações no admin MVP:
+Notificações no admin MVP (Fase 2 UI):
 
 ```text
 badge no menu
@@ -499,9 +563,23 @@ lista de pendentes
 
 Não criar notification center completo nesta fase.
 
+Backend Fase 1 (Backoffice + CSRF nas mutações):
+
+```text
+GET  /api/admin/customers
+GET  /api/admin/customers/pending-count
+GET  /api/admin/customers/{id}
+POST /api/admin/customers/{id}/approve
+POST /api/admin/customers/{id}/reject
+POST /api/admin/customers/{id}/suspend
+POST /api/admin/customers/{id}/reactivate
+```
+
+Não devolver `guestAccessToken`, hashes nem dados de staff nesta listagem.
+
 ## E-mails transacionais
 
-Esta decisão impacta Brevo.
+Esta decisão impacta Brevo. **Fase 3** — não bloqueia o modelo nem a Fase 1.
 
 Eventos necessários:
 
@@ -601,6 +679,12 @@ Checkout__AllowGuestCheckout=false
 CustomerAccess__RequireApproval=true
 ```
 
+MVP: configuração de ambiente. Um tenant, um cliente. Admin UI para ligar/desligar a loja = evolução.
+
+`appsettings.json` (TESTE/HML/PROD deste cliente) usa `StoreAccess:Mode=Closed` (equivalente a `PrivateCatalogApprovedOnly`). `appsettings.Development.json` permanece `Open` (`PublicCatalogAndGuestCheckout`) para DX e testes de regressão do catálogo público.
+
+Aliases de configuração: `Closed` → `PrivateCatalogApprovedOnly`; `Open` → `PublicCatalogAndGuestCheckout`; `Checkout:AllowGuest` → mesmo efeito de `Checkout:AllowGuestCheckout`; filtro admin `status=Pending` → `PendingApproval`. O JSON público expõe **os dois** nomes: `mode`/`allowGuest`/`approvalStatus` (Open/Closed/Pending) e `storeAccessMode`/`allowGuestCheckout`/`accessStatus` (canônicos deste ADR).
+
 ## Compatibilidade com funcionalidades existentes
 
 ### Orders
@@ -647,7 +731,7 @@ Sem impacto.
 
 ### Brevo
 
-Passa a ser requisito para aprovação de cadastro e comunicação com admin/cliente.
+Passa a ser requisito para aprovação de cadastro e comunicação com admin/cliente (Fase 3).
 
 ## Não objetivos desta ADR
 
@@ -663,6 +747,9 @@ permissões avançadas por equipe
 roles complexas
 chat nativo
 WhatsApp Business API
+login social, 2FA, magic link
+aprovação por CNPJ/documento
+e-mail “conta aprovada” (outbox) na Fase 1
 ```
 
 ## Riscos
@@ -672,9 +759,10 @@ WhatsApp Business API
 Mitigação:
 
 ```text
-usar feature flags
+usar feature flags / config por ambiente
 manter compatibilidade com pedidos antigos
 testar checkout aprovado/não aprovado/guest
+Development permanece com catálogo público + guest para regressão
 ```
 
 ### Risco 2 — vazamento de catálogo privado
@@ -692,7 +780,7 @@ Mitigação:
 
 ```text
 não fundir cookies/policies nesta fase
-unificar só a UI de login
+unificar só a UI de login (Fase 2)
 manter Backoffice e Customer separados internamente
 ```
 
@@ -701,10 +789,11 @@ manter Backoffice e Customer separados internamente
 Mitigação:
 
 ```text
-badge no menu
-card no dashboard
+badge no menu (Fase 2)
+card no dashboard (Fase 2)
 lista de aprovações
-e-mail para admin via Brevo
+GET /api/admin/customers/approvals/count (Fase 1; alias /pending-count)
+e-mail para admin via Brevo (Fase 3)
 ```
 
 ## Plano de implementação
@@ -717,6 +806,7 @@ CustomerAccessStatus
 migration
 register cria PendingApproval
 login/me retorna status
+GET /api/store/access
 checkout exige Approved conforme config
 order creation reforça customer aprovado
 admin endpoints approve/reject/suspend/reactivate
@@ -794,6 +884,8 @@ A feature será considerada pronta quando:
 17. E-mail/notificação de aprovação fica planejado para Brevo.
 18. Testes backend/frontend cobrem os fluxos críticos.
 ```
+
+Itens 13–14 e a parte frontend de 18 são Fase 2. Item 17 é Fase 3. Fase 1 cobre 1–12, 15–16 e testes backend de 18.
 
 ## Decisão final
 

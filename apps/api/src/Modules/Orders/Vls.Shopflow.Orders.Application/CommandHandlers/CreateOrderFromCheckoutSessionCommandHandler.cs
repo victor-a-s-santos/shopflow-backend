@@ -90,7 +90,7 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
         DateTimeOffset? tokenExpiresAt = null;
         var options = guestOrderAccessOptions.Value;
 
-        if (options.Enabled)
+        if (options.Enabled && command.IssueGuestAccessToken && command.CustomerUserId is null)
         {
             var ttlDays = Math.Max(1, options.TokenTtlDays);
             tokenExpiresAt = DateTimeOffset.UtcNow.AddDays(ttlDays);

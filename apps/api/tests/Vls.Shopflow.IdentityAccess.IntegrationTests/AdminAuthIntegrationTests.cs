@@ -201,11 +201,15 @@ public class ShopflowWebApplicationFactory : WebApplicationFactory<Program>
                 ["ConnectionStrings:Orders"] = ConnectionString,
                 ["ConnectionStrings:PaymentsPix"] = ConnectionString,
                 ["ConnectionStrings:IdentityAccess"] = ConnectionString,
+                ["ConnectionStrings:Notifications"] = ConnectionString,
                 ["SHOPFLOW_ADMIN_EMAIL"] = AdminEmail,
                 ["SHOPFLOW_ADMIN_PASSWORD"] = AdminPassword,
                 ["SHOPFLOW_ADMIN_NAME"] = "Integration Admin",
                 ["DataProtection:KeysPath"] = Path.Combine(Path.GetTempPath(), "shopflow-test-dataprotection"),
-                ["AllowedOrigins:0"] = "http://localhost"
+                ["AllowedOrigins:0"] = "http://localhost",
+                ["StoreAccess:Mode"] = "PublicCatalogAndGuestCheckout",
+                ["Checkout:AllowGuestCheckout"] = "true",
+                ["CustomerAccess:RequireApproval"] = "false"
             });
         });
 

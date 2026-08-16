@@ -11,3 +11,7 @@ Resumo:
 O Worker (`OrderEmailIntentDispatcherWorker`) copia intents `Pending` para `notifications.email_outbox`. A Brevo só é chamada pelo `EmailOutboxWorker`.
 
 Idempotência: `order:{orderId:D}:created|paid|shipped|delivered`.
+
+Remessa (`DeliveryBatch`) reusa as mesmas keys por pedido de propósito. Não criar `batch-shipped:{batchId}` — duplicaria o e-mail. Templates não incluem batchId, nota interna nem GUID operacional.
+
+Aprovação de cadastro: `docs/customer/customer-approval-emails.md`.

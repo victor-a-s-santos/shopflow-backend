@@ -18,7 +18,7 @@ Módulo responsável por criar e consultar sessões de checkout, reservar estoqu
 - IdentityCustomer (backend)
 - Pagamento integrado neste módulo (Orders + PaymentsPix)
 
-**Checkout convidado:** não exige login customer. `POST /api/checkout/sessions` e fluxos downstream permanecem públicos (ver SEC-005).
+**Checkout convidado:** controlado por `Checkout:AllowGuest` / `AllowGuestCheckout`. Cliente atual = desligado. Ver `docs/checkout/checkout-session.md` e `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`. Tracking legado de pedidos guest permanece (`docs/orders/guest-order-access.md`).
 
 ## Fluxo — criar sessão
 

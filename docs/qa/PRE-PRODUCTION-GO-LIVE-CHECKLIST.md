@@ -256,7 +256,8 @@ Documentar: passou / falhou / not run / flake.
 
 - [ ] Remover código temporário de raw capture quando diagnóstico encerrado.
 - [ ] Atualizar dependências com advisory alto (`System.Security.Cryptography.Xml`).
-- [ ] Brevo: `Brevo__Enabled` + sender verificado; worker outbox ativo; smoke confirm/reset/order/paid/ship (`docs/integrations/brevo-transactional-emails.md`).
-- [ ] FE: `/confirm-email`, `/reset-password`, tracking `/pedido/:n?t=` hidrata token.
+- [ ] Brevo: `Brevo__Enabled` + sender verificado; worker outbox ativo; smoke confirm/reset/approval/order/paid/ship (`docs/qa/BREVO-TRANSACTIONAL-EMAILS-SMOKE.md`).
+- [ ] `AdminNotifications__ApprovalRequestsEmail` preenchido em TESTE/HML/PROD.
+- [ ] FE: `/confirm-email`, `/reset-password`, `/account/pending-approval`, tracking `/pedido/:n?t=` hidrata token.
 - [ ] Frete real (fora do escopo e-mail).
 - [ ] Alinhar docs stale (`shopflow-current-state`, FE context).

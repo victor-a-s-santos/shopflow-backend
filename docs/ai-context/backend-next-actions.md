@@ -1,9 +1,16 @@
-# Backend next actions (alias)
+# Próximas ações — backend
 
-Fonte canônica deste arquivo: [`next-actions.md`](./next-actions.md).
+Documento de ponte. A lista viva continua em `docs/ai-context/next-actions.md`.
 
-Delivery/Fulfillment Fase 2+3 (backend): [`docs/orders/delivery-fulfillment-phase-2.md`](../orders/delivery-fulfillment-phase-2.md), [`docs/orders/delivery-batch-phase-3.md`](../orders/delivery-batch-phase-3.md). Design: [`docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`](../architecture/DELIVERY-FULFILLMENT-DESIGN.md) — FE e WhatsApp/chat ainda pendentes.
+## Concluído nesta Fase 1
 
-Postal code lookup: [`docs/integrations/postal-code-lookup.md`](../integrations/postal-code-lookup.md) — `GET /api/integrations/postal-code/br/{cep}` (Shipping + ViaCEP no backend).
+Store access / customer approval no backend: config Open/Closed + 4 modos internos, cadastro Pending, gates de catálogo/checkout, admin `/approvals`, codes ProblemDetails. Ver `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`.
 
-Product images R2: [`docs/integrations/cloudflare-r2-product-images.md`](../integrations/cloudflare-r2-product-images.md) — backend S3-compatible; FE só consome URL pública. Backfill TEST: [`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`](../qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md).
+## Pendente (não é backend desta fase)
+
+- **Fase 2 frontend:** guards de catálogo/checkout, tela “cadastro em análise”, fila `/admin/customers/approvals`, badge de pendentes, login visual unificado. **Não** fundir cookies/policies. **Não** remover `/admin/login` no backend.
+- Guest tracking legado permanece.
+
+## Concluído — Fase 3 Brevo
+
+E-mails de cadastro pendente (admin + cliente), aprovado, recusado e suspenso via outbox. Pedido/pago/enviado/entregue e confirm/reset já existiam (EMAIL-001). Ver `docs/customer/customer-approval-emails.md`.

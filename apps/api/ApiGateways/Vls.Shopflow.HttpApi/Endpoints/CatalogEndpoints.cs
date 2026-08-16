@@ -20,13 +20,15 @@ public static class CatalogEndpoints
         {
             var dto = await sender.Send(new GetAllAttributeDefinitionsQuery(), ct);
             return Results.Ok(dto);
-        });
+        })
+        .RequireApprovedCatalogAccess();
         
         cat.MapGet("/categories", async (ISender sender, CancellationToken ct) =>
         {
             var result = await sender.Send(new GetAllCategoriesQuery(), ct);
             return Results.Ok(result);
-        });
+        })
+        .RequireApprovedCatalogAccess();
 
         // -------------------------------------------------------
         // CREATE VARIANT PRODUCT
@@ -176,7 +178,8 @@ public static class CatalogEndpoints
         {
             var dto = await sender.Send(new GetProductBySlugQuery(slug), ct);
             return dto is null ? Results.NotFound() : Results.Ok(dto);
-        });
+        })
+        .RequireApprovedCatalogAccess();
 
         // -------------------------------------------------------
         // GET PRODUCT BY ID
@@ -187,7 +190,8 @@ public static class CatalogEndpoints
         {
             var dto = await sender.Send(new GetProductByIdQuery(id), ct);
             return dto is null ? Results.NotFound() : Results.Ok(dto);
-        });
+        })
+        .RequireApprovedCatalogAccess();
 
         // -------------------------------------------------------
         // GET PAGED PRODUCTS
@@ -214,7 +218,8 @@ public static class CatalogEndpoints
                     q),
                 ct);
             return Results.Ok(dto);
-        });
+        })
+        .RequireApprovedCatalogAccess();
 
         // -------------------------------------------------------
         // PRODUCT IMAGES (multipart upload + manage)

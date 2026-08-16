@@ -7,7 +7,7 @@
 
 Shopflow é um e-commerce modular em monorepo: backend .NET (monólito modular) + frontend React (Vite). O foco atual é operação de catálogo/estoque no admin, vitrine funcional, carrinho local e checkout integrado com sessão real (`CartCheckout`). O módulo **Orders** backend MVP cria pedidos `PendingPayment` a partir de sessões de checkout — **sem integração frontend ainda**.
 
-**Decisão de produto fixa:** checkout como convidado é permitido e prioritário. Login/cadastro são opcionais e preparados apenas visualmente.
+**Decisão de produto (ADR):** loja configurável via `StoreAccess:Mode`. Cliente atual (TESTE/HML/PROD) = `Closed` (`PrivateCatalogApprovedOnly`) + aprovação administrativa + `Checkout:AllowGuest=false`. Development/testes de regressão permanecem `Open` com catálogo público e guest. Ver `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md` e `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`.
 
 ---
 
@@ -73,11 +73,11 @@ Upload de imagens: **Cloudflare R2** (S3-compatible) quando `Storage__Provider=C
 | **CartCheckout (frontend)** | UI 4 etapas, `POST /api/checkout/sessions`, reserva real, cria pedido + Pix Pending | Shipping |
 | **Orders (backend)** | create + guest status; `orderNumber`; Admin/Customer orders; **guest claim** create-account/claim com codes oficiais + Identity password errors; Paid via Pix | Frontend pós-Pix (conta opcional), “Meus pedidos”, claim UI |
 | **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API**; webhook via **mercadopago-sdk** + oráculo manual; `SendNotificationUrlInOrderCreate` (painel vs payload); reconciliação Worker `GET /v1/orders` (fallback); Paid só `processed`/`accredited` | Frontend QR |
-| **Notifications / Brevo** | `orders.email_intents` + dispatcher + outbox `notifications.email_outbox` + `EmailOutboxWorker` + templates HTML PT-BR; auth confirm/reset pós-commit; order/paid/ship/deliver | Validar em TESTE com Brevo sandbox + ApiKey na VPS; FE deep-links |
+| **Notifications / Brevo** | `orders.email_intents` + dispatcher + outbox `notifications.email_outbox` + `EmailOutboxWorker` + templates HTML PT-BR; auth confirm/reset; order/paid/ship/deliver; **aprovação de cadastro (Fase 3)** | Validar em TESTE com Brevo sandbox + ApiKey na VPS; FE deep-links / pending-approval |
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |
 | **Cart (frontend)** | CRUD local por `skuId`, drawer, persistência | Sincronização com backend (não previsto ainda) |
-| **IdentityAccess (backend)** | Admin + Customer auth, CSRF, policies `Backoffice`/`Customer`, 30 testes | Frontend customer auth; Account; guest order token |
+| **IdentityAccess (backend)** | Admin + Customer auth, CSRF, policies `Backoffice`/`Customer`, **StoreAccess Open/Closed + CustomerAccessStatus (Fase 1)** + e-mails de aprovação (Fase 3) | Frontend Fase 2 (guards, login unificado, tela de aprovações) |
 | **Admin Dashboard** | Contagem real de produtos | Pedidos (156) e atividade recente são **hardcoded/fake** |
 
 ### Visual-only (frontend preparado, backend parcial)
