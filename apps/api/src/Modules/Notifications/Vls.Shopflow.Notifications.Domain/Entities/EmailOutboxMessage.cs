@@ -88,6 +88,18 @@ public sealed class EmailOutboxMessage : Entity<Guid>
         LastError = Truncate(reason, MaxLastErrorLength);
     }
 
+    /// <summary>
+    /// Returns the message to Pending without consuming an attempt.
+    /// Used when the provider is disabled or missing configuration so the send stays recoverable.
+    /// </summary>
+    public void ReleaseForConfigurationRetry(string reason, DateTimeOffset nextAttemptAt)
+    {
+        Status = EmailOutboxStatus.Pending;
+        ProcessingStartedAt = null;
+        LastError = Truncate(reason, MaxLastErrorLength);
+        NextAttemptAt = nextAttemptAt;
+    }
+
     public void MarkRetry(string error, DateTimeOffset nextAttemptAt)
     {
         Attempts += 1;

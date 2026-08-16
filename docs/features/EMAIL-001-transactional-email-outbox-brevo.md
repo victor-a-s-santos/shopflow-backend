@@ -88,6 +88,9 @@ Hosted service no **Worker existente** (`OrderEmailIntentDispatcherWorker`), sem
 - Órfãos `Processing`: `ProcessingStartedAt` + `EmailOutbox__ProcessingTimeoutSeconds` (default 120) voltam a ser elegíveis.
 - Unique de `IdempotencyKey`: insert concorrente é idempotente (não é falha operacional).
 - Retry: timeout / 429 / 5xx transitório; 4xx permanente; `MaxAttempts` limitado.
+- Configuração Brevo ausente ou `Brevo__Enabled=false`: a mensagem volta para `Pending` **sem** consumir `Attempts` (`ReleaseForConfigurationRetry`). Não usa `Skipped` — em produção o e-mail precisa permanecer recuperável quando a chave ainda não está no ambiente.
+- `EmailOutbox__Enabled=false`: o worker não claima; rows ficam `Pending`.
+- `Skipped` permanece no domínio para um “não enviar” explícito; o processor não o usa para falta de config.
 
 ## Brevo
 
