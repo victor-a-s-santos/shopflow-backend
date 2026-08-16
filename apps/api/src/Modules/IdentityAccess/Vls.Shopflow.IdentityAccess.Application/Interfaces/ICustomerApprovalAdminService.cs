@@ -10,6 +10,9 @@ public interface ICustomerApprovalAdminService
         string? search,
         int page,
         int pageSize,
+        DateTimeOffset? createdFrom = null,
+        DateTimeOffset? createdTo = null,
+        string? sort = null,
         CancellationToken cancellationToken = default);
 
     Task<int> CountPendingAsync(CancellationToken cancellationToken = default);

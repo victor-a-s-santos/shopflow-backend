@@ -50,7 +50,9 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("mode").GetString().Should().Be("PrivateCatalogApprovedOnly");
+        body.GetProperty("mode").GetString().Should().Be("Closed");
+        body.GetProperty("storeAccessMode").GetString().Should().Be("PrivateCatalogApprovedOnly");
+        body.GetProperty("allowGuest").GetBoolean().Should().BeFalse();
         body.GetProperty("allowGuestCheckout").GetBoolean().Should().BeFalse();
         body.GetProperty("requireApprovedCustomerToBrowse").GetBoolean().Should().BeTrue();
         body.GetProperty("requireApprovedCustomerForCheckout").GetBoolean().Should().BeTrue();
@@ -75,7 +77,9 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("approvalStatus").GetString().Should().Be("Pending");
         body.GetProperty("accessStatus").GetString().Should().Be(nameof(CustomerAccessStatus.PendingApproval));
+        body.GetProperty("message").GetString().Should().Be("Cadastro enviado para aprovação.");
         body.GetProperty("approvedAt").ValueKind.Should().Be(JsonValueKind.Null);
 
         var me = await client.GetAsync("/api/auth/customer/me");
@@ -102,12 +106,15 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
         });
         login.StatusCode.Should().Be(HttpStatusCode.OK);
         var loginBody = await login.Content.ReadFromJsonAsync<JsonElement>();
+        loginBody.GetProperty("approvalStatus").GetString().Should().Be("Pending");
         loginBody.GetProperty("accessStatus").GetString().Should().Be(nameof(CustomerAccessStatus.PendingApproval));
 
         var me = await client.GetAsync("/api/auth/customer/me");
         me.StatusCode.Should().Be(HttpStatusCode.OK);
         var meBody = await me.Content.ReadFromJsonAsync<JsonElement>();
+        meBody.GetProperty("approvalStatus").GetString().Should().Be("Pending");
         meBody.GetProperty("accessStatus").GetString().Should().Be(nameof(CustomerAccessStatus.PendingApproval));
+        meBody.TryGetProperty("approvalRequestedAt", out _).Should().BeTrue();
     }
 
     [Fact]
@@ -121,7 +128,7 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.CustomerLoginRequired);
+        body.GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.StoreAccessRequiresLogin);
     }
 
     [Fact]
@@ -135,12 +142,12 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
         var catalog = await client.GetAsync("/api/catalog/categories");
         catalog.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var catalogBody = await catalog.Content.ReadFromJsonAsync<JsonElement>();
-        catalogBody.GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.CustomerAccessNotApproved);
+        catalogBody.GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.StoreAccessRequiresApproval);
 
         var checkout = await client.PostAsJsonAsync("/api/checkout/sessions", SampleCheckoutRequest());
         checkout.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var checkoutBody = await checkout.Content.ReadFromJsonAsync<JsonElement>();
-        checkoutBody.GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.CustomerAccessNotApproved);
+        checkoutBody.GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.CustomerApprovalPending);
     }
 
     [Fact]
@@ -175,16 +182,25 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
         var csrf = await admin.GetFromJsonAsync<JsonElement>("/api/auth/csrf");
         var token = csrf.GetProperty("token").GetString();
 
-        var count = await admin.GetFromJsonAsync<JsonElement>("/api/admin/customers/pending-count");
+        var count = await admin.GetFromJsonAsync<JsonElement>("/api/admin/customers/approvals/count");
+        count.GetProperty("pending").GetInt32().Should().BeGreaterThan(0);
         count.GetProperty("pendingCount").GetInt32().Should().BeGreaterThan(0);
 
-        var list = await admin.GetAsync("/api/admin/customers?status=PendingApproval&q=" + Uri.EscapeDataString(pendingEmail));
+        var list = await admin.GetAsync("/api/admin/customers/approvals?q=" + Uri.EscapeDataString(pendingEmail));
         list.StatusCode.Should().Be(HttpStatusCode.OK);
         var listBody = await list.Content.ReadFromJsonAsync<JsonElement>();
         var items = listBody.GetProperty("items");
         items.GetArrayLength().Should().BeGreaterThan(0);
         var customerId = items[0].GetProperty("customerId").GetGuid();
+        items[0].GetProperty("approvalStatus").GetString().Should().Be("Pending");
         items[0].GetProperty("accessStatus").GetString().Should().Be(nameof(CustomerAccessStatus.PendingApproval));
+        items[0].TryGetProperty("passwordHash", out _).Should().BeFalse();
+        items[0].TryGetProperty("securityStamp", out _).Should().BeFalse();
+
+        var pendingAlias = await admin.GetAsync("/api/admin/customers/approvals?status=Pending&q=" + Uri.EscapeDataString(pendingEmail));
+        pendingAlias.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await pendingAlias.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("items").GetArrayLength().Should().BeGreaterThan(0);
 
         var approveRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/customers/{customerId}/approve")
         {
@@ -194,8 +210,9 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
         var approve = await admin.SendAsync(approveRequest);
         approve.StatusCode.Should().Be(HttpStatusCode.OK);
         var approvedBody = await approve.Content.ReadFromJsonAsync<JsonElement>();
+        approvedBody.GetProperty("approvalStatus").GetString().Should().Be(nameof(CustomerAccessStatus.Approved));
         approvedBody.GetProperty("accessStatus").GetString().Should().Be(nameof(CustomerAccessStatus.Approved));
-        approvedBody.GetProperty("accessDecidedByAdminUserId").GetGuid().Should().NotBeEmpty();
+        approvedBody.GetProperty("approvedByAdminId").GetGuid().Should().NotBeEmpty();
 
         var suspendRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/customers/{customerId}/suspend")
         {
@@ -244,7 +261,7 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
             return;
 
         var client = await CreatePendingCustomerClientAsync();
-        var response = await client.GetAsync("/api/admin/customers");
+        var response = await client.GetAsync("/api/admin/customers/approvals");
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
     }
 
@@ -295,6 +312,112 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
         suspendedCheckout.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await suspendedCheckout.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.CustomerAccessSuspended);
+    }
+
+    [Fact]
+    public async Task CatalogProductDetail_PendingCustomer_Returns403()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = await CreatePendingCustomerClientAsync();
+        var response = await client.GetAsync($"/api/catalog/products/{Guid.NewGuid()}");
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.StoreAccessRequiresApproval);
+    }
+
+    [Fact]
+    public async Task AdminApprove_WithoutCsrf_IsBlocked()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var pendingEmail = await _factory.RegisterCustomerAsync();
+        Guid customerId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ShopflowUser>>();
+            var user = await users.FindByEmailAsync(pendingEmail);
+            customerId = user!.Id;
+        }
+
+        var admin = _factory.CreateAuthenticatedAdminClient();
+        var response = await admin.PostAsJsonAsync($"/api/admin/customers/{customerId}/approve", new { reason = "sem csrf" });
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task AdminApprove_ReasonTooLong_Returns400()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var pendingEmail = await _factory.RegisterCustomerAsync();
+        Guid customerId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ShopflowUser>>();
+            var user = await users.FindByEmailAsync(pendingEmail);
+            customerId = user!.Id;
+        }
+
+        var admin = _factory.CreateAuthenticatedAdminClient();
+        var csrf = await admin.GetFromJsonAsync<JsonElement>("/api/auth/csrf");
+        var token = csrf.GetProperty("token").GetString();
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/customers/{customerId}/approve")
+        {
+            Content = JsonContent.Create(new { reason = new string('x', 1001) })
+        };
+        request.Headers.Add("X-CSRF-TOKEN", token);
+        var response = await admin.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.CustomerApprovalReasonTooLong);
+    }
+
+    [Fact]
+    public async Task AdminApprove_FromSuspended_Succeeds()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var email = await _factory.RegisterCustomerAsync();
+        await ApproveCustomerAsync(email);
+        await SetStatusAsync(email, CustomerAccessStatus.Suspended);
+        Guid customerId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ShopflowUser>>();
+            var user = await users.FindByEmailAsync(email);
+            customerId = user!.Id;
+        }
+
+        var admin = _factory.CreateAuthenticatedAdminClient();
+        var csrf = await admin.GetFromJsonAsync<JsonElement>("/api/auth/csrf");
+        var token = csrf.GetProperty("token").GetString();
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/customers/{customerId}/approve")
+        {
+            Content = JsonContent.Create(new { reason = "liberado novamente" })
+        };
+        request.Headers.Add("X-CSRF-TOKEN", token);
+        var response = await admin.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("approvalStatus").GetString().Should().Be(nameof(CustomerAccessStatus.Approved));
+    }
+
+    [Fact]
+    public async Task AdminCustomerNotFound_Returns404WithCode()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var admin = _factory.CreateAuthenticatedAdminClient();
+        var response = await admin.GetAsync($"/api/admin/customers/{Guid.NewGuid()}");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.CustomerNotFound);
     }
 
     private async Task<HttpClient> CreatePendingCustomerClientAsync()

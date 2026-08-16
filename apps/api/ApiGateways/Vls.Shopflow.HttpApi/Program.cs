@@ -349,7 +349,12 @@ app.Use(async (ctx, next) =>
         var problem = HttpProblemDetails.Problem(
             ctx,
             ex.StatusCode,
-            ex.StatusCode == StatusCodes.Status409Conflict ? "Conflict" : "Bad Request",
+            ex.StatusCode switch
+            {
+                StatusCodes.Status409Conflict => "Conflict",
+                StatusCodes.Status404NotFound => "Not found",
+                _ => "Bad Request"
+            },
             ex.Message);
 
         problem.Extensions["code"] = ex.Code;

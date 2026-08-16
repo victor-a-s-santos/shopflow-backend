@@ -52,7 +52,7 @@ public static class CustomerAuthEndpoints
                     statusCode: StatusCodes.Status400BadRequest);
             }
 
-            return Results.Created("/api/auth/customer/me", CustomerResponseMapper.ToRegisterResponse(result.Customer));
+            return Results.Created("/api/auth/customer/me", CustomerResponseMapper.ToRegisterResponse(result.Customer, result.Message));
         })
         .RequireRateLimiting(DependencyInjection.CustomerRegisterRateLimitPolicy)
         .DisableAntiforgery();

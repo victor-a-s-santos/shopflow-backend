@@ -169,8 +169,8 @@ namespace Vls.Shopflow.IdentityAccess.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("AccessDecisionReason")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTimeOffset?>("AccessRequestedAt")
                         .HasColumnType("timestamp with time zone");

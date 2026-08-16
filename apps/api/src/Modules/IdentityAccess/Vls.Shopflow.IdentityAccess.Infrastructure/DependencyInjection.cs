@@ -333,6 +333,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentCustomerAccessor, CurrentCustomerAccessor>();
         services.AddScoped<ICustomerPasswordService, CustomerPasswordService>();
         services.AddScoped<ICustomerApprovalAdminService, CustomerApprovalAdminService>();
+        services.AddScoped<ICustomerPendingApprovalNotifier, LoggingCustomerPendingApprovalNotifier>();
         services.AddSingleton<IStoreAccessPolicy, StoreAccessPolicy>();
     }
 

@@ -8,7 +8,7 @@ Permitir que o frontend consulte o **status limitado** de um pedido sem login e 
 
 ## Geração
 
-- Momento: `POST /api/orders/from-checkout-session` (pedido criado com sucesso).
+- Momento: `POST /api/orders/from-checkout-session` (pedido criado com sucesso), **somente** se guest checkout estiver permitido e o pedido não tiver `CustomerUserId`. Loja Closed / `AllowGuest=false` não emite token em pedidos novos. Tracking legado permanece (`docs/orders/guest-order-access.md`).
 - Token bruto: 256 bits via `RandomNumberGenerator`, encoding **Base64Url**.
 - Persistência: **apenas** HMAC-SHA256 hex (`GuestOrderAccess__TokenHashSecret`).
 - O token bruto retorna **uma única vez** nos campos:

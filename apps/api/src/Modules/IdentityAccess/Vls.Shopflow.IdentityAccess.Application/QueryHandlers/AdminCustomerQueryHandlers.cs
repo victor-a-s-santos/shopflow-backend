@@ -17,7 +17,15 @@ public sealed class GetAdminCustomersQueryHandler(ICustomerApprovalAdminService 
     : IRequestHandler<GetAdminCustomersQuery, PagedAdminCustomersDto>
 {
     public Task<PagedAdminCustomersDto> Handle(GetAdminCustomersQuery request, CancellationToken cancellationToken)
-        => service.ListAsync(request.Status, request.Search, request.Page, request.PageSize, cancellationToken);
+        => service.ListAsync(
+            request.Status,
+            request.Search,
+            request.Page,
+            request.PageSize,
+            request.CreatedFrom,
+            request.CreatedTo,
+            request.Sort,
+            cancellationToken);
 }
 
 public sealed class GetPendingCustomerCountQueryHandler(ICustomerApprovalAdminService service)

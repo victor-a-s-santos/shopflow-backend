@@ -10,7 +10,10 @@ public sealed record GetAdminCustomersQuery(
     CustomerAccessStatus? Status,
     string? Search,
     int Page = 1,
-    int PageSize = 20) : IRequest<PagedAdminCustomersDto>;
+    int PageSize = 20,
+    DateTimeOffset? CreatedFrom = null,
+    DateTimeOffset? CreatedTo = null,
+    string? Sort = null) : IRequest<PagedAdminCustomersDto>;
 
 public sealed record GetPendingCustomerCountQuery : IRequest<PendingCustomerCountDto>;
 

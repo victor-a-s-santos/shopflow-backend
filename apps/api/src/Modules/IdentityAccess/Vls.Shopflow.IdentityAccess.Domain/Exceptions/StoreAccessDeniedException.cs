@@ -15,19 +15,28 @@ public sealed class StoreAccessDeniedException : Exception
     }
 
     public static StoreAccessDeniedException LoginRequired()
-        => new(401, StoreAccessErrorCodes.CustomerLoginRequired, "Login is required.");
+        => new(401, StoreAccessErrorCodes.CustomerLoginRequired, StoreAccessMessages.LoginRequiredToBuy);
 
     public static StoreAccessDeniedException GuestCheckoutDisabled()
-        => new(401, StoreAccessErrorCodes.GuestCheckoutDisabled, "Guest checkout is disabled.");
+        => new(401, StoreAccessErrorCodes.GuestCheckoutDisabled, StoreAccessMessages.GuestCheckoutDisabled);
+
+    public static StoreAccessDeniedException ApprovalPending()
+        => new(403, StoreAccessErrorCodes.CustomerApprovalPending, StoreAccessMessages.ApprovalPending);
 
     public static StoreAccessDeniedException NotApproved()
-        => new(403, StoreAccessErrorCodes.CustomerAccessNotApproved, "Customer access is not approved.");
+        => new(403, StoreAccessErrorCodes.CustomerAccessNotApproved, StoreAccessMessages.LoginRequiredToBuy);
 
     public static StoreAccessDeniedException Rejected()
-        => new(403, StoreAccessErrorCodes.CustomerAccessRejected, "Customer access was rejected.");
+        => new(403, StoreAccessErrorCodes.CustomerAccessRejected, StoreAccessMessages.AccessRejected);
 
     public static StoreAccessDeniedException Suspended()
-        => new(403, StoreAccessErrorCodes.CustomerAccessSuspended, "Customer access is suspended.");
+        => new(403, StoreAccessErrorCodes.CustomerAccessSuspended, StoreAccessMessages.AccessSuspended);
+
+    public static StoreAccessDeniedException CatalogRequiresLogin()
+        => new(401, StoreAccessErrorCodes.StoreAccessRequiresLogin, StoreAccessMessages.StoreRequiresApprovedCustomer);
+
+    public static StoreAccessDeniedException CatalogRequiresApproval()
+        => new(403, StoreAccessErrorCodes.StoreAccessRequiresApproval, StoreAccessMessages.StoreRequiresApprovedCustomer);
 }
 
 public sealed class CustomerApprovalException : Exception
@@ -42,6 +51,15 @@ public sealed class CustomerApprovalException : Exception
         Code = code;
     }
 
-    public static CustomerApprovalException InvalidTransition(string message)
-        => new(409, StoreAccessErrorCodes.CustomerAccessInvalidTransition, message);
+    public static CustomerApprovalException InvalidTransition(string? message = null)
+        => new(
+            409,
+            StoreAccessErrorCodes.CustomerApprovalInvalidStatus,
+            string.IsNullOrWhiteSpace(message) ? StoreAccessMessages.InvalidApprovalStatus : message);
+
+    public static CustomerApprovalException ReasonTooLong()
+        => new(400, StoreAccessErrorCodes.CustomerApprovalReasonTooLong, StoreAccessMessages.ReasonTooLong);
+
+    public static CustomerApprovalException NotFound()
+        => new(404, StoreAccessErrorCodes.CustomerNotFound, StoreAccessMessages.CustomerNotFound);
 }

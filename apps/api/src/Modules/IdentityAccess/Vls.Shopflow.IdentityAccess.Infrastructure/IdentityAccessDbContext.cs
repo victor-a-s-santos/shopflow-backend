@@ -25,7 +25,7 @@ public sealed class IdentityAccessDbContext : IdentityDbContext<ShopflowUser, Sh
             entity.Property(u => u.IsActive).IsRequired();
             entity.Property(u => u.CreatedAt).IsRequired();
             entity.Property(u => u.AccessStatus).IsRequired();
-            entity.Property(u => u.AccessDecisionReason).HasMaxLength(512);
+            entity.Property(u => u.AccessDecisionReason).HasMaxLength(1000);
             entity.HasIndex(u => new { u.IsStaff, u.AccessStatus, u.AccessRequestedAt });
         });
 

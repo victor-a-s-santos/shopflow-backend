@@ -455,7 +455,9 @@ public sealed class EndpointExposureIntegrationTests : IClassFixture<ShopflowWeb
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("mode").GetString().Should().Be("PublicCatalogAndGuestCheckout");
+        body.GetProperty("mode").GetString().Should().Be("Open");
+        body.GetProperty("storeAccessMode").GetString().Should().Be("PublicCatalogAndGuestCheckout");
+        body.GetProperty("allowGuest").GetBoolean().Should().BeTrue();
         body.GetProperty("allowGuestCheckout").GetBoolean().Should().BeTrue();
     }
 

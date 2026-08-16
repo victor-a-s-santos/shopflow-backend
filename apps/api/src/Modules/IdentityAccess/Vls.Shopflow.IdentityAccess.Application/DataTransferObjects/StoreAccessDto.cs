@@ -2,6 +2,8 @@ namespace Vls.Shopflow.IdentityAccess.Application.DataTransferObjects;
 
 public sealed record StoreAccessDto(
     string Mode,
+    string StoreAccessMode,
+    bool AllowGuest,
     bool AllowGuestCheckout,
     bool RequireApprovedCustomerToBrowse,
     bool RequireLoginForCheckout,

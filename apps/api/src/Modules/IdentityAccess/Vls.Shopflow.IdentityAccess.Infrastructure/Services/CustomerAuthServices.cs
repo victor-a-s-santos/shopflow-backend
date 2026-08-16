@@ -3,10 +3,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Vls.Shopflow.IdentityAccess.Application.DataTransferObjects;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
-using Vls.Shopflow.IdentityAccess.Application.Options;
+using Vls.Shopflow.IdentityAccess.Application.Services;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Domain.Enums;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Identity;
@@ -17,7 +16,8 @@ public sealed class CustomerRegistrationService(
     UserManager<ShopflowUser> userManager,
     RoleManager<ShopflowRole> roleManager,
     IIdentityEmailSender emailSender,
-    IOptions<CustomerAccessOptions> customerAccessOptions,
+    IStoreAccessPolicy storeAccessPolicy,
+    ICustomerPendingApprovalNotifier pendingApprovalNotifier,
     ILogger<CustomerRegistrationService> logger)
     : ICustomerRegistrationService
 {
@@ -47,7 +47,7 @@ public sealed class CustomerRegistrationService(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var requireApproval = customerAccessOptions.Value.RequireApproval;
+        var requireApproval = storeAccessPolicy.RequireApproval;
         var accessStatus = requireApproval
             ? CustomerAccessStatus.PendingApproval
             : CustomerAccessStatus.Approved;
@@ -110,7 +110,18 @@ public sealed class CustomerRegistrationService(
         logger.LogInformation("Customer registered: {UserId} ({Email})", user.Id, normalizedEmail);
 
         var dto = await MapCustomerDtoAsync(user);
-        return new RegisterCustomerResult(true, dto, null, IsDuplicateEmail: false, []);
+        var message = accessStatus == CustomerAccessStatus.PendingApproval
+            ? CustomerAccessContract.RegisterPendingMessage
+            : CustomerAccessContract.RegisterApprovedMessage;
+
+        if (accessStatus == CustomerAccessStatus.PendingApproval)
+        {
+            await pendingApprovalNotifier.NotifyRegisteredPendingAsync(
+                new CustomerRegisteredPendingApproval(user.Id, normalizedEmail, user.FullName ?? string.Empty, now),
+                cancellationToken);
+        }
+
+        return new RegisterCustomerResult(true, dto, null, IsDuplicateEmail: false, [], message);
     }
 
     internal static RegisterCustomerFieldError MapIdentityError(IdentityError error)

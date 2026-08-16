@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Vls.Shopflow.IdentityAccess.Application.DataTransferObjects;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
+using Vls.Shopflow.IdentityAccess.Application.Services;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Domain.Enums;
 using Vls.Shopflow.IdentityAccess.Domain.Exceptions;
@@ -19,6 +20,9 @@ public sealed class CustomerApprovalAdminService(
         string? search,
         int page,
         int pageSize,
+        DateTimeOffset? createdFrom = null,
+        DateTimeOffset? createdTo = null,
+        string? sort = null,
         CancellationToken cancellationToken = default)
     {
         var query = CustomerUsers();
@@ -35,12 +39,16 @@ public sealed class CustomerApprovalAdminService(
                 || (u.PhoneNumber != null && EF.Functions.ILike(u.PhoneNumber, $"%{term}%")));
         }
 
+        if (createdFrom is not null)
+            query = query.Where(u => u.CreatedAt >= createdFrom);
+
+        if (createdTo is not null)
+            query = query.Where(u => u.CreatedAt <= createdTo);
+
         var totalItems = await query.CountAsync(cancellationToken);
         var totalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)pageSize);
 
-        var users = await query
-            .OrderBy(u => u.AccessStatus)
-            .ThenByDescending(u => u.AccessRequestedAt ?? u.CreatedAt)
+        var users = await ApplySort(query, sort)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
@@ -71,7 +79,12 @@ public sealed class CustomerApprovalAdminService(
             customerId,
             adminUserId,
             reason,
-            allowedFrom: [CustomerAccessStatus.PendingApproval, CustomerAccessStatus.Rejected],
+            allowedFrom:
+            [
+                CustomerAccessStatus.PendingApproval,
+                CustomerAccessStatus.Rejected,
+                CustomerAccessStatus.Suspended
+            ],
             next: CustomerAccessStatus.Approved,
             cancellationToken);
 
@@ -123,23 +136,28 @@ public sealed class CustomerApprovalAdminService(
         CancellationToken cancellationToken)
     {
         var user = await FindCustomerAsync(customerId, cancellationToken)
-                   ?? throw new KeyNotFoundException("Customer not found.");
+                   ?? throw CustomerApprovalException.NotFound();
+
+        if (!string.IsNullOrWhiteSpace(reason)
+            && reason.Trim().Length > CustomerAccessContract.MaxDecisionReasonLength)
+        {
+            throw CustomerApprovalException.ReasonTooLong();
+        }
 
         if (user.AccessStatus == next)
             return Map(user);
 
         if (!allowedFrom.Contains(user.AccessStatus))
-        {
-            throw CustomerApprovalException.InvalidTransition(
-                $"Cannot change customer access from {user.AccessStatus} to {next}.");
-        }
+            throw CustomerApprovalException.InvalidTransition();
 
         var now = DateTimeOffset.UtcNow;
         user.AccessStatus = next;
         user.AccessDecidedAt = now;
         user.AccessDecidedByAdminUserId = adminUserId;
-        user.AccessDecisionReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         user.ApprovedAt = next == CustomerAccessStatus.Approved ? now : null;
+        user.AccessDecisionReason = next == CustomerAccessStatus.Approved
+            ? (string.IsNullOrWhiteSpace(reason) ? null : reason.Trim())
+            : (string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
 
         var result = await userManager.UpdateAsync(user);
         if (!result.Succeeded)
@@ -153,6 +171,25 @@ public sealed class CustomerApprovalAdminService(
 
     private IQueryable<ShopflowUser> CustomerUsers()
         => db.Users.AsNoTracking().Where(u => !u.IsStaff);
+
+    private static IQueryable<ShopflowUser> ApplySort(IQueryable<ShopflowUser> query, string? sort)
+    {
+        var key = sort?.Trim().ToLowerInvariant();
+        return key switch
+        {
+            "createdat" => query.OrderBy(u => u.CreatedAt),
+            "-createdat" => query.OrderByDescending(u => u.CreatedAt),
+            "email" => query.OrderBy(u => u.Email),
+            "-email" => query.OrderByDescending(u => u.Email),
+            "name" => query.OrderBy(u => u.FullName),
+            "-name" => query.OrderByDescending(u => u.FullName),
+            "requestedat" => query.OrderBy(u => u.AccessRequestedAt ?? u.CreatedAt),
+            "-requestedat" => query.OrderByDescending(u => u.AccessRequestedAt ?? u.CreatedAt),
+            _ => query
+                .OrderBy(u => u.AccessStatus)
+                .ThenByDescending(u => u.AccessRequestedAt ?? u.CreatedAt)
+        };
+    }
 
     private async Task<ShopflowUser?> FindCustomerAsync(Guid customerId, CancellationToken cancellationToken)
     {

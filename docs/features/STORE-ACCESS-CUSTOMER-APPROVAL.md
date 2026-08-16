@@ -2,22 +2,41 @@
 
 Implementação da Fase 1 do ADR `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md`.
 
-Não inclui frontend (Fase 2) nem e-mails Brevo de aprovação (Fase 3).
+Não inclui frontend (Fase 2), login visual unificado, nem e-mails Brevo de aprovação (Fase 3).
+
+Detalhes por área:
+
+- `docs/customer/customer-approval.md`
+- `docs/catalog/store-access.md`
+- `docs/checkout/checkout-session.md`
+- `docs/orders/guest-order-access.md`
 
 ## Configuração
 
 ```env
-StoreAccess__Mode=PrivateCatalogApprovedOnly
+StoreAccess__Mode=Closed
 CustomerAccess__RequireApproval=true
+Checkout__AllowGuest=false
 Checkout__AllowGuestCheckout=false
 ```
 
-| Ambiente | Modo | Guest checkout | RequireApproval |
-|----------|------|----------------|-----------------|
-| `appsettings.json` (TESTE/HML/PROD deste cliente) | `PrivateCatalogApprovedOnly` | `false` | `true` |
-| `appsettings.Development.json` / testes de regressão | `PublicCatalogAndGuestCheckout` | `true` | `false` |
+| Ambiente | `mode` público | Modo interno | Guest | RequireApproval |
+|----------|----------------|--------------|-------|-----------------|
+| `appsettings.json` (TESTE/HML/PROD deste cliente) | `Closed` | `PrivateCatalogApprovedOnly` | `false` | efetivo `true` |
+| `appsettings.Development.json` / testes de regressão | `Open` | `PublicCatalogAndGuestCheckout` | `true` | `false` |
 
-Modos: `PublicCatalogAndGuestCheckout`, `PublicCatalogLoginCheckout`, `PublicCatalogApprovedCheckout`, `PrivateCatalogApprovedOnly`. Valor desconhecido falha fechado para `PrivateCatalogApprovedOnly`.
+Modos internos (ADR): `PublicCatalogAndGuestCheckout`, `PublicCatalogLoginCheckout`, `PublicCatalogApprovedCheckout`, `PrivateCatalogApprovedOnly`.
+
+Aliases de configuração:
+
+- `StoreAccess__Mode=Closed` → `PrivateCatalogApprovedOnly`
+- `StoreAccess__Mode=Open` → `PublicCatalogAndGuestCheckout`
+- `Checkout__AllowGuest` → mesmo efeito de `Checkout__AllowGuestCheckout`
+- filtro admin `status=Pending` → `PendingApproval`
+
+Valor de modo desconhecido falha fechado para `PrivateCatalogApprovedOnly` (`Closed`). Ausência de `Checkout:AllowGuest` / `AllowGuestCheckout` trata guest como **desligado** (default seguro). Development define os dois como `true`.
+
+Loja `Closed` (ou `PublicCatalogApprovedCheckout`) força cadastro `Pending` mesmo se `CustomerAccess:RequireApproval=false`.
 
 ## Contratos
 
@@ -27,7 +46,9 @@ Modos: `PublicCatalogAndGuestCheckout`, `PublicCatalogLoginCheckout`, `PublicCat
 
 ```json
 {
-  "mode": "PrivateCatalogApprovedOnly",
+  "mode": "Closed",
+  "storeAccessMode": "PrivateCatalogApprovedOnly",
+  "allowGuest": false,
   "allowGuestCheckout": false,
   "requireApprovedCustomerToBrowse": true,
   "requireLoginForCheckout": true,
@@ -39,32 +60,46 @@ Modos: `PublicCatalogAndGuestCheckout`, `PublicCatalogLoginCheckout`, `PublicCat
 
 ```json
 {
+  "approvalStatus": "Pending",
   "accessStatus": "PendingApproval",
+  "approvalRequestedAt": "2026-08-16T13:00:00+00:00",
   "accessRequestedAt": "2026-08-16T13:00:00+00:00",
-  "approvedAt": null
+  "approvedAt": null,
+  "message": "Cadastro enviado para aprovação."
 }
 ```
 
-Status: `PendingApproval` | `Approved` | `Rejected` | `Suspended`.
+`message` só no register. Status públicos: `Pending` | `Approved` | `Rejected` | `Suspended`. Canônicos: `PendingApproval` | `Approved` | `Rejected` | `Suspended`.
 
-Cadastro **não** emite cookie. Login com senha correta emite `CustomerCookie` mesmo se pendente — o frontend usa `accessStatus` para redirecionar. Catálogo privado e checkout continuam bloqueados no backend.
+Cadastro **não** emite cookie. Login com senha correta emite `CustomerCookie` mesmo se pendente/recusado/suspenso. Catálogo privado e checkout continuam bloqueados no backend.
+
+Hook `CustomerRegisteredPendingApproval` (log). Brevo = Fase 3.
 
 ### Codes (ProblemDetails `code`)
 
 | Code | HTTP | Quando |
 |------|------|--------|
-| `CUSTOMER_LOGIN_REQUIRED` | 401 | Catálogo privado sem sessão customer |
-| `GUEST_CHECKOUT_DISABLED` | 401 | Checkout/pedido anônimo com `AllowGuestCheckout=false` |
-| `CUSTOMER_ACCESS_NOT_APPROVED` | 403 | Pendente |
+| `STORE_ACCESS_REQUIRES_LOGIN` | 401 | Catálogo Closed sem sessão customer |
+| `STORE_ACCESS_REQUIRES_APPROVAL` | 403 | Catálogo Closed com customer não aprovado |
+| `CUSTOMER_LOGIN_REQUIRED` | 401 | Checkout exige login (modo Open com guest off por política de login) |
+| `GUEST_CHECKOUT_DISABLED` | 401 | Checkout/pedido anônimo com `AllowGuest=false` |
+| `CUSTOMER_APPROVAL_PENDING` | 403 | Checkout com cadastro em análise |
 | `CUSTOMER_ACCESS_REJECTED` | 403 | Recusado |
 | `CUSTOMER_ACCESS_SUSPENDED` | 403 | Suspenso |
-| `CUSTOMER_ACCESS_INVALID_TRANSITION` | 409 | Transição admin inválida |
+| `CUSTOMER_ACCESS_NOT_APPROVED` | 403 | Fallback não aprovado |
+| `CUSTOMER_APPROVAL_INVALID_STATUS` | 400/409 | Filtro ou transição admin inválida |
+| `CUSTOMER_APPROVAL_REASON_TOO_LONG` | 400 | Motivo > 1000 |
+| `CUSTOMER_NOT_FOUND` | 404 | Customer admin inexistente |
+
+Mensagens PT-BR (exemplos): “Para comprar, entre com uma conta aprovada.”; “Seu cadastro ainda está em análise.”; “O checkout como convidado está desabilitado.”; “Esta loja está disponível apenas para clientes aprovados.”
 
 ### Admin (Backoffice + CSRF nas mutações)
 
 ```
-GET  /api/admin/customers?status=&q=&page=&pageSize=
-GET  /api/admin/customers/pending-count
+GET  /api/admin/customers/approvals?status=&q=&page=&pageSize=&createdFrom=&createdTo=&sort=
+GET  /api/admin/customers/approvals/count          → { "pending": n, "pendingCount": n }
+GET  /api/admin/customers?status=&q=&page=&pageSize=&createdFrom=&createdTo=&sort=
+GET  /api/admin/customers/pending-count            (alias do count)
 GET  /api/admin/customers/{id}
 POST /api/admin/customers/{id}/approve
 POST /api/admin/customers/{id}/reject
@@ -72,28 +107,33 @@ POST /api/admin/customers/{id}/suspend
 POST /api/admin/customers/{id}/reactivate
 ```
 
-Body opcional: `{ "reason": "..." }` (máx. 512). Auditoria: admin id, data/hora, motivo.
+`/approvals` lista **Pending** por default (`status=all` lista todos). `q` busca nome/e-mail/telefone. `sort`: `createdAt`, `email`, `name`, `requestedAt` (prefixo `-` = desc).
+
+Body opcional: `{ "reason": "..." }` (máx. 1000). Auditoria: admin id, data/hora, motivo. DTO não expõe hash/tokens.
 
 Transições:
 
-- approve: `PendingApproval` ou `Rejected` → `Approved`
+- approve: `PendingApproval` / `Rejected` / `Suspended` → `Approved`
 - reject: `PendingApproval` → `Rejected`
 - suspend: `Approved` → `Suspended`
-- reactivate: `Suspended` ou `Rejected` → `Approved`
+- reactivate: `Suspended` / `Rejected` → `Approved`
 
-Staff nunca aparece nesta listagem.
+Staff nunca aparece nesta listagem. Customer comum não acessa.
 
 ## Proteções
 
-Em `PrivateCatalogApprovedOnly`, exigem customer **Approved**:
+Em `Closed` / `PrivateCatalogApprovedOnly`, exigem customer **Approved** (staff Backoffice continua autorizado):
 
 - `GET /api/catalog/attributes|categories|products|products/{id}|products/by-slug/{slug}`
-- `GET /api/inventory/skus/{skuId}` (vitrine; Backoffice continua com breakdown completo)
+- `GET /api/inventory/skus/{skuId}` (vitrine)
 - `POST /api/checkout/sessions`
 - `POST /api/orders/from-checkout-session`
 
-Pedidos novos nesse modo nascem com `CustomerUserId`. Guest token **não** é emitido se o pedido tem customer ou se guest checkout está desligado. `GET /api/orders/public/{orderNumber}` permanece para pedidos legados.
+Públicos: health, auth, register, forgot/reset, csrf, CEP, guest tracking legado.
+
+Pedidos novos em Closed nascem com `CustomerUserId`. Guest token **não** é emitido se o pedido tem customer ou se guest checkout está desligado. `GET /api/orders/public/{orderNumber}` permanece para pedidos antigos.
 
 ## Migration
 
-`AddCustomerAccessStatus` no schema `identity.users`. Clientes existentes → `Approved` (`AccessStatus=1`) com `ApprovedAt`/`AccessRequestedAt` = `CreatedAt`.
+`AddCustomerAccessStatus` — clientes existentes → `Approved`.  
+`ExpandCustomerAccessDecisionReason` — motivo até 1000 caracteres.

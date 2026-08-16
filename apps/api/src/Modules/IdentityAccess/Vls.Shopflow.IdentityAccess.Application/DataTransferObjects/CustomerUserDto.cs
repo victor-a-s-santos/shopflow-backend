@@ -20,7 +20,8 @@ public sealed record RegisterCustomerResult(
     CustomerUserDto? Customer,
     string? ErrorMessage,
     bool IsDuplicateEmail,
-    IReadOnlyList<RegisterCustomerFieldError> Errors);
+    IReadOnlyList<RegisterCustomerFieldError> Errors,
+    string? Message = null);
 
 public sealed record CustomerLoginResult(
     bool Succeeded,

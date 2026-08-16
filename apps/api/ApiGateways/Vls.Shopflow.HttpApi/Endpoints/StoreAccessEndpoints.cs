@@ -13,6 +13,8 @@ public static class StoreAccessEndpoints
             return Results.Ok(new
             {
                 mode = dto.Mode,
+                storeAccessMode = dto.StoreAccessMode,
+                allowGuest = dto.AllowGuest,
                 allowGuestCheckout = dto.AllowGuestCheckout,
                 requireApprovedCustomerToBrowse = dto.RequireApprovedCustomerToBrowse,
                 requireLoginForCheckout = dto.RequireLoginForCheckout,

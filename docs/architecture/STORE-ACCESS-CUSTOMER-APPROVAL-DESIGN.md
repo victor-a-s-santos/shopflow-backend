@@ -112,13 +112,17 @@ Resposta (sem secrets):
 
 ```json
 {
-  "mode": "PrivateCatalogApprovedOnly",
+  "mode": "Closed",
+  "storeAccessMode": "PrivateCatalogApprovedOnly",
+  "allowGuest": false,
   "allowGuestCheckout": false,
   "requireApprovedCustomerToBrowse": true,
   "requireLoginForCheckout": true,
   "requireApprovedCustomerForCheckout": true
 }
 ```
+
+`mode` é o contrato curto (`Open` | `Closed`) para o frontend. `storeAccessMode` permanece o nome canônico de 4 modos deste ADR. `Closed` = `PrivateCatalogApprovedOnly`; qualquer outro modo = `Open`.
 
 A API de catálogo/checkout **não confia** só no FE.
 
@@ -309,12 +313,13 @@ O endpoint de login ou `/me` deve retornar o status de acesso do cliente.
 Campos esperados no DTO customer:
 
 ```text
-accessStatus
-accessRequestedAt
+approvalStatus          (Pending | Approved | Rejected | Suspended)
+accessStatus            (PendingApproval | Approved | Rejected | Suspended — canônico)
+approvalRequestedAt / accessRequestedAt
 approvedAt
 ```
 
-O frontend usa esses campos para redirecionamento e bloqueio visual.
+`approvalStatus=Pending` é o alias público de `PendingApproval`. O frontend usa esses campos para redirecionamento e bloqueio visual.
 
 ### Checkout
 
@@ -344,10 +349,16 @@ Codes:
 
 ```text
 CUSTOMER_LOGIN_REQUIRED
-CUSTOMER_ACCESS_NOT_APPROVED
+GUEST_CHECKOUT_DISABLED
+CUSTOMER_APPROVAL_PENDING
 CUSTOMER_ACCESS_REJECTED
 CUSTOMER_ACCESS_SUSPENDED
-GUEST_CHECKOUT_DISABLED
+CUSTOMER_ACCESS_NOT_APPROVED
+STORE_ACCESS_REQUIRES_LOGIN
+STORE_ACCESS_REQUIRES_APPROVAL
+CUSTOMER_APPROVAL_INVALID_STATUS
+CUSTOMER_APPROVAL_REASON_TOO_LONG
+CUSTOMER_NOT_FOUND
 ```
 
 ### Order creation
@@ -670,7 +681,9 @@ CustomerAccess__RequireApproval=true
 
 MVP: configuração de ambiente. Um tenant, um cliente. Admin UI para ligar/desligar a loja = evolução.
 
-`appsettings.json` (TESTE/HML/PROD deste cliente) usa o modo privado. `appsettings.Development.json` permanece aberto para DX e testes de regressão do catálogo público.
+`appsettings.json` (TESTE/HML/PROD deste cliente) usa `StoreAccess:Mode=Closed` (equivalente a `PrivateCatalogApprovedOnly`). `appsettings.Development.json` permanece `Open` (`PublicCatalogAndGuestCheckout`) para DX e testes de regressão do catálogo público.
+
+Aliases de configuração: `Closed` → `PrivateCatalogApprovedOnly`; `Open` → `PublicCatalogAndGuestCheckout`; `Checkout:AllowGuest` → mesmo efeito de `Checkout:AllowGuestCheckout`; filtro admin `status=Pending` → `PendingApproval`. O JSON público expõe **os dois** nomes: `mode`/`allowGuest`/`approvalStatus` (Open/Closed/Pending) e `storeAccessMode`/`allowGuestCheckout`/`accessStatus` (canônicos deste ADR).
 
 ## Compatibilidade com funcionalidades existentes
 
@@ -779,7 +792,7 @@ Mitigação:
 badge no menu (Fase 2)
 card no dashboard (Fase 2)
 lista de aprovações
-GET /api/admin/customers/pending-count (Fase 1)
+GET /api/admin/customers/approvals/count (Fase 1; alias /pending-count)
 e-mail para admin via Brevo (Fase 3)
 ```
 

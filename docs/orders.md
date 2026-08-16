@@ -8,7 +8,7 @@ Módulo responsável por criar e consultar pedidos a partir de sessões de check
 - Pedido nasce com status **`PendingPayment`**
 - Snapshot imutável de cliente, endereço, itens e totais da sessão
 - Uma `CheckoutSession` gera **no máximo um** `Order`
-- Checkout convidado permitido (sem `CustomerId`)
+- Checkout convidado **configurável** (`Checkout:AllowGuest`); cliente atual desliga novos guests. Pedidos antigos sem `CustomerUserId` permanecem. Ver `docs/orders/guest-order-access.md`.
 - **Sem** pagamento real, Pix, cobrança ou confirmação de estoque vendido
 - Expiração automática via worker quando pagamento não ocorre (ver `docs/expiration-worker.md`)
 

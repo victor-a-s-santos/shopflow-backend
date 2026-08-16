@@ -42,7 +42,7 @@
 **ADR:** `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md`  
 **Fase 1 backend:** `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`
 
-**Próximo:** Fase 2 frontend (`CustomerApprovedRoute`, login unificado, fila `/admin/customers/approvals`). Fase 3 e-mails Brevo de aprovação.
+**Próximo:** Fase 2 frontend (`CustomerApprovedRoute`, login unificado, fila `/admin/customers/approvals`). Fase 3 e-mails Brevo de aprovação. Backend desta fase: `docs/ai-context/backend-next-actions.md`.
 
 ### Delivery / Fulfillment (próximo: FE)
 
@@ -90,11 +90,11 @@
 
 **Backend concluído** (jun/2026): endpoints `/api/auth/customer/*`, cookie HttpOnly separado, testes de integração.
 
-**Fase 1 store access (ago/2026):** `CustomerAccessStatus`, `GET /api/store/access`, catálogo/checkout gated, admin approve/reject/suspend. Doc: `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`.
+**Fase 1 store access (ago/2026):** `CustomerAccessStatus`, `GET /api/store/access` (`mode` Open/Closed), catálogo/checkout gated, admin `/api/admin/customers/approvals`. Docs: `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`, `docs/ai-context/backend-next-actions.md`.
 
-**Pendente:** Fase 2 frontend (`authService`, guards, tela de aprovações); Fase 3 e-mails Brevo.
+**Pendente:** Fase 2 frontend (`authService`, guards, tela de aprovações, login visual unificado); Fase 3 e-mails Brevo.
 
-Checkout convidado fica atrás de `Checkout:AllowGuestCheckout` (desligado no cliente atual).
+Checkout convidado fica atrás de `Checkout:AllowGuest` (desligado no cliente atual). Guest tracking legado permanece.
 
 ---
 
