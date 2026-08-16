@@ -5,7 +5,8 @@ namespace Vls.Shopflow.Orders.Application.Commands;
 
 public sealed record CreateOrderFromCheckoutSessionCommand(
     Guid CheckoutSessionId,
-    Guid? CustomerUserId = null)
+    Guid? CustomerUserId = null,
+    bool IssueGuestAccessToken = true)
     : ICommand<OrderDto>;
 
 public sealed record GetOrderByIdQuery(Guid OrderId)

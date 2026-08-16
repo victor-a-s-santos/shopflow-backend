@@ -1,4 +1,5 @@
 using MediatR;
+using Vls.Shopflow.IdentityAccess.Application.Interfaces;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.Inventory.Application.Commands;
 using Vls.Shopflow.Inventory.Application.Queries;
@@ -29,6 +30,16 @@ public static class InventoryEndpoints
             {
                 var full = await sender.Send(new GetInventoryBySkuIdQuery(skuId), ct);
                 return full is null ? Results.NotFound() : Results.Ok(full);
+            }
+
+            var storeAccess = ctx.RequestServices.GetRequiredService<IStoreAccessPolicy>();
+            if (storeAccess.RequireApprovedCustomerToBrowse)
+            {
+                var currentCustomer = ctx.RequestServices.GetRequiredService<ICurrentCustomerAccessor>();
+                var customer = await currentCustomer.GetCurrentCustomerAsync(ct);
+                var decision = storeAccess.EvaluateBrowse(customer);
+                if (!decision.Allowed)
+                    return StoreAccessHttp.Denied(ctx, decision);
             }
 
             var safe = await sender.Send(new GetSkuAvailabilityBySkuIdQuery(skuId), ct);

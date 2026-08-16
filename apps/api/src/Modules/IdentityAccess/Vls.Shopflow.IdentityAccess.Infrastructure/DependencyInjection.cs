@@ -10,6 +10,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
+using Vls.Shopflow.IdentityAccess.Application.Options;
+using Vls.Shopflow.IdentityAccess.Application.Services;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Identity;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Middleware;
@@ -87,6 +89,9 @@ public static class DependencyInjection
     {
         services.Configure<AdminAuthOptions>(configuration.GetSection(AdminAuthOptions.SectionName));
         services.Configure<CustomerAuthOptions>(configuration.GetSection(CustomerAuthOptions.SectionName));
+        services.Configure<StoreAccessOptions>(configuration.GetSection(StoreAccessOptions.SectionName));
+        services.Configure<CheckoutAccessOptions>(configuration.GetSection(CheckoutAccessOptions.SectionName));
+        services.Configure<CustomerAccessOptions>(configuration.GetSection(CustomerAccessOptions.SectionName));
         services.Configure<ShopflowDataProtectionOptions>(configuration.GetSection(ShopflowDataProtectionOptions.SectionName));
         services.Configure<AdminSeedOptions>(configuration.GetSection(AdminSeedOptions.SectionName));
 
@@ -327,6 +332,9 @@ public static class DependencyInjection
         services.AddScoped<ICustomerSignInService, CustomerSignInService>();
         services.AddScoped<ICurrentCustomerAccessor, CurrentCustomerAccessor>();
         services.AddScoped<ICustomerPasswordService, CustomerPasswordService>();
+        services.AddScoped<ICustomerApprovalAdminService, CustomerApprovalAdminService>();
+        services.AddScoped<ICustomerPendingApprovalNotifier, LoggingCustomerPendingApprovalNotifier>();
+        services.AddSingleton<IStoreAccessPolicy, StoreAccessPolicy>();
     }
 
 }

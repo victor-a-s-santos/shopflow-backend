@@ -37,6 +37,13 @@
 
 ## Etapa imediata (prioridade 1)
 
+### Store access / customer approval
+
+**ADR:** `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md`  
+**Fase 1 backend:** `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`
+
+**Próximo:** Fase 2 frontend (`CustomerApprovedRoute`, login unificado, fila `/admin/customers/approvals`). Fase 3 e-mails Brevo de aprovação. Backend desta fase: `docs/ai-context/backend-next-actions.md`.
+
 ### Delivery / Fulfillment (próximo: FE)
 
 **Design:** `docs/architecture/DELIVERY-FULFILLMENT-DESIGN.md`  
@@ -83,9 +90,11 @@
 
 **Backend concluído** (jun/2026): endpoints `/api/auth/customer/*`, cookie HttpOnly separado, testes de integração.
 
-**Pendente:** integração frontend (`authService`, `AuthContext`, CSRF), Account real; guest status UI com `X-ORDER-ACCESS-TOKEN`.
+**Fase 1 store access (ago/2026):** `CustomerAccessStatus`, `GET /api/store/access` (`mode` Open/Closed), catálogo/checkout gated, admin `/api/admin/customers/approvals`. Docs: `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`, `docs/ai-context/backend-next-actions.md`.
 
-Checkout convidado permanece público e prioritário.
+**Pendente:** Fase 2 frontend (`authService`, guards, tela de aprovações, login visual unificado); Fase 3 e-mails Brevo.
+
+Checkout convidado fica atrás de `Checkout:AllowGuest` (desligado no cliente atual). Guest tracking legado permanece.
 
 ---
 

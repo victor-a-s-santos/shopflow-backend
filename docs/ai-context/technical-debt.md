@@ -21,7 +21,8 @@
 | **Batch Product Edit** | ~~ausente~~ → `POST /api/admin/inventory/skus/availability` | Wiring frontend Product Edit |
 | **Lint frontend (erros pré-existentes)** | `npm run lint` — `textarea.tsx`, `api.ts`, `tailwind.config.ts` | CI futuro falhará |
 | **Upload local de imagens** | ~~só filesystem~~ → R2 via `Storage__*` (`docs/integrations/cloudflare-r2-product-images.md`); local permanece fallback | Blobs antigos: backfill **TEST** manual (`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`); prod TBD |
-| **Frontend customer auth desconectado** | Backend `/api/auth/customer/*` pronto; UI visual-only | Login/conta não funcionam na loja |
+| **Checkout convidado desligado no cliente atual** | `Checkout:AllowGuest=false`; tracking legado permanece (`docs/orders/guest-order-access.md`) | Novos guest checkouts bloqueados; pedidos antigos ok |
+| **Frontend store access / approval** | Backend Fase 1 pronto; UI ainda visual-only | Guards, tela Pending, fila admin, login unificado = Fase 2 |
 | **Shipping / frete** | `ShippingAmount = null`; CEP lookup OK; frete calculado pendente | Cotação de frete |
 | **Delivery FE** | Batch/fulfillment backend pronto; UI admin/checkout não | Frontend remessa + preferências |
 | **Dashboard admin com dados fake** | `AdminDashboard` — pedidos hardcoded | Métricas enganosas |

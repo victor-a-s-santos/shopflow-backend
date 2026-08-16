@@ -165,6 +165,61 @@ public sealed class CreateOrderFromCheckoutSessionHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WithCustomerUserId_DoesNotIssueGuestToken()
+    {
+        var sessionId = Guid.NewGuid();
+        var customerUserId = Guid.NewGuid();
+        var reader = new Mock<ICheckoutSessionReader>();
+        reader.Setup(x => x.GetByIdAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PendingSession(sessionId));
+
+        var repository = new Mock<IOrderRepository>();
+        repository.Setup(x => x.GetByCheckoutSessionIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order?)null);
+        repository.Setup(x => x.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
+        var handler = CreateHandler(reader.Object, repository.Object, tokenRepo: tokenRepo.Object);
+
+        var result = await handler.Handle(
+            new CreateOrderFromCheckoutSessionCommand(sessionId, customerUserId),
+            CancellationToken.None);
+
+        result.GuestAccessToken.Should().BeNull();
+        tokenRepo.Verify(
+            x => x.AddAsync(It.IsAny<GuestOrderAccessToken>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenIssueGuestAccessTokenFalse_DoesNotIssueToken()
+    {
+        var sessionId = Guid.NewGuid();
+        var reader = new Mock<ICheckoutSessionReader>();
+        reader.Setup(x => x.GetByIdAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PendingSession(sessionId));
+
+        var repository = new Mock<IOrderRepository>();
+        repository.Setup(x => x.GetByCheckoutSessionIdWithItemsAsync(sessionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order?)null);
+        repository.Setup(x => x.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var tokenRepo = new Mock<IGuestOrderAccessTokenRepository>();
+        var handler = CreateHandler(reader.Object, repository.Object, tokenRepo: tokenRepo.Object);
+
+        var result = await handler.Handle(
+            new CreateOrderFromCheckoutSessionCommand(sessionId, IssueGuestAccessToken: false),
+            CancellationToken.None);
+
+        result.GuestAccessToken.Should().BeNull();
+        tokenRepo.Verify(
+            x => x.AddAsync(It.IsAny<GuestOrderAccessToken>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task Handle_WhenGuestAccessDisabled_DoesNotIssueToken()
     {
         var sessionId = Guid.NewGuid();

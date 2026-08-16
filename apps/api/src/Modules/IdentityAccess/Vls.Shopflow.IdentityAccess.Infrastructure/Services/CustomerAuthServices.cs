@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Vls.Shopflow.IdentityAccess.Application.DataTransferObjects;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
+using Vls.Shopflow.IdentityAccess.Application.Services;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
+using Vls.Shopflow.IdentityAccess.Domain.Enums;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Identity;
 
 namespace Vls.Shopflow.IdentityAccess.Infrastructure.Services;
@@ -14,6 +16,8 @@ public sealed class CustomerRegistrationService(
     UserManager<ShopflowUser> userManager,
     RoleManager<ShopflowRole> roleManager,
     IIdentityEmailSender emailSender,
+    IStoreAccessPolicy storeAccessPolicy,
+    ICustomerPendingApprovalNotifier pendingApprovalNotifier,
     ILogger<CustomerRegistrationService> logger)
     : ICustomerRegistrationService
 {
@@ -42,6 +46,12 @@ public sealed class CustomerRegistrationService(
             await roleManager.CreateAsync(new ShopflowRole { Name = AuthRoles.Customer });
         }
 
+        var now = DateTimeOffset.UtcNow;
+        var requireApproval = storeAccessPolicy.RequireApproval;
+        var accessStatus = requireApproval
+            ? CustomerAccessStatus.PendingApproval
+            : CustomerAccessStatus.Approved;
+
         var user = new ShopflowUser
         {
             Id = Guid.NewGuid(),
@@ -52,7 +62,10 @@ public sealed class CustomerRegistrationService(
             PhoneNumber = phone?.Trim(),
             IsStaff = false,
             IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = now,
+            AccessStatus = accessStatus,
+            AccessRequestedAt = now,
+            ApprovedAt = requireApproval ? null : now
         };
 
         var createResult = await userManager.CreateAsync(user, password);
@@ -97,7 +110,18 @@ public sealed class CustomerRegistrationService(
         logger.LogInformation("Customer registered: {UserId} ({Email})", user.Id, normalizedEmail);
 
         var dto = await MapCustomerDtoAsync(user);
-        return new RegisterCustomerResult(true, dto, null, IsDuplicateEmail: false, []);
+        var message = accessStatus == CustomerAccessStatus.PendingApproval
+            ? CustomerAccessContract.RegisterPendingMessage
+            : CustomerAccessContract.RegisterApprovedMessage;
+
+        if (accessStatus == CustomerAccessStatus.PendingApproval)
+        {
+            await pendingApprovalNotifier.NotifyRegisteredPendingAsync(
+                new CustomerRegisteredPendingApproval(user.Id, normalizedEmail, user.FullName ?? string.Empty, now),
+                cancellationToken);
+        }
+
+        return new RegisterCustomerResult(true, dto, null, IsDuplicateEmail: false, [], message);
     }
 
     internal static RegisterCustomerFieldError MapIdentityError(IdentityError error)
@@ -136,7 +160,10 @@ public sealed class CustomerRegistrationService(
             user.FullName ?? string.Empty,
             user.PhoneNumber,
             user.EmailConfirmed,
-            roles.ToList());
+            roles.ToList(),
+            user.AccessStatus,
+            user.AccessRequestedAt,
+            user.ApprovedAt);
     }
 
     private Task<CustomerUserDto> MapCustomerDtoAsync(ShopflowUser user)
