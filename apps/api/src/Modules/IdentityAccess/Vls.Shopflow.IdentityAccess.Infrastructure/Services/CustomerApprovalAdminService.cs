@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Vls.Shopflow.IdentityAccess.Application.DataTransferObjects;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
 using Vls.Shopflow.IdentityAccess.Application.Services;
@@ -12,7 +13,9 @@ namespace Vls.Shopflow.IdentityAccess.Infrastructure.Services;
 
 public sealed class CustomerApprovalAdminService(
     IdentityAccessDbContext db,
-    UserManager<ShopflowUser> userManager)
+    UserManager<ShopflowUser> userManager,
+    ICustomerAccessNotifier accessNotifier,
+    ILogger<CustomerApprovalAdminService> logger)
     : ICustomerApprovalAdminService
 {
     public async Task<PagedAdminCustomersDto> ListAsync(
@@ -150,6 +153,7 @@ public sealed class CustomerApprovalAdminService(
         if (!allowedFrom.Contains(user.AccessStatus))
             throw CustomerApprovalException.InvalidTransition();
 
+        var previous = user.AccessStatus;
         var now = DateTimeOffset.UtcNow;
         user.AccessStatus = next;
         user.AccessDecidedAt = now;
@@ -166,7 +170,40 @@ public sealed class CustomerApprovalAdminService(
             throw new InvalidOperationException($"Failed to update customer access: {errors}");
         }
 
+        if (previous != next)
+            await NotifyAccessChangedAsync(user, next, cancellationToken);
+
         return Map(user);
+    }
+
+    private async Task NotifyAccessChangedAsync(
+        ShopflowUser user,
+        CustomerAccessStatus next,
+        CancellationToken cancellationToken)
+    {
+        var notification = new CustomerAccessChangedNotification(
+            user.Id,
+            user.Email ?? string.Empty,
+            user.FullName ?? string.Empty,
+            user.AccessDecidedAt);
+
+        try
+        {
+            if (next == CustomerAccessStatus.Approved)
+                await accessNotifier.NotifyApprovedAsync(notification, cancellationToken);
+            else if (next == CustomerAccessStatus.Rejected)
+                await accessNotifier.NotifyRejectedAsync(notification, cancellationToken);
+            else if (next == CustomerAccessStatus.Suspended)
+                await accessNotifier.NotifySuspendedAsync(notification, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Failed to enqueue customer access e-mail CustomerUserId={CustomerUserId} Next={Next}",
+                user.Id,
+                next);
+        }
     }
 
     private IQueryable<ShopflowUser> CustomerUsers()

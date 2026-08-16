@@ -20,7 +20,8 @@ public sealed class TransactionalEmailTemplatesTests
         var (subject, html, text) = TransactionalEmailTemplates.ConfirmEmail(
             App, "a@b.com", "Ana Silva", "raw-token-value");
 
-        subject.Should().Be("Confirme seu cadastro");
+        subject.Should().Be("Confirme seu e-mail");
+        html.Should().Contain("independente");
         html.Should().Contain("confirm-email?");
         html.Should().Contain("token=");
         html.Should().NotContain("InternalOrderNote");
@@ -98,6 +99,82 @@ public sealed class TransactionalEmailTemplatesTests
         link.Should().Contain($"/account/orders/{order.OrderId:D}");
         link.Should().NotContain("should-not-appear");
     }
+
+    [Fact]
+    public void CustomerApprovalRequestAdmin_ContainsAdminLinkAndNoSecrets()
+    {
+        var customer = SampleCustomer();
+        var (subject, html, _) = TransactionalEmailTemplates.CustomerApprovalRequestAdmin(App, customer);
+
+        subject.Should().Be("Novo cadastro aguardando aprovação");
+        html.Should().Contain("/admin/customers/approvals");
+        html.Should().Contain("Ana Lojista");
+        html.Should().Contain("ana@example.com");
+        html.Should().Contain("11988887777");
+        html.Should().NotContain("password");
+        html.Should().NotContain("hash");
+        html.Should().NotContain("AccessDecisionReason");
+    }
+
+    [Fact]
+    public void CustomerRegistrationReceived_MentionsPendingReview()
+    {
+        var (subject, html, _) = TransactionalEmailTemplates.CustomerRegistrationReceived(App, SampleCustomer());
+        subject.Should().Contain("solicitação de cadastro");
+        html.Should().Contain("em análise");
+        html.Should().Contain("/account/pending-approval");
+    }
+
+    [Fact]
+    public void CustomerApproved_ContainsLoginLink()
+    {
+        var (subject, html, _) = TransactionalEmailTemplates.CustomerApproved(App, SampleCustomer());
+        subject.Should().Be("Seu acesso foi aprovado");
+        html.Should().Contain("/login");
+    }
+
+    [Fact]
+    public void CustomerRejected_DoesNotIncludeInternalReason()
+    {
+        var (_, html, text) = TransactionalEmailTemplates.CustomerRejected(App, SampleCustomer());
+        html.Should().NotContain("fora do perfil");
+        html.Should().NotContain("AccessDecisionReason");
+        text.Should().Contain("não foi aprovado");
+    }
+
+    [Fact]
+    public void CustomerSuspended_DoesNotIncludeInternalReason()
+    {
+        var (subject, html, _) = TransactionalEmailTemplates.CustomerSuspended(App, SampleCustomer());
+        subject.Should().Contain("acesso");
+        html.Should().Contain("temporariamente bloqueado");
+        html.Should().NotContain("inadimplencia");
+        html.Should().NotContain("AccessDecisionReason");
+    }
+
+    [Fact]
+    public void OrderShipped_DoesNotExposeBatchId()
+    {
+        var (_, html, _) = TransactionalEmailTemplates.OrderShipped(App, SampleOrder());
+        html.Should().NotContain("DeliveryBatch");
+        html.Should().NotContain("batchId");
+    }
+
+    [Fact]
+    public void OrderDelivered_DoesNotExposeProviderIds()
+    {
+        var (_, html, _) = TransactionalEmailTemplates.OrderDelivered(App, SampleOrder());
+        html.Should().NotContain("ProviderOrderId");
+        html.Should().NotContain("InternalOrderNote");
+    }
+
+    private static CustomerApprovalEmailRequest SampleCustomer()
+        => new(
+            Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            "ana@example.com",
+            "Ana Lojista",
+            "11988887777",
+            DateTimeOffset.Parse("2026-08-16T13:00:00Z"));
 
     private static OrderEmailNotificationRequest SampleOrder()
         => new(

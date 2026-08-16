@@ -45,18 +45,20 @@ public sealed class BrevoTransactionalEmailSender(
             TextContent = message.TextContent,
             ReplyTo = string.IsNullOrWhiteSpace(settings.ReplyToEmail)
                 ? null
-                : new BrevoSender { Email = settings.ReplyToEmail }
+                : new BrevoSender { Name = settings.ReplyToName, Email = settings.ReplyToEmail }
         };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "v3/smtp/email");
+        request.Headers.TryAddWithoutValidation("api-key", settings.ApiKey);
+        if (settings.SandboxMode)
+            request.Headers.TryAddWithoutValidation("X-Sib-Sandbox", "drop");
+        request.Content = JsonContent.Create(payload, options: JsonOptions);
 
         if (settings.SandboxMode)
         {
             logger.LogInformation(
-                "Brevo SandboxMode=true — sending transactional email (use a Brevo test sender/domain in non-prod)");
+                "Brevo SandboxMode=true — sending with X-Sib-Sandbox=drop (ApiKey not logged)");
         }
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, "v3/smtp/email");
-        request.Headers.TryAddWithoutValidation("api-key", settings.ApiKey);
-        request.Content = JsonContent.Create(payload, options: JsonOptions);
 
         HttpResponseMessage response;
         try

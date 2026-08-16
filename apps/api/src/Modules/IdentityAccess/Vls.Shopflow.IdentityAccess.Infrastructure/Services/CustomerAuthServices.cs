@@ -17,7 +17,7 @@ public sealed class CustomerRegistrationService(
     RoleManager<ShopflowRole> roleManager,
     IIdentityEmailSender emailSender,
     IStoreAccessPolicy storeAccessPolicy,
-    ICustomerPendingApprovalNotifier pendingApprovalNotifier,
+    ICustomerAccessNotifier customerAccessNotifier,
     ILogger<CustomerRegistrationService> logger)
     : ICustomerRegistrationService
 {
@@ -116,9 +116,24 @@ public sealed class CustomerRegistrationService(
 
         if (accessStatus == CustomerAccessStatus.PendingApproval)
         {
-            await pendingApprovalNotifier.NotifyRegisteredPendingAsync(
-                new CustomerRegisteredPendingApproval(user.Id, normalizedEmail, user.FullName ?? string.Empty, now),
-                cancellationToken);
+            try
+            {
+                await customerAccessNotifier.NotifyRegisteredPendingAsync(
+                    new CustomerRegisteredPendingApproval(
+                        user.Id,
+                        normalizedEmail,
+                        user.FullName ?? string.Empty,
+                        now,
+                        user.PhoneNumber),
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(
+                    ex,
+                    "Failed to enqueue pending-approval e-mails for {UserId}",
+                    user.Id);
+            }
         }
 
         return new RegisterCustomerResult(true, dto, null, IsDuplicateEmail: false, [], message);

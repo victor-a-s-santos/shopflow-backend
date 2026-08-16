@@ -5,15 +5,19 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Domain.Enums;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Identity;
+using Vls.Shopflow.Notifications.Domain.Entities;
+using Vls.Shopflow.Notifications.Domain.Enums;
+using Vls.Shopflow.Notifications.Infrastructure;
 
 namespace Vls.Shopflow.IdentityAccess.IntegrationTests;
 
-public sealed class PrivateStoreAccessWebApplicationFactory : ShopflowWebApplicationFactory
+public class PrivateStoreAccessWebApplicationFactory : ShopflowWebApplicationFactory
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -24,7 +28,10 @@ public sealed class PrivateStoreAccessWebApplicationFactory : ShopflowWebApplica
             {
                 ["StoreAccess:Mode"] = "PrivateCatalogApprovedOnly",
                 ["Checkout:AllowGuestCheckout"] = "false",
-                ["CustomerAccess:RequireApproval"] = "true"
+                ["CustomerAccess:RequireApproval"] = "true",
+                ["AdminNotifications:ApprovalRequestsEmail"] = "ops.integration@test.local",
+                ["PublicApp:BaseUrl"] = "https://loja.test",
+                ["PublicApp:AdminBaseUrl"] = "https://admin.test"
             });
         });
     }
@@ -418,6 +425,113 @@ public sealed class CustomerApprovalIntegrationTests : IClassFixture<PrivateStor
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await response.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("code").GetString().Should().Be(StoreAccessErrorCodes.CustomerNotFound);
+    }
+
+    [Fact]
+    public async Task Register_EnqueuesAdminAndCustomerPendingEmails()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+        var email = $"pending-mail-{Guid.NewGuid():N}@test.local";
+        var response = await client.PostAsJsonAsync("/api/auth/customer/register", new
+        {
+            email,
+            password = ShopflowWebApplicationFactory.CustomerPassword,
+            fullName = "Pending Mail",
+            phone = "11988887777"
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var customerId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("customerId").GetGuid();
+
+        var rows = await LoadOutboxAsync(customerId);
+        rows.Should().Contain(r =>
+            r.Type == EmailNotificationType.CustomerApprovalRequestAdmin
+            && r.RecipientEmail == "ops.integration@test.local"
+            && r.IdempotencyKey == $"customer:{customerId:D}:approval-request-admin"
+            && r.HtmlBody.Contains("/admin/customers/approvals", StringComparison.Ordinal));
+        rows.Should().Contain(r =>
+            r.Type == EmailNotificationType.CustomerRegistrationReceived
+            && r.RecipientEmail == email
+            && r.IdempotencyKey == $"customer:{customerId:D}:registration-received"
+            && r.HtmlBody.Contains("em análise", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AdminApproveRejectSuspend_EnqueueCustomerEmailsWithoutInternalReason()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var email = $"decision-mail-{Guid.NewGuid():N}@test.local";
+        var register = await _factory.CreateClient().PostAsJsonAsync("/api/auth/customer/register", new
+        {
+            email,
+            password = ShopflowWebApplicationFactory.CustomerPassword,
+            fullName = "Decision Mail",
+            phone = "11988887777"
+        });
+        register.EnsureSuccessStatusCode();
+        var customerId = (await register.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("customerId").GetGuid();
+
+        var admin = _factory.CreateAuthenticatedAdminClient();
+        var csrf = await admin.GetFromJsonAsync<JsonElement>("/api/auth/csrf");
+        var token = csrf.GetProperty("token").GetString();
+
+        async Task<HttpResponseMessage> Mutate(string action, string reason)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/customers/{customerId}/{action}")
+            {
+                Content = JsonContent.Create(new { reason })
+            };
+            request.Headers.Add("X-CSRF-TOKEN", token);
+            return await admin.SendAsync(request);
+        }
+
+        (await Mutate("approve", "lojista conhecido")).EnsureSuccessStatusCode();
+        (await Mutate("suspend", "inadimplencia interna")).EnsureSuccessStatusCode();
+        (await Mutate("reactivate", "regularizado")).EnsureSuccessStatusCode();
+
+        var otherEmail = $"reject-mail-{Guid.NewGuid():N}@test.local";
+        var otherRegister = await _factory.CreateClient().PostAsJsonAsync("/api/auth/customer/register", new
+        {
+            email = otherEmail,
+            password = ShopflowWebApplicationFactory.CustomerPassword,
+            fullName = "Reject Mail",
+            phone = "11988887777"
+        });
+        otherRegister.EnsureSuccessStatusCode();
+        var otherId = (await otherRegister.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("customerId").GetGuid();
+        var reject = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/customers/{otherId}/reject")
+        {
+            Content = JsonContent.Create(new { reason = "fora do perfil" })
+        };
+        reject.Headers.Add("X-CSRF-TOKEN", token);
+        (await admin.SendAsync(reject)).EnsureSuccessStatusCode();
+
+        var approved = await LoadOutboxAsync(customerId);
+        approved.Count(r => r.Type == EmailNotificationType.CustomerApproved).Should().Be(2);
+        approved.Should().Contain(r => r.Type == EmailNotificationType.CustomerSuspended);
+        approved.Should().OnlyContain(r =>
+            !r.HtmlBody.Contains("lojista conhecido", StringComparison.Ordinal)
+            && !r.HtmlBody.Contains("inadimplencia", StringComparison.Ordinal)
+            && !r.HtmlBody.Contains("AccessDecisionReason", StringComparison.Ordinal));
+
+        var rejected = await LoadOutboxAsync(otherId);
+        rejected.Should().Contain(r =>
+            r.Type == EmailNotificationType.CustomerRejected
+            && !r.HtmlBody.Contains("fora do perfil", StringComparison.Ordinal));
+    }
+
+    private async Task<List<EmailOutboxMessage>> LoadOutboxAsync(Guid customerId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+        var prefix = $"customer:{customerId:D}:";
+        return await db.EmailOutboxMessages
+            .Where(m => m.IdempotencyKey.StartsWith(prefix))
+            .ToListAsync();
     }
 
     private async Task<HttpClient> CreatePendingCustomerClientAsync()

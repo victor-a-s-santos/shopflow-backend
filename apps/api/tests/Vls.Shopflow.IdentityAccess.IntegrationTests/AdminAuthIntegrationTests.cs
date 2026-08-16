@@ -201,6 +201,7 @@ public class ShopflowWebApplicationFactory : WebApplicationFactory<Program>
                 ["ConnectionStrings:Orders"] = ConnectionString,
                 ["ConnectionStrings:PaymentsPix"] = ConnectionString,
                 ["ConnectionStrings:IdentityAccess"] = ConnectionString,
+                ["ConnectionStrings:Notifications"] = ConnectionString,
                 ["SHOPFLOW_ADMIN_EMAIL"] = AdminEmail,
                 ["SHOPFLOW_ADMIN_PASSWORD"] = AdminPassword,
                 ["SHOPFLOW_ADMIN_NAME"] = "Integration Admin",

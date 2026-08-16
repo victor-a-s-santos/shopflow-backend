@@ -29,6 +29,26 @@ public interface IEmailNotificationService
     Task EnqueueOrderDeliveredAsync(
         OrderEmailNotificationRequest request,
         CancellationToken cancellationToken = default);
+
+    Task EnqueueCustomerApprovalRequestAdminAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task EnqueueCustomerRegistrationReceivedAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task EnqueueCustomerApprovedAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task EnqueueCustomerRejectedAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task EnqueueCustomerSuspendedAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record OrderEmailNotificationRequest(
@@ -43,3 +63,11 @@ public sealed record OrderEmailNotificationRequest(
     string? FinalDeliveryMethod = null,
     string? PreferredDeliveryMethod = null,
     DateOnly? PreferredDeliveryDate = null);
+
+public sealed record CustomerApprovalEmailRequest(
+    Guid CustomerUserId,
+    string Email,
+    string FullName,
+    string? Phone = null,
+    DateTimeOffset? RequestedAt = null,
+    DateTimeOffset? DecidedAt = null);

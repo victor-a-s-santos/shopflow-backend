@@ -13,6 +13,7 @@ namespace Vls.Shopflow.Notifications.Application.Services;
 public sealed class EmailNotificationService(
     IEmailOutboxRepository outbox,
     IOptions<PublicAppOptions> publicAppOptions,
+    IOptions<AdminNotificationsOptions> adminNotificationsOptions,
     ILogger<EmailNotificationService> logger) : IEmailNotificationService
 {
     public Task EnqueueConfirmEmailAsync(
@@ -121,6 +122,100 @@ public sealed class EmailNotificationService(
             cancellationToken);
     }
 
+    public Task EnqueueCustomerApprovalRequestAdminAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var adminEmail = adminNotificationsOptions.Value.ApprovalRequestsEmail?.Trim();
+        if (string.IsNullOrWhiteSpace(adminEmail))
+        {
+            logger.LogWarning(
+                "Skip admin approval e-mail: AdminNotifications:ApprovalRequestsEmail is empty. CustomerUserId={CustomerUserId}",
+                request.CustomerUserId);
+            return Task.CompletedTask;
+        }
+
+        var (subject, html, text) = TransactionalEmailTemplates.CustomerApprovalRequestAdmin(
+            publicAppOptions.Value, request);
+        return EnqueueAsync(
+            EmailNotificationType.CustomerApprovalRequestAdmin,
+            adminEmail,
+            "Operação",
+            subject,
+            html,
+            text,
+            $"customer:{request.CustomerUserId:D}:approval-request-admin",
+            cancellationToken);
+    }
+
+    public Task EnqueueCustomerRegistrationReceivedAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var (subject, html, text) = TransactionalEmailTemplates.CustomerRegistrationReceived(
+            publicAppOptions.Value, request);
+        return EnqueueAsync(
+            EmailNotificationType.CustomerRegistrationReceived,
+            request.Email,
+            request.FullName,
+            subject,
+            html,
+            text,
+            $"customer:{request.CustomerUserId:D}:registration-received",
+            cancellationToken);
+    }
+
+    public Task EnqueueCustomerApprovedAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var (subject, html, text) = TransactionalEmailTemplates.CustomerApproved(
+            publicAppOptions.Value, request);
+        return EnqueueAsync(
+            EmailNotificationType.CustomerApproved,
+            request.Email,
+            request.FullName,
+            subject,
+            html,
+            text,
+            CustomerAccessIdempotencyKey("approved", request.CustomerUserId, request.DecidedAt),
+            cancellationToken);
+    }
+
+    public Task EnqueueCustomerRejectedAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var (subject, html, text) = TransactionalEmailTemplates.CustomerRejected(
+            publicAppOptions.Value, request);
+        return EnqueueAsync(
+            EmailNotificationType.CustomerRejected,
+            request.Email,
+            request.FullName,
+            subject,
+            html,
+            text,
+            CustomerAccessIdempotencyKey("rejected", request.CustomerUserId, request.DecidedAt),
+            cancellationToken);
+    }
+
+    public Task EnqueueCustomerSuspendedAsync(
+        CustomerApprovalEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var (subject, html, text) = TransactionalEmailTemplates.CustomerSuspended(
+            publicAppOptions.Value, request);
+        return EnqueueAsync(
+            EmailNotificationType.CustomerSuspended,
+            request.Email,
+            request.FullName,
+            subject,
+            html,
+            text,
+            CustomerAccessIdempotencyKey("suspended", request.CustomerUserId, request.DecidedAt),
+            cancellationToken);
+    }
+
     private async Task EnqueueAsync(
         EmailNotificationType type,
         string email,
@@ -134,9 +229,10 @@ public sealed class EmailNotificationService(
         if (await outbox.ExistsByIdempotencyKeyAsync(idempotencyKey, cancellationToken))
         {
             logger.LogInformation(
-                "Email outbox skip duplicate Type={Type} IdempotencyKey={IdempotencyKey}",
+                "Email outbox skip duplicate Type={Type} IdempotencyKey={IdempotencyKey} Recipient={Recipient}",
                 type,
-                idempotencyKey);
+                idempotencyKey,
+                MaskEmail(email));
             return;
         }
 
@@ -153,23 +249,50 @@ public sealed class EmailNotificationService(
         if (!inserted)
         {
             logger.LogInformation(
-                "Email outbox idempotent insert Type={Type} IdempotencyKey={IdempotencyKey}",
+                "Email outbox idempotent insert Type={Type} IdempotencyKey={IdempotencyKey} Recipient={Recipient}",
                 type,
-                idempotencyKey);
+                idempotencyKey,
+                MaskEmail(email));
             return;
         }
 
         logger.LogInformation(
-            "Email outbox enqueued Type={Type} OutboxId={OutboxId} IdempotencyKey={IdempotencyKey}",
+            "Email outbox enqueued Type={Type} OutboxId={OutboxId} IdempotencyKey={IdempotencyKey} Recipient={Recipient}",
             type,
             message.Id,
-            idempotencyKey);
+            idempotencyKey,
+            MaskEmail(email));
     }
+
+    /// <summary>
+    /// One row per real access decision. Includes DecidedAt so reactivate-after-suspend
+    /// can send a second approved e-mail without colliding with the first.
+    /// </summary>
+    internal static string CustomerAccessIdempotencyKey(string action, Guid customerUserId, DateTimeOffset? decidedAt)
+        => $"customer:{customerUserId:D}:{action}:{decidedAt?.UtcTicks ?? 0}";
 
     /// <summary>Short hash for idempotency — never store/log raw tokens.</summary>
     internal static string HashToken(string email, string token)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{email.Trim().ToLowerInvariant()}|{token}"));
         return Convert.ToHexString(bytes.AsSpan(0, 16)).ToLowerInvariant();
+    }
+
+    internal static string MaskEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return "***";
+
+        var trimmed = email.Trim();
+        var at = trimmed.IndexOf('@');
+        if (at <= 0)
+            return "***";
+
+        var local = trimmed[..at];
+        var domain = trimmed[at..];
+        if (local.Length == 1)
+            return $"{local}***{domain}";
+
+        return $"{local[0]}***{domain}";
     }
 }
