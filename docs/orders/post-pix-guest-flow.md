@@ -19,7 +19,7 @@ Guest checkout → Order → Pix Paid
 ## Acompanhar sem conta
 
 **Preferido:** `GET /api/orders/public/{orderNumber}`  
-Header `X-ORDER-ACCESS-TOKEN` (ou `?token=` — ver risco em [`customer-orders.md`](./customer-orders.md)).
+Header `X-ORDER-ACCESS-TOKEN` (ou query `t` / `token` — ver risco e contrato em [`EMAIL-002-guest-order-link-validation.md`](../features/EMAIL-002-guest-order-link-validation.md)).
 
 **Legado:** `GET /api/orders/guest/{orderId}/status` + mesmo header.
 
@@ -49,6 +49,6 @@ Detalhes: [`guest-order-claim.md`](./guest-order-claim.md).
 MVP: create-account e claim são permitidos com token válido **mesmo se o pedido ainda estiver PendingPayment**.  
 Não alteram status de pagamento. A UI deve incentivar a ação após Paid.
 
-## Sem e-mail transacional
+## Sem e-mail transacional (histórico)
 
-Não há e-mail com link do pedido. O guest depende do `guestAccessToken` persistido no browser (retorno do create order / localStorage). Recuperação sem token fica como dívida técnica.
+O acompanhamento guest **também** usa o link do e-mail OrderCreated (`/pedido/{orderNumber}?t=`). Ver [`EMAIL-002-guest-order-link-validation.md`](../features/EMAIL-002-guest-order-link-validation.md). Recuperação depois que o token some do e-mail/browser continua dívida (sem reemissão).

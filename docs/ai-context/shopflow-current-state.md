@@ -103,7 +103,7 @@ Upload de imagens: **Cloudflare R2** (S3-compatible) quando `Storage__Provider=C
 - Frontend integração customer auth (backend pronto) — parcialmente wired
 - Storage externo de imagens (R2) — **feito** (`docs/integrations/cloudflare-r2-product-images.md`); backfill TEST manual documentado (`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`)
 - CI/CD pipeline
-- FE guest tracking hidratar `?t=` do e-mail; páginas confirm/reset email
+- FE guest tracking hidratar `?t=` do e-mail (EMAIL-002; backend aceita `t` no public status); páginas confirm/reset email
 - Testes HttpApi end-to-end
 - Chat nativo (após WhatsApp CTA)
 

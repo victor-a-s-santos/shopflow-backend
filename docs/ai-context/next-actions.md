@@ -6,7 +6,7 @@
 
 ## Concluído recentemente
 
-- [x] **Brevo transactional emails** — outbox `notifications.email_outbox` + worker + templates PT-BR (confirm/reset/order/paid/ship/deliver); (`docs/integrations/brevo-transactional-emails.md`); pendência FE `?t=` no tracking + páginas confirm/reset
+- [x] **Brevo transactional emails** — outbox `notifications.email_outbox` + worker + templates PT-BR (confirm/reset/order/paid/ship/deliver); (`docs/integrations/brevo-transactional-emails.md`); FE deep-link guest: `docs/features/EMAIL-002-guest-order-link-validation.md`
 - [x] **Product description + isActive contract** — create/update/detail persistem e retornam `description`/`isActive`; migration `description`; (`docs/catalog/admin-product-contract.md`); pendência FE enviar/hidratar no formulário
 - [x] **Admin Inventory SKUs listing** — `GET /api/admin/inventory/skus` paginado (q/status/stockStatus/category/sort + estoque); separado de Catalog Admin (`docs/inventory/admin-inventory-skus-listing.md`); pendência FE Inventory Admin
 - [x] **Admin products listing** — `GET /api/admin/catalog/products` paginado (status/featured/q/category/sort); separado da vitrine (`docs/catalog/admin-products-listing.md`); pendência FE Admin Products

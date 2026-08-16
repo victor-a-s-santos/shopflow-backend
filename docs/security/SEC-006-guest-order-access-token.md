@@ -58,11 +58,12 @@ Em HML/Production, `TokenHashSecret` é obrigatório quando Enabled=true.
 ## Frontend (próxima etapa)
 
 1. Guardar `guestAccessToken` da criação do pedido (ex.: sessionStorage junto do Pix).
-2. Polling/consulta em `GET /api/orders/guest/{orderId}/status` com o header.
-3. Mapear `orderStatus` + `payment.status` para UI (aguardando / aprovado / expirado / cancelado).
+2. Polling/consulta em `GET /api/orders/guest/{orderId}/status` **ou** `GET /api/orders/public/{orderNumber}` com o header.
+3. Hidratar `?t=` do e-mail em `/pedido/:orderNumber` (EMAIL-002). Não deixar o token só na query da API.
+4. Mapear `orderStatus` + `payment.status` para UI (aguardando / aprovado / expirado / cancelado).
 
 ## Limitações
 
-- Sem reenvio de token / e-mail.
+- Sem reenvio de token.
 - Sem attributes/image no snapshot do Order (ainda).
-- Sem link por query string (evitar token em logs de URL).
+- Token no link de e-mail usa query `t` na **loja**; a API prefere header (query `t`/`token` aceita para deep-link/teste).

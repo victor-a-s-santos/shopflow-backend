@@ -160,7 +160,7 @@ public static class TransactionalEmailTemplates
             return $"{baseUrl}/account/orders/{order.OrderId:D}";
 
         // Guest: public tracking by order number. Token in query for email deep-link
-        // (FE should read ?t= — see docs; never log the token).
+        // (FE hydrates ?t= per EMAIL-002; never log the token).
         var path = $"{baseUrl}/pedido/{Uri.EscapeDataString(order.OrderNumber.ToString(CultureInfo.InvariantCulture))}";
         if (string.IsNullOrWhiteSpace(order.GuestAccessToken))
             return path;
