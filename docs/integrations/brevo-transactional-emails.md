@@ -69,7 +69,9 @@ TemplateId no painel Brevo: não usado ainda (campo reservado para evolução).
 | Customer logado | `{PublicApp}/account/orders/{orderId}` |
 | Guest | `{PublicApp}/pedido/{orderNumber}?t={guestAccessToken}` |
 
-Token guest só no e-mail do **novo pedido** (momento em que o raw token existe). E-mails posteriores de guest podem omitir `?t=` se o token não estiver disponível — FE deve aceitar `?t=` no tracking público (pendência se ainda não lê query).
+Token guest só no e-mail do **novo pedido** (momento em que o raw token existe). E-mails posteriores de guest podem omitir `?t=` se o token não estiver disponível.
+
+O FE **precisa** hidratar `?t=` na rota `/pedido/:orderNumber` e chamar `GET /api/orders/public/{orderNumber}` com header `X-ORDER-ACCESS-TOKEN`. Contrato: `docs/features/EMAIL-002-guest-order-link-validation.md`.
 
 Páginas auth sugeridas: `/confirm-email`, `/reset-password` (query `email` + `token`).
 

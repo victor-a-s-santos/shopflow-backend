@@ -4,6 +4,7 @@ using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Infrastructure;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
+using Vls.Shopflow.Orders.Application.Services;
 
 namespace Vls.Shopflow.HttpApi.Endpoints;
 
@@ -39,22 +40,21 @@ public static class OrdersEndpoints
             Guid orderId,
             CancellationToken ct) =>
         {
-            var accessToken = request.Headers[OrderAccessTokenHeaderName].FirstOrDefault();
+            var accessToken = ReadGuestAccessToken(request);
             var result = await sender.Send(new GetGuestOrderStatusQuery(orderId, accessToken), ct);
             return Results.Ok(result);
         })
         .RequireRateLimiting(DependencyInjection.GuestOrderStatusRateLimitPolicy)
         .AllowAnonymous();
 
-        // Preferred guest tracking: orderNumber + token (header preferred; query allowed for email/deep links).
+        // Preferred guest tracking: orderNumber + token (header preferred; query t/token for email/deep links).
         orders.MapGet("/public/{orderNumber}", async (
             ISender sender,
             HttpRequest request,
             string orderNumber,
             CancellationToken ct) =>
         {
-            var accessToken = request.Headers[OrderAccessTokenHeaderName].FirstOrDefault()
-                              ?? request.Query["token"].FirstOrDefault();
+            var accessToken = ReadGuestAccessToken(request);
             var result = await sender.Send(new GetPublicOrderStatusQuery(orderNumber, accessToken), ct);
             return Results.Ok(result);
         })
@@ -86,4 +86,10 @@ public static class OrdersEndpoints
 
         return group;
     }
+
+    internal static string? ReadGuestAccessToken(HttpRequest request)
+        => GuestOrderAccessTokenLocator.Resolve(
+            request.Headers[OrderAccessTokenHeaderName].FirstOrDefault(),
+            request.Query["t"].FirstOrDefault(),
+            request.Query["token"].FirstOrDefault());
 }

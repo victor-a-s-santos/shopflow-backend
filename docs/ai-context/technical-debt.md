@@ -39,7 +39,7 @@
 | **Admin Products usa listagem pública** | Backend `/api/admin/catalog/products` pronto; FE ainda limitado (~48) | `docs/catalog/admin-products-listing.md` |
 | **Admin product form description/isActive wire** | Backend create/update/detail prontos; FE ainda pode strippar `description` no create e não hidratar no edit | `docs/catalog/admin-product-contract.md` |
 | **Subcategorias na listagem** | Filtro é match exato de categoria | Árvore/filhos não incluídos |
-| **Guest claim sem e-mail / magic link** | E-mail de pedido criado pode incluir `?t=`; tracking público ainda precisa hidratar query; sem magic link pós-perda | `docs/integrations/brevo-transactional-emails.md` |
+| **Guest claim / tracking por e-mail** | OrderCreated inclui `?t=`; API public aceita `t`; **FE ainda precisa hidratar query** (EMAIL-002) | `docs/features/EMAIL-002-guest-order-link-validation.md` |
 | **FE confirm/reset pages** | Backend envia links `/confirm-email` e `/reset-password` | Wiring UI customer auth |
 | **Salvar produto admin multi-endpoint** | Create shell → variants → images separados; sem transação global | Persistência parcial se o FE falhar no meio; ver `docs/catalog/admin-product-contract.md` |
 | **Arquivos de imagem órfãos** | Delete agora tenta remover objeto (R2/local); falha só logada | Lixo residual se storage falhar |
