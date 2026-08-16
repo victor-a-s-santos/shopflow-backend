@@ -1,5 +1,5 @@
-# Temporary TESTE-only validation for EMAIL-001 sandbox send.
-# Do not merge. Does not rsync, rebuild, or touch HML/PROD.
+# Temporary TESTE-only validation for EMAIL-001 Test B (real delivery).
+# Do not merge. Does not rsync, rebuild API, or touch HML/PROD.
 name: TESTE Brevo sandbox validate
 
 on:
@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate-sandbox:
-    name: Worker env + new order + outbox Sent
+  validate-delivery:
+    name: Test B real delivery + outbox Sent
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -35,7 +35,7 @@ jobs:
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Worker status and env
+      - name: Disable sandbox and recreate worker-test
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -46,16 +46,36 @@ jobs:
           set -euo pipefail
           cd "$REMOTE_DEPLOY_DIR"
 
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path(".env.test")
+          text = p.read_text()
+          pat = re.compile(r"^Brevo__SandboxMode=.*$", re.M)
+          line = "Brevo__SandboxMode=false"
+          if pat.search(text):
+              text = pat.sub(line, text, count=1)
+          else:
+              text = text.rstrip() + "\n" + line + "\n"
+          p.write_text(text)
+          print("Brevo__SandboxMode=false written (value only)")
+          PY
+
+          grep -E '^Brevo__SandboxMode=' .env.test
+
+          echo "=== recreate worker-test ==="
+          docker compose up -d --force-recreate --no-deps worker-test
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if docker compose exec -T worker-test sh -c 'echo ok' </dev/null >/dev/null 2>&1; then
+              echo "worker ready attempt $i"
+              break
+            fi
+            echo "waiting worker $i"
+            sleep 3
+          done
+
           echo "=== docker compose ps worker-test ==="
           docker compose ps worker-test
-
-          echo "=== forbidden phrases in last 80 log lines ==="
-          if docker compose logs --tail=80 worker-test 2>&1 \
-            | grep -Ei 'missing ApiKey|Brevo disabled|missing SenderEmail'; then
-            echo "FORBIDDEN_PHRASE=present"
-            exit 1
-          fi
-          echo "FORBIDDEN_PHRASE=absent"
 
           echo "=== container env (no secrets) ==="
           docker compose exec -T worker-test sh -c '
@@ -65,8 +85,14 @@ jobs:
           if [ -n "$Brevo__ApiKey" ]; then echo "ApiKey=SET"; else echo "ApiKey=MISSING"; fi
           ' </dev/null
 
+          SANDBOX="$(docker compose exec -T worker-test sh -c 'printf %s "$Brevo__SandboxMode"' </dev/null)"
           APIKEY_STATE="$(docker compose exec -T worker-test sh -c 'if [ -n "$Brevo__ApiKey" ]; then echo SET; else echo MISSING; fi' </dev/null)"
+          echo "SANDBOX=$SANDBOX"
           echo "APIKEY_STATE=$APIKEY_STATE"
+          case "$SANDBOX" in
+            false|False|FALSE) ;;
+            *) echo "FAIL: SandboxMode is '$SANDBOX' expected false"; exit 1 ;;
+          esac
           if [ "$APIKEY_STATE" != "SET" ]; then
             echo "Brevo__ApiKey is not present in worker-test."
             exit 1
@@ -124,15 +150,15 @@ jobs:
 
           checkout_body = {
               "customer": {
-                  "fullName": "EMAIL-001 Teste A Sandbox",
+                  "fullName": "EMAIL-001 Teste B Entrega",
                   "email": "victor.a.santanna@gmail.com",
-                  "phone": "11999990003",
+                  "phone": "11999990004",
               },
               "address": {
                   "zipCode": "01310100",
                   "street": "Avenida Paulista",
                   "number": "1000",
-                  "complement": "EMAIL-001-TESTA-RETRY",
+                  "complement": "EMAIL-001-TESTB",
                   "neighborhood": "Bela Vista",
                   "city": "Sao Paulo",
                   "state": "SP",
@@ -178,7 +204,7 @@ jobs:
           echo "waiting 40s for dispatcher + outbox + Brevo..."
           sleep 40
 
-          SINCE="1m"
+          SINCE="2m"
           if [[ -f /tmp/shopflow-email-follow-since ]]; then
             SINCE="$(cat /tmp/shopflow-email-follow-since)"
           fi
@@ -186,6 +212,11 @@ jobs:
           docker compose logs --since "$SINCE" worker-test 2>&1 \
             | grep -Eiv 'apikey|token=|password|secret|guestaccess|htmlbody' \
             | grep -Ei 'email|brevo|outbox|intent|sent|skip|failed|error|provider|401|sandbox' || true
+
+          if docker compose logs --since "$SINCE" worker-test 2>&1 | grep -F 'Brevo SandboxMode=true'; then
+            echo "FAIL: worker still logged SandboxMode=true"
+            exit 1
+          fi
 
           KEY="order:${ORDER_ID}:created"
 
@@ -234,5 +265,5 @@ jobs:
           if [[ "$FAIL" -ne 0 ]]; then
             exit 1
           fi
-          echo "PASS: OrderCreated intent Dispatched and outbox Sent"
+          echo "PASS: Test B OrderCreated intent Dispatched and outbox Sent (sandbox off)"
           EOF
