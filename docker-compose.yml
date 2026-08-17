@@ -39,6 +39,7 @@ services:
       SHOPFLOW_ADMIN_EMAIL: ${SHOPFLOW_ADMIN_EMAIL:-}
       SHOPFLOW_ADMIN_PASSWORD: ${SHOPFLOW_ADMIN_PASSWORD:-}
       SHOPFLOW_ADMIN_NAME: ${SHOPFLOW_ADMIN_NAME:-Shopflow Admin}
+      SHOPFLOW_ADMIN_RESET_PASSWORD: ${SHOPFLOW_ADMIN_RESET_PASSWORD:-false}
       Uploads__RootPath: /app/wwwroot/uploads
       Uploads__PublicBaseUrl: http://localhost:5127
       Storage__Provider: ${Storage__Provider:-Local}
