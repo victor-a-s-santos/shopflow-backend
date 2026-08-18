@@ -175,7 +175,7 @@ public sealed class AdminAuthIntegrationTests : IClassFixture<ShopflowWebApplica
     }
 }
 
-public sealed class ShopflowWebApplicationFactory : WebApplicationFactory<Program>
+public class ShopflowWebApplicationFactory : WebApplicationFactory<Program>
 {
     public const string AdminEmail = "admin.integration@test.local";
     public const string AdminPassword = "TestAdmin123";
@@ -201,18 +201,21 @@ public sealed class ShopflowWebApplicationFactory : WebApplicationFactory<Progra
                 ["ConnectionStrings:Orders"] = ConnectionString,
                 ["ConnectionStrings:PaymentsPix"] = ConnectionString,
                 ["ConnectionStrings:IdentityAccess"] = ConnectionString,
+                ["ConnectionStrings:Notifications"] = ConnectionString,
                 ["SHOPFLOW_ADMIN_EMAIL"] = AdminEmail,
                 ["SHOPFLOW_ADMIN_PASSWORD"] = AdminPassword,
                 ["SHOPFLOW_ADMIN_NAME"] = "Integration Admin",
                 ["DataProtection:KeysPath"] = Path.Combine(Path.GetTempPath(), "shopflow-test-dataprotection"),
-                ["AllowedOrigins:0"] = "http://localhost"
+                ["AllowedOrigins:0"] = "http://localhost",
+                ["StoreAccess:Mode"] = "PublicCatalogAndGuestCheckout",
+                ["Checkout:AllowGuestCheckout"] = "true",
+                ["CustomerAccess:RequireApproval"] = "false"
             });
         });
 
         builder.ConfigureServices(services =>
         {
-            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IIdentityEmailSender));
-            if (descriptor is not null)
+            foreach (var descriptor in services.Where(d => d.ServiceType == typeof(IIdentityEmailSender)).ToList())
                 services.Remove(descriptor);
 
             services.AddSingleton<IIdentityEmailSender>(EmailSender);

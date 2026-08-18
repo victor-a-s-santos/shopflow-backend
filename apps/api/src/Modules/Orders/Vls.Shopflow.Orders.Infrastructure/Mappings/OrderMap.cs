@@ -35,6 +35,34 @@ internal sealed class OrderMap : IEntityTypeConfiguration<Order>
             .HasMaxLength(30)
             .IsRequired();
 
+        map.Property(x => x.CustomerUserId);
+
+        map.Property(x => x.OrderNumber).IsRequired();
+        map.HasIndex(x => x.OrderNumber)
+            .IsUnique()
+            .HasDatabaseName("IX_orders_OrderNumber");
+
+        map.Property(x => x.PreferredDeliveryMethod)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        map.Property(x => x.PreferredDeliveryDate);
+        map.Property(x => x.CustomerOrderNote).HasMaxLength(1000);
+        map.Property(x => x.InternalOrderNote).HasMaxLength(2000);
+
+        map.Property(x => x.FulfillmentStatus)
+            .HasConversion<string>()
+            .HasMaxLength(30)
+            .IsRequired()
+            .HasDefaultValue(Domain.Enums.FulfillmentStatus.AwaitingShipment);
+        map.Property(x => x.FinalDeliveryMethod)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        map.Property(x => x.TrackingCode).HasMaxLength(120);
+        map.Property(x => x.ShippedAt);
+        map.Property(x => x.DeliveredAt);
+        map.Property(x => x.FulfillmentUpdatedAt);
+        map.Property(x => x.FulfillmentUpdatedByAdminId);
+
         map.Property(x => x.CreatedAt).IsRequired();
         map.Property(x => x.UpdatedAt);
         map.Property(x => x.PaidAt);
@@ -42,6 +70,12 @@ internal sealed class OrderMap : IEntityTypeConfiguration<Order>
 
         map.HasIndex(x => x.CustomerEmail);
         map.HasIndex(x => x.CreatedAt);
+        map.HasIndex(x => new { x.CustomerUserId, x.CreatedAt })
+            .HasDatabaseName("IX_orders_CustomerUserId_CreatedAt");
+        map.HasIndex(x => new { x.FulfillmentStatus, x.CreatedAt })
+            .HasDatabaseName("IX_orders_FulfillmentStatus_CreatedAt");
+        map.HasIndex(x => new { x.CustomerUserId, x.FulfillmentStatus, x.CreatedAt })
+            .HasDatabaseName("IX_orders_CustomerUserId_FulfillmentStatus_CreatedAt");
 
         map.HasMany(x => x.Items)
             .WithOne()
@@ -70,6 +104,16 @@ internal sealed class OrderItemMap : IEntityTypeConfiguration<OrderItem>
         map.Property(x => x.Quantity).IsRequired();
         map.Property(x => x.UnitPrice).HasColumnType("numeric(12,2)").IsRequired();
         map.Property(x => x.Subtotal).HasColumnType("numeric(12,2)").IsRequired();
+
+        map.Property(x => x.SalesMode).HasMaxLength(32);
+        map.Property(x => x.PackageSize);
+        map.Property(x => x.PackageLabel).HasMaxLength(200);
+        map.Property(x => x.PackageDescription).HasMaxLength(1000);
+        map.Property(x => x.QuantityUnitLabel).HasMaxLength(64);
+        map.Property(x => x.ShowTotalPieces);
+        map.Property(x => x.TotalPieces);
+        map.Property(x => x.EquivalentUnitPrice).HasColumnType("numeric(12,2)");
+        map.Property(x => x.SalesDisplaySummary).HasMaxLength(200);
 
         map.HasIndex(x => x.OrderId);
         map.HasIndex(x => x.SkuId);

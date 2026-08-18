@@ -26,6 +26,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Application\Vls.Shopflow.Orders.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Domain\Vls.Shopflow.Orders.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Infrastructure\Vls.Shopflow.Orders.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

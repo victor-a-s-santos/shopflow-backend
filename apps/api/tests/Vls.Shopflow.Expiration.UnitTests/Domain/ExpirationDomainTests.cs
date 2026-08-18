@@ -114,6 +114,14 @@ public sealed class ExpirationDomainTests
             null,
             null,
             null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
             DateTimeOffset.UtcNow.AddMinutes(15));
 
         payment.Expire();

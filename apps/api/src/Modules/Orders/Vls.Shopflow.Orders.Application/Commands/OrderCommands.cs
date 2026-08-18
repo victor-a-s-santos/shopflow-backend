@@ -3,7 +3,10 @@ using Vls.Shopflow.Orders.Application.DataTransferObjects;
 
 namespace Vls.Shopflow.Orders.Application.Commands;
 
-public sealed record CreateOrderFromCheckoutSessionCommand(Guid CheckoutSessionId)
+public sealed record CreateOrderFromCheckoutSessionCommand(
+    Guid CheckoutSessionId,
+    Guid? CustomerUserId = null,
+    bool IssueGuestAccessToken = true)
     : ICommand<OrderDto>;
 
 public sealed record GetOrderByIdQuery(Guid OrderId)
@@ -11,3 +14,12 @@ public sealed record GetOrderByIdQuery(Guid OrderId)
 
 public sealed record GetOrderByCheckoutSessionIdQuery(Guid CheckoutSessionId)
     : IQuery<OrderDto>;
+
+public sealed record GetGuestOrderStatusQuery(Guid OrderId, string? AccessToken)
+    : IQuery<GuestOrderStatusDto>;
+
+/// <summary>
+/// Public guest tracking by friendly order number + access token (not GUID alone).
+/// </summary>
+public sealed record GetPublicOrderStatusQuery(string OrderNumber, string? AccessToken)
+    : IQuery<GuestOrderStatusDto>;

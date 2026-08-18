@@ -18,7 +18,7 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("catalog")
-                .HasAnnotation("ProductVersion", "9.0.0")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -95,11 +95,27 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("description");
+
+                    b.Property<int?>("DisplayOrder")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("HasSkus")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsFeatured")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -109,6 +125,9 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("IsActive", "IsFeatured", "DisplayOrder", "CreatedAt", "Id")
+                        .HasDatabaseName("IX_products_storefront_list");
 
                     b.ToTable("products", "catalog", t =>
                         {
@@ -126,21 +145,32 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsPrimary")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ObjectKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
-                    b.Property<string>("StoragePath")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                    b.Property<string>("StorageProvider")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Url")
                         .IsRequired()
@@ -149,19 +179,13 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ObjectKey");
+
                     b.HasIndex("ProductId", "IsPrimary");
 
                     b.HasIndex("ProductId", "SortOrder");
 
                     b.ToTable("product_images", "catalog");
-
-                    b.HasOne("Vls.Shopflow.Catalog.Domain.Entities.Product", "Product")
-                        .WithMany("Images")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.Sku", b =>
@@ -187,18 +211,23 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
 
                     b.ToTable("product_skus", "catalog", t =>
                         {
+                            t.HasCheckConstraint("CK_product_skus_minimum_quantity", "minimum_quantity >= 1");
+
+                            t.HasCheckConstraint("CK_product_skus_package_size", "package_size IS NULL OR package_size > 1");
+
                             t.HasCheckConstraint("CK_product_skus_price_nonnegative", "(regular_price >= 0)\n            AND (promo_price IS NULL OR promo_price >= 0)");
 
                             t.HasCheckConstraint("CK_product_skus_promo_le_regular", "(promo_price IS NULL OR promo_price <= regular_price)");
 
                             t.HasCheckConstraint("CK_product_skus_promo_window", "(promo_start IS NULL OR promo_end IS NULL OR promo_start <= promo_end)");
+
+                            t.HasCheckConstraint("CK_product_skus_quantity_step", "quantity_step >= 1");
                         });
                 });
 
             modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.SkuAttribute", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("AttributeDefinitionId")
@@ -248,6 +277,34 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("AttributeDefinition");
+                });
+
+            modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.Category", b =>
+                {
+                    b.OwnsOne("Vls.Shopflow.Catalog.Domain.ValueObjects.Slug", "Slug", b1 =>
+                        {
+                            b1.Property<Guid>("CategoryId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Value")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("slug");
+
+                            b1.HasKey("CategoryId");
+
+                            b1.HasIndex("Value")
+                                .IsUnique();
+
+                            b1.ToTable("categories", "catalog");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CategoryId");
+                        });
+
+                    b.Navigation("Slug")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.Product", b =>
@@ -359,6 +416,17 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.ProductImage", b =>
+                {
+                    b.HasOne("Vls.Shopflow.Catalog.Domain.Entities.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.Sku", b =>
                 {
                     b.HasOne("Vls.Shopflow.Catalog.Domain.Entities.Product", "Product")
@@ -439,10 +507,81 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
                                 .IsRequired();
                         });
 
+                    b.OwnsOne("Vls.Shopflow.Catalog.Domain.ValueObjects.SkuSalesRule", "SalesRule", b1 =>
+                        {
+                            b1.Property<Guid>("SkuId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<bool>("AllowCustomerToChooseVariants")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("boolean")
+                                .HasDefaultValue(true)
+                                .HasColumnName("allow_customer_to_choose_variants");
+
+                            b1.Property<bool>("IsWholesaleOnly")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("boolean")
+                                .HasDefaultValue(false)
+                                .HasColumnName("is_wholesale_only");
+
+                            b1.Property<int>("MinimumQuantity")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer")
+                                .HasDefaultValue(1)
+                                .HasColumnName("minimum_quantity");
+
+                            b1.Property<string>("PackageDescription")
+                                .HasMaxLength(1000)
+                                .HasColumnType("character varying(1000)")
+                                .HasColumnName("package_description");
+
+                            b1.Property<string>("PackageLabel")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("package_label");
+
+                            b1.Property<int?>("PackageSize")
+                                .HasColumnType("integer")
+                                .HasColumnName("package_size");
+
+                            b1.Property<int>("QuantityStep")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer")
+                                .HasDefaultValue(1)
+                                .HasColumnName("quantity_step");
+
+                            b1.Property<string>("QuantityUnitLabel")
+                                .HasMaxLength(64)
+                                .HasColumnType("character varying(64)")
+                                .HasColumnName("quantity_unit_label");
+
+                            b1.Property<int>("SalesMode")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer")
+                                .HasDefaultValue(0)
+                                .HasColumnName("sales_mode");
+
+                            b1.Property<bool>("ShowTotalPieces")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("boolean")
+                                .HasDefaultValue(false)
+                                .HasColumnName("show_total_pieces");
+
+                            b1.HasKey("SkuId");
+
+                            b1.ToTable("product_skus", "catalog");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SkuId");
+                        });
+
                     b.Navigation("Price")
                         .IsRequired();
 
                     b.Navigation("Product");
+
+                    b.Navigation("SalesRule")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.SkuAttribute", b =>
@@ -483,11 +622,6 @@ namespace Vls.Shopflow.Catalog.Infrastructure.Migrations
                     b.Navigation("Images");
 
                     b.Navigation("Skus");
-                });
-
-            modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.ProductImage", b =>
-                {
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Vls.Shopflow.Catalog.Domain.Entities.Sku", b =>

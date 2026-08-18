@@ -20,4 +20,7 @@ public sealed record CheckoutSessionResponseDto(
     decimal Subtotal,
     decimal? Shipping,
     decimal Total,
-    CheckoutPaymentDto Payment);
+    CheckoutPaymentDto Payment,
+    string? PreferredDeliveryMethod = null,
+    DateOnly? PreferredDeliveryDate = null,
+    string? CustomerOrderNote = null);

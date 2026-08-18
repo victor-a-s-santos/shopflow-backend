@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MediatR;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.PaymentsPix.Application.Commands;
@@ -24,6 +25,96 @@ public static class PaymentsPixEndpoints
                 : Results.Ok(result.Payment);
         });
 
+        payments.MapPost("/webhooks/mercado-pago", async (
+            HttpRequest request,
+            ISender sender,
+            CancellationToken ct) =>
+        {
+            using var document = await JsonDocument.ParseAsync(request.Body, cancellationToken: ct);
+            var root = document.RootElement;
+            // TEMPORARY DIAGNOSTIC ONLY: truncated in capture service (max 8 KB). Never logged in Production.
+            var bodyRawJson = root.GetRawText();
+
+            var dataIdFromQuery = request.Query["data.id"].FirstOrDefault();
+            var queryTypeExact = request.Query["type"].FirstOrDefault();
+
+            string? dataIdFromBody = null;
+            string? dataStatus = null;
+            string? dataStatusDetail = null;
+            if (root.TryGetProperty("data", out var dataElement))
+            {
+                if (dataElement.TryGetProperty("id", out var idElement))
+                {
+                    dataIdFromBody = idElement.ValueKind == JsonValueKind.Number
+                        ? idElement.GetRawText()
+                        : idElement.GetString();
+                }
+
+                if (dataElement.TryGetProperty("status", out var statusElement)
+                    && statusElement.ValueKind == JsonValueKind.String)
+                {
+                    dataStatus = statusElement.GetString();
+                }
+
+                if (dataElement.TryGetProperty("status_detail", out var statusDetailElement)
+                    && statusDetailElement.ValueKind == JsonValueKind.String)
+                {
+                    dataStatusDetail = statusDetailElement.GetString();
+                }
+            }
+
+            var providerEventId = root.TryGetProperty("id", out var eventIdElement)
+                ? eventIdElement.ValueKind == JsonValueKind.Number
+                    ? eventIdElement.GetRawText()
+                    : eventIdElement.GetString()
+                : null;
+
+            var action = root.TryGetProperty("action", out var actionElement)
+                ? actionElement.GetString()
+                : null;
+
+            var type = root.TryGetProperty("type", out var typeElement)
+                ? typeElement.GetString()
+                : null;
+
+            var liveMode = root.TryGetProperty("live_mode", out var liveModeElement)
+                           && liveModeElement.ValueKind is JsonValueKind.True;
+
+            var applicationId = ReadJsonStringOrNumber(root, "application_id");
+            var userId = ReadJsonStringOrNumber(root, "user_id");
+
+            var result = await sender.Send(
+                new ProcessMercadoPagoPixWebhookCommand(
+                    dataIdFromQuery,
+                    dataIdFromBody,
+                    request.Headers["x-signature"].FirstOrDefault(),
+                    request.Headers["x-request-id"].FirstOrDefault(),
+                    action,
+                    type,
+                    liveMode,
+                    providerEventId,
+                    applicationId,
+                    userId,
+                    dataStatus,
+                    dataStatusDetail,
+                    request.QueryString.HasValue ? request.QueryString.Value : null,
+                    queryTypeExact,
+                    bodyRawJson,
+                    request.Path.Value,
+                    request.Method),
+                ct);
+
+            return Results.Json(
+                new
+                {
+                    outcome = result.Outcome,
+                    message = result.Message,
+                    pixPaymentId = result.PixPaymentId,
+                    orderId = result.OrderId
+                },
+                statusCode: result.StatusCode);
+        });
+
         // Full payment details — backoffice only until guest access token exists (Phase 4).
         payments.MapGet("/{paymentId:guid}", async (
             ISender sender,
@@ -46,5 +137,18 @@ public static class PaymentsPixEndpoints
         .RequireAuthorization(AuthPolicies.Backoffice);
 
         return group;
+    }
+
+    private static string? ReadJsonStringOrNumber(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var element))
+            return null;
+
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.GetRawText(),
+            _ => null
+        };
     }
 }

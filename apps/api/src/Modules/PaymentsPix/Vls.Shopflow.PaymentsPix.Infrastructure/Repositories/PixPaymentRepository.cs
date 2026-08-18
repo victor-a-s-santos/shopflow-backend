@@ -13,6 +13,26 @@ public sealed class PixPaymentRepository(PaymentsPixDbContext db) : IPixPaymentR
     public Task<PixPayment?> GetByIdAsync(Guid paymentId, CancellationToken cancellationToken)
         => db.PixPayments.FirstOrDefaultAsync(p => p.Id == paymentId, cancellationToken);
 
+    public Task<PixPayment?> GetByProviderPaymentIdAsync(
+        string providerPaymentId,
+        CancellationToken cancellationToken)
+        => db.PixPayments.FirstOrDefaultAsync(
+            p => p.ProviderPaymentId == providerPaymentId
+                 || p.ProviderTransactionId == providerPaymentId,
+            cancellationToken);
+
+    public Task<PixPayment?> GetByProviderOrderIdAsync(
+        string providerOrderId,
+        CancellationToken cancellationToken)
+    {
+        var trimmed = providerOrderId.Trim();
+        // MP query data.id may differ in case from the value persisted at charge time.
+        return db.PixPayments.FirstOrDefaultAsync(
+            p => p.ProviderOrderId != null
+                 && p.ProviderOrderId.ToLower() == trimmed.ToLower(),
+            cancellationToken);
+    }
+
     public Task<PixPayment?> GetPendingByOrderIdAsync(Guid orderId, CancellationToken cancellationToken)
         => db.PixPayments.FirstOrDefaultAsync(
             p => p.OrderId == orderId && p.Status == PixPaymentStatus.Pending,
@@ -35,6 +55,21 @@ public sealed class PixPaymentRepository(PaymentsPixDbContext db) : IPixPaymentR
                 ((p.ExpiresAt != null && p.ExpiresAt <= asOfUtc) ||
                  (p.ExpiresAt == null && p.CreatedAt <= createdBeforeUtc)))
             .OrderBy(p => p.ExpiresAt ?? p.CreatedAt)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PixPayment>> GetPendingMercadoPagoForReconciliationBatchAsync(
+        DateTimeOffset createdAfterUtc,
+        int batchSize,
+        CancellationToken cancellationToken)
+        => await db.PixPayments
+            .Where(p =>
+                p.Status == PixPaymentStatus.Pending
+                && p.Provider == PixPaymentProviderType.MercadoPago
+                && p.ProviderOrderId != null
+                && p.ProviderOrderId != ""
+                && p.CreatedAt >= createdAfterUtc)
+            .OrderBy(p => p.CreatedAt)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
 }

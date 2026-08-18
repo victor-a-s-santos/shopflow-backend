@@ -1,4 +1,5 @@
 using MediatR;
+using Vls.Shopflow.IdentityAccess.Application.Interfaces;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.Inventory.Application.Commands;
 using Vls.Shopflow.Inventory.Application.Queries;
@@ -29,6 +30,16 @@ public static class InventoryEndpoints
             {
                 var full = await sender.Send(new GetInventoryBySkuIdQuery(skuId), ct);
                 return full is null ? Results.NotFound() : Results.Ok(full);
+            }
+
+            var storeAccess = ctx.RequestServices.GetRequiredService<IStoreAccessPolicy>();
+            if (storeAccess.RequireApprovedCustomerToBrowse)
+            {
+                var currentCustomer = ctx.RequestServices.GetRequiredService<ICurrentCustomerAccessor>();
+                var customer = await currentCustomer.GetCurrentCustomerAsync(ct);
+                var decision = storeAccess.EvaluateBrowse(customer);
+                if (!decision.Allowed)
+                    return StoreAccessHttp.Denied(ctx, decision);
             }
 
             var safe = await sender.Send(new GetSkuAvailabilityBySkuIdQuery(skuId), ct);
@@ -75,8 +86,8 @@ public static class InventoryEndpoints
             StockChangeRequest req,
             CancellationToken ct) =>
         {
-            await sender.Send(new RemoveStockCommand(skuId, req.Quantity, req.Reason), ct);
-            return Results.NoContent();
+            var result = await sender.Send(new RemoveStockCommand(skuId, req.Quantity, req.Reason), ct);
+            return Results.Ok(result);
         })
         .RequireAuthorization(AuthPolicies.Backoffice);
 
@@ -93,6 +104,46 @@ public static class InventoryEndpoints
         var adminInv = group.MapGroup("/admin/inventory")
             .WithTags("InventoryAdmin")
             .RequireAuthorization(AuthPolicies.Backoffice);
+
+        adminInv.MapGet("/skus", async (
+            ISender sender,
+            int? page,
+            int? pageSize,
+            string? sort,
+            string? q,
+            Guid? productId,
+            string? categorySlug,
+            Guid? categoryId,
+            string? status,
+            string? stockStatus,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(
+                new GetAdminInventorySkusQuery(
+                    page ?? 1,
+                    pageSize ?? 20,
+                    sort ?? AdminInventorySkuListSort.Default,
+                    q,
+                    productId,
+                    categorySlug,
+                    categoryId,
+                    status ?? AdminInventorySkuListFilters.StatusAll,
+                    stockStatus ?? AdminInventorySkuListFilters.StockAll),
+                ct);
+
+            return Results.Ok(result);
+        });
+
+        adminInv.MapPost("/skus/availability", async (
+            ISender sender,
+            GetSkuAvailabilityBatchRequest req,
+            CancellationToken ct) =>
+        {
+            var result = await sender.Send(
+                new GetSkuAvailabilityBatchQuery(req.SkuIds ?? []),
+                ct);
+            return Results.Ok(result);
+        });
 
         adminInv.MapPost("/skus/{skuId:guid}/reserve", async (
             ISender sender,
@@ -130,3 +181,5 @@ public sealed record CreateInventoryForSkuRequest(int InitialQuantity = 0);
 public sealed record StockChangeRequest(int Quantity, string? Reason);
 
 public sealed record ReserveStockRequest(int Quantity, DateTimeOffset? ExpiresAt);
+
+public sealed record GetSkuAvailabilityBatchRequest(IReadOnlyList<Guid>? SkuIds);

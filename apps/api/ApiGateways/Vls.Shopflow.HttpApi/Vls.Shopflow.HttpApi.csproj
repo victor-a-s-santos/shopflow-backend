@@ -29,6 +29,10 @@
     <ProjectReference Include="..\..\src\Modules\IdentityAccess\Vls.Shopflow.IdentityAccess.Application\Vls.Shopflow.IdentityAccess.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\IdentityAccess\Vls.Shopflow.IdentityAccess.Infrastructure\Vls.Shopflow.IdentityAccess.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\IdentityAccess\Vls.Shopflow.IdentityAccess.Domain\Vls.Shopflow.IdentityAccess.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Shipping\Vls.Shopflow.Shipping.Application\Vls.Shopflow.Shipping.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Shipping\Vls.Shopflow.Shipping.Infrastructure\Vls.Shopflow.Shipping.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\Vls.Shopflow.Notifications.Application\Vls.Shopflow.Notifications.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\Vls.Shopflow.Notifications.Infrastructure\Vls.Shopflow.Notifications.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

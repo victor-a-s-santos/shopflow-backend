@@ -4,6 +4,8 @@ using FluentValidation;
 
 using MediatR;
 
+using Microsoft.AspNetCore.HttpOverrides;
+
 using Microsoft.AspNetCore.Identity;
 
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +13,8 @@ using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
 using Vls.Shopflow.Catalog.Application.Behaviors;
+
+using Vls.Shopflow.Catalog.Application.Interfaces;
 
 using Vls.Shopflow.Catalog.Infrastructure;
 
@@ -32,7 +36,13 @@ using Vls.Shopflow.Orders.Infrastructure;
 
 using Vls.Shopflow.PaymentsPix.Infrastructure;
 
+using Vls.Shopflow.Shipping.Infrastructure;
+
+using Vls.Shopflow.Notifications.Infrastructure;
+
 using Vls.Shopflow.HttpApi.Endpoints;
+
+using Vls.Shopflow.HttpApi;
 
 
 
@@ -84,7 +94,19 @@ builder.Services.AddOrdersModuleFromConfig(builder.Configuration, enableSensitiv
 
 builder.Services.AddPaymentsPixModuleFromConfig(builder.Configuration, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
 
+builder.Services.AddShippingModuleFromConfig(builder.Configuration);
+
 builder.Services.AddIdentityAccessModuleFromConfig(builder.Configuration, builder.Environment, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
+
+// After Identity/Orders so outbox email adapters override logging/null stubs.
+builder.Services.AddNotificationsModuleFromConfig(builder.Configuration, enableSensitiveLoggingOnDev: builder.Environment.IsDevelopment());
+
+builder.Services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.ICustomerAccountPort, Vls.Shopflow.HttpApi.Services.CustomerAccountPort>();
+
+// API runs HTTP inside Docker behind Caddy/Cloudflare TLS termination.
+// Forwarded headers restore Request.Scheme=https so Secure cookies (antiforgery) work.
+// Only trust X-Forwarded-* from private Docker/loopback peers (Caddy), never from any client.
+builder.Services.Configure<ForwardedHeadersOptions>(Vls.Shopflow.HttpApi.ForwardedHeadersConfiguration.Configure);
 
 var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
     ?.Where(static o => !string.IsNullOrWhiteSpace(o))
@@ -116,6 +138,40 @@ builder.Services.AddEndpointsApiExplorer();
 
 
 var app = builder.Build();
+
+{
+    var paymentsPixLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("PaymentsPix.Startup");
+    var provider = builder.Configuration["PaymentsPix:Provider"] ?? "Fake";
+    var mpEnvironment = builder.Configuration["MercadoPago:Environment"] ?? "(unset)";
+    var accessTokenConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["MercadoPago:AccessToken"]);
+    var webhookSecretConfigured = !string.IsNullOrWhiteSpace(builder.Configuration["MercadoPago:WebhookSecret"]);
+    var notificationUrl = builder.Configuration["MercadoPago:NotificationUrl"];
+    var notificationUrlConfigured = !string.IsNullOrWhiteSpace(notificationUrl);
+    var configuredApplicationId = builder.Configuration["MercadoPago:ApplicationId"];
+    var configuredUserId = builder.Configuration["MercadoPago:UserId"];
+    var webhookSecretFingerprint = app.Environment.IsProduction()
+        ? null
+        : Vls.Shopflow.PaymentsPix.Application.Security.MercadoPagoSecretFingerprint.Compute(
+            builder.Configuration["MercadoPago:WebhookSecret"]);
+    paymentsPixLogger.LogInformation(
+        "PaymentsPix provider: {Provider}. MercadoPago environment: {Environment}. " +
+        "MercadoPago access token configured: {AccessTokenConfigured}. " +
+        "MercadoPago webhook secret configured: {WebhookSecretConfigured}. " +
+        "MercadoPago notification URL configured: {NotificationUrlConfigured}. " +
+        "MercadoPago notification URL: {NotificationUrl}. " +
+        "MercadoPago application_id configured: {ApplicationIdConfigured}. " +
+        "MercadoPago user_id configured: {UserIdConfigured}. " +
+        "MercadoPago webhook_secret_fingerprint: {WebhookSecretFingerprint}.",
+        provider,
+        mpEnvironment,
+        accessTokenConfigured,
+        webhookSecretConfigured,
+        notificationUrlConfigured,
+        notificationUrlConfigured ? notificationUrl : "(unset)",
+        string.IsNullOrWhiteSpace(configuredApplicationId) ? "(unset)" : configuredApplicationId.Trim(),
+        string.IsNullOrWhiteSpace(configuredUserId) ? "(unset)" : configuredUserId.Trim(),
+        webhookSecretFingerprint ?? "(hidden-in-production)");
+}
 
 
 
@@ -158,7 +214,8 @@ using (var scope = app.Services.CreateScope())
         builder.Configuration,
         app.Environment,
         app.Environment,
-        demoSeedLogger);
+        demoSeedLogger,
+        scope.ServiceProvider.GetRequiredService<IObjectStorageService>());
 
     if (demoOptions.Enabled && demoOptions.CreateInventory)
     {
@@ -200,6 +257,12 @@ using (var scope = app.Services.CreateScope())
 
 
 
+    var notificationsDb = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+
+    await notificationsDb.Database.MigrateAsync();
+
+
+
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ShopflowUser>>();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ShopflowRole>>();
@@ -232,6 +295,10 @@ if (app.Environment.IsDevelopment())
 
 
 
+// Must run before exception handling, CORS, auth, cookies, CSRF and endpoints
+// that depend on Request.Scheme (Secure antiforgery cookies behind TLS proxy).
+app.UseForwardedHeaders();
+
 app.Use(async (ctx, next) =>
 
 {
@@ -248,15 +315,86 @@ app.Use(async (ctx, next) =>
 
     {
 
-        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+        var problem = HttpProblemDetails.Validation(ctx, ex);
 
-        await ctx.Response.WriteAsJsonAsync(new {
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status400BadRequest;
 
-            message = "Validation failed",
+        await ctx.Response.WriteAsJsonAsync(problem);
 
-            errors  = ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage })
+    }
 
-        });
+    catch (Vls.Shopflow.IdentityAccess.Domain.Exceptions.StoreAccessDeniedException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            ex.StatusCode,
+            ex.StatusCode == StatusCodes.Status401Unauthorized ? "Unauthorized" : "Forbidden",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = ex.StatusCode;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.IdentityAccess.Domain.Exceptions.CustomerApprovalException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            ex.StatusCode,
+            ex.StatusCode switch
+            {
+                StatusCodes.Status409Conflict => "Conflict",
+                StatusCodes.Status404NotFound => "Not found",
+                _ => "Bad Request"
+            },
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = ex.StatusCode;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Catalog.Domain.Exceptions.CatalogConflictException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Conflict(ctx, ex.Message, ex.Field, ex.ErrorCode);
+
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+
+    {
+
+        var problem = HttpProblemDetails.Conflict(
+
+            ctx,
+
+            "A unique constraint was violated. Check codes and identifiers for duplicates.",
+
+            field: "code",
+
+            errorCode: Vls.Shopflow.Catalog.Domain.Exceptions.CatalogErrorCodes.SkuCodeDuplicate);
+
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -264,9 +402,19 @@ app.Use(async (ctx, next) =>
 
     {
 
-        ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+        var problem = HttpProblemDetails.Problem(
 
-        await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });
+            ctx,
+
+            StatusCodes.Status404NotFound,
+
+            "Not found",
+
+            ex.Message);
+
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status404NotFound;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -324,21 +472,25 @@ app.Use(async (ctx, next) =>
 
     {
 
-        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+        var problem = HttpProblemDetails.Conflict(
 
-        await ctx.Response.WriteAsJsonAsync(new
+            ctx,
 
-        {
+            ex.Message,
 
-            message = ex.Message,
+            field: "quantity",
 
-            skuId = ex.SkuId,
+            errorCode: "INSUFFICIENT_AVAILABLE_STOCK");
 
-            requested = ex.Requested,
+        problem.Extensions["skuId"] = ex.SkuId;
 
-            available = ex.Available
+        problem.Extensions["requested"] = ex.Requested;
 
-        });
+        problem.Extensions["available"] = ex.Available;
+
+        ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -389,6 +541,211 @@ app.Use(async (ctx, next) =>
         ctx.Response.StatusCode = StatusCodes.Status409Conflict;
 
         await ctx.Response.WriteAsJsonAsync(new { message = ex.Message, skuId = ex.SkuId });
+
+    }
+
+    catch (Vls.Shopflow.CartCheckout.Domain.Exceptions.CheckoutSalesRuleViolationException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Validation(
+
+            ctx,
+
+            [
+
+                new FluentValidation.Results.ValidationFailure(ex.Field, ex.Message)
+
+                {
+
+                    ErrorCode = ex.Code
+
+                }
+
+            ],
+
+            title: "Validation failed",
+
+            detail: ex.Message,
+
+            code: ex.Code,
+
+            message: ex.Message);
+
+        problem.Extensions["skuId"] = ex.SkuId;
+
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.DeliveryBatchAddressMismatchException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            StatusCodes.Status409Conflict,
+            "Conflict",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+        problem.Extensions["addresses"] = ex.AddressSummaries;
+
+        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.DeliveryBatchNotFoundException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            StatusCodes.Status404NotFound,
+            "Not Found",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+        problem.Extensions["batchId"] = ex.BatchId;
+
+        ctx.Response.StatusCode = StatusCodes.Status404NotFound;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.DeliveryBatchException ex)
+
+    {
+
+        var status = ex.Code is
+            Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.AddressMismatch
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.CustomerMismatch
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderAlreadyInBatch
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderNotPaid
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderNotEligible
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderAlreadyShipped
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.OrderAlreadyDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.CannotBeShipped
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.CannotBeDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.MustBeShippedBeforeDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.AlreadyDelivered
+            ? StatusCodes.Status409Conflict
+            : StatusCodes.Status400BadRequest;
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            status,
+            status == StatusCodes.Status409Conflict ? "Conflict" : "Bad Request",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = status;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderNoteTooLongException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Validation(
+
+            ctx,
+
+            [
+
+                new FluentValidation.Results.ValidationFailure(ex.Field, ex.Message)
+
+                {
+
+                    ErrorCode = ex.Code
+
+                }
+
+            ],
+
+            title: "Validation failed",
+
+            detail: ex.Message,
+
+            code: ex.Code,
+
+            message: ex.Message);
+
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.TrackingCodeTooLongException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Validation(
+
+            ctx,
+
+            [
+
+                new FluentValidation.Results.ValidationFailure("trackingCode", ex.Message)
+
+                {
+
+                    ErrorCode = ex.Code
+
+                }
+
+            ],
+
+            title: "Validation failed",
+
+            detail: ex.Message,
+
+            code: ex.Code,
+
+            message: ex.Message);
+
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderFulfillmentException ex)
+
+    {
+
+        var status = ex.Code is
+            Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderMustBeShippedBeforeDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderNotPaidForShipment
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderCannotBeShipped
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderCannotBeDelivered
+            ? StatusCodes.Status409Conflict
+            : StatusCodes.Status400BadRequest;
+
+        var problem = HttpProblemDetails.Problem(
+            ctx,
+            status,
+            status == StatusCodes.Status409Conflict ? "Conflict" : "Bad Request",
+            ex.Message);
+
+        problem.Extensions["code"] = ex.Code;
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = status;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -449,6 +806,163 @@ app.Use(async (ctx, next) =>
             existingOrderId = ex.ExistingOrderId
 
         });
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessTokenExpiredException)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+
+            ctx,
+
+            StatusCodes.Status401Unauthorized,
+
+            "Unauthorized",
+
+            "Order access denied.");
+
+        problem.Extensions["code"] = Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessTokenExpiredException.ErrorCode;
+
+        problem.Extensions["message"] = "Order access denied.";
+
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessDeniedException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+
+            ctx,
+
+            StatusCodes.Status401Unauthorized,
+
+            "Unauthorized",
+
+            "Order access denied.");
+
+        problem.Extensions["code"] = ex.Code;
+
+        problem.Extensions["message"] = "Order access denied.";
+
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccessMisconfiguredException ex)
+
+    {
+
+        ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+
+        await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccountAlreadyExistsException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Conflict(
+
+            ctx,
+
+            ex.Message,
+
+            field: null,
+
+            errorCode: Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccountAlreadyExistsException.ErrorCode);
+
+        problem.Extensions["code"] = Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccountAlreadyExistsException.ErrorCode;
+
+        problem.Extensions["message"] = ex.Message;
+
+        problem.Extensions["redirectTo"] = Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderAccountAlreadyExistsException.RedirectTo;
+
+        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.PasswordRequirementsNotMetException ex)
+
+    {
+
+        var failures = ex.Errors
+            .Select(e => new FluentValidation.Results.ValidationFailure(e.Field, e.Message));
+
+        var problem = HttpProblemDetails.Validation(
+
+            ctx,
+
+            failures,
+
+            title: "Validation failed",
+
+            detail: ex.Message,
+
+            code: Vls.Shopflow.Orders.Domain.Exceptions.PasswordRequirementsNotMetException.ErrorCode,
+
+            message: ex.Message);
+
+        ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderClaimForbiddenException ex)
+
+    {
+
+        var problem = HttpProblemDetails.Problem(
+
+            ctx,
+
+            StatusCodes.Status403Forbidden,
+
+            "Forbidden",
+
+            ex.Message);
+
+        problem.Extensions["code"] = Vls.Shopflow.Orders.Domain.Exceptions.GuestOrderClaimForbiddenException.ErrorCode;
+
+        problem.Extensions["message"] = ex.Message;
+
+        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
+    catch (Vls.Shopflow.Orders.Domain.Exceptions.OrderAlreadyLinkedToAnotherCustomerException)
+
+    {
+
+        var problem = HttpProblemDetails.Conflict(
+
+            ctx,
+
+            "This order cannot be linked.",
+
+            errorCode: Vls.Shopflow.Orders.Domain.Exceptions.OrderAlreadyLinkedToAnotherCustomerException.ErrorCode);
+
+        problem.Extensions["code"] = Vls.Shopflow.Orders.Domain.Exceptions.OrderAlreadyLinkedToAnotherCustomerException.ErrorCode;
+
+        problem.Extensions["message"] = "This order cannot be linked.";
+
+        ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
 
     }
 
@@ -522,7 +1036,84 @@ app.Use(async (ctx, next) =>
 
     }
 
+    catch (Vls.Shopflow.PaymentsPix.Domain.Exceptions.MercadoPagoPixChargeFailedException ex)
+
+    {
+
+        ctx.Response.StatusCode = StatusCodes.Status502BadGateway;
+
+        await ctx.Response.WriteAsJsonAsync(new
+
+        {
+
+            message = ex.Message,
+
+            orderId = ex.OrderId,
+
+            providerStatusCode = ex.StatusCode,
+
+            providerMessage = ex.ProviderMessage
+
+        });
+
+    }
+
+    catch (Exception ex) when (ex is not OperationCanceledException)
+
+    {
+
+        var logger = ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("HttpApi");
+
+        logger.LogError(ex, "Unhandled exception. TraceId={TraceId}", HttpProblemDetails.GetTraceId(ctx));
+
+        var problem = HttpProblemDetails.Unexpected(ctx);
+
+        ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+        await ctx.Response.WriteAsJsonAsync(problem);
+
+    }
+
 });
+
+static bool IsUniqueViolation(DbUpdateException ex)
+
+{
+
+    // Postgres unique_violation = 23505 (avoid hard dependency on Npgsql types in the gateway).
+    for (Exception? current = ex; current is not null; current = current.InnerException)
+
+    {
+
+        var typeName = current.GetType().FullName ?? string.Empty;
+
+        if (typeName.Contains("PostgresException", StringComparison.Ordinal))
+
+        {
+
+            var sqlState = current.GetType().GetProperty("SqlState")?.GetValue(current) as string;
+
+            if (sqlState == "23505")
+
+                return true;
+
+        }
+
+        var message = current.Message;
+
+        if (message.Contains("23505", StringComparison.Ordinal)
+
+            || message.Contains("unique constraint", StringComparison.OrdinalIgnoreCase)
+
+            || message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase))
+
+            return true;
+
+    }
+
+    return false;
+
+}
 
 
 
@@ -542,7 +1133,11 @@ app.MapGroup("/api").MapAdminAuthEndpoints();
 
 app.MapGroup("/api").MapCustomerAuthEndpoints();
 
+app.MapGroup("/api").MapStoreAccessEndpoints();
+
 app.MapGroup("/api").MapCatalogEndpoints();
+
+app.MapGroup("/api").MapAdminCatalogEndpoints();
 
 app.MapGroup("/api").MapInventoryEndpoints();
 
@@ -550,7 +1145,17 @@ app.MapGroup("/api").MapCheckoutEndpoints();
 
 app.MapGroup("/api").MapOrdersEndpoints();
 
+app.MapGroup("/api").MapAdminOrdersEndpoints();
+
+app.MapGroup("/api").MapAdminCustomersEndpoints();
+
+app.MapGroup("/api").MapAdminDeliveryBatchesEndpoints();
+
+app.MapGroup("/api").MapCustomerOrdersEndpoints();
+
 app.MapGroup("/api").MapPaymentsPixEndpoints();
+
+app.MapGroup("/api").MapIntegrationsEndpoints();
 
 
 

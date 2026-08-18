@@ -2,7 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
+using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Application.Repositories;
+using Vls.Shopflow.PaymentsPix.Application.Services;
+using Vls.Shopflow.PaymentsPix.Infrastructure.MercadoPago;
 using Vls.Shopflow.PaymentsPix.Infrastructure.Providers;
 using Vls.Shopflow.PaymentsPix.Infrastructure.Repositories;
 using Vls.Shopflow.PaymentsPix.Infrastructure.Services;
@@ -15,6 +18,7 @@ public static class DependencyInjection
     public static IServiceCollection AddPaymentsPixModule(
         this IServiceCollection services,
         string connectionString,
+        IConfiguration? configuration = null,
         bool enableSensitiveLoggingOnDev = false)
     {
         services.AddDbContext<PaymentsPixDbContext>(opt =>
@@ -28,7 +32,7 @@ public static class DependencyInjection
                 opt.EnableSensitiveDataLogging();
         });
 
-        RegisterServices(services);
+        RegisterServices(services, configuration);
         return services;
     }
 
@@ -43,14 +47,66 @@ public static class DependencyInjection
                  ?? throw new InvalidOperationException(
                      "ConnectionStrings:PaymentsPix, Orders or Catalog not configured.");
 
-        return services.AddPaymentsPixModule(cs, enableSensitiveLoggingOnDev);
+        services.Configure<PaymentsPixOptions>(configuration.GetSection(PaymentsPixOptions.SectionName));
+        services.Configure<MercadoPagoOptions>(configuration.GetSection(MercadoPagoOptions.SectionName));
+        services.Configure<MercadoPagoReconciliationOptions>(
+            configuration.GetSection(MercadoPagoReconciliationOptions.SectionName));
+
+        return services.AddPaymentsPixModule(cs, configuration, enableSensitiveLoggingOnDev);
     }
 
-    private static void RegisterServices(IServiceCollection services)
+    private static void RegisterServices(IServiceCollection services, IConfiguration? configuration)
     {
         services.AddScoped<IPaymentsPixUnitOfWork, PaymentsPixUnitOfWork>();
         services.AddScoped<IPixPaymentRepository, PixPaymentRepository>();
+        services.AddScoped<IMercadoPagoWebhookEventRepository, MercadoPagoWebhookEventRepository>();
         services.AddScoped<IOrderPaymentReader, OrderPaymentReader>();
+        services.AddScoped<IOrderPaidWriter, OrderPaidWriter>();
+        services.AddScoped<ICheckoutReservationIdsReader, CheckoutReservationIdsReader>();
+        services.AddScoped<IInventoryReservationConfirmer, InventoryReservationConfirmer>();
+        services.AddScoped<IMercadoPagoPixPaidTransitionService, MercadoPagoPixPaidTransitionService>();
+        services.AddScoped<IMercadoPagoPixReconciliationProcessor, MercadoPagoPixReconciliationProcessor>();
+        services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.IOrderPixPaymentStatusReader, OrderPixPaymentStatusReader>();
+        services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.IAdminOrderPixPaymentReader, AdminOrderPixPaymentReader>();
+        services.AddScoped<Vls.Shopflow.Orders.Application.Interfaces.ICustomerOrderPixPaymentReader, CustomerOrderPixPaymentReader>();
+        services.AddSingleton<IMercadoPagoOfficialWebhookSignatureClient, MercadoPagoOfficialWebhookSignatureClient>();
+        services.AddSingleton<ManualMercadoPagoWebhookSignatureValidator>();
+        services.AddSingleton<IMercadoPagoWebhookSignatureValidator, CompositeMercadoPagoWebhookSignatureValidator>();
+        services.AddSingleton<IMercadoPagoWebhookSignatureProbe, MercadoPagoWebhookSignatureProbe>();
+        // TEMPORARY DIAGNOSTIC ONLY — singleton for MaxEvents counter; remove after diagnosis.
+        services.AddSingleton<IMercadoPagoWebhookRawCapture, MercadoPagoWebhookRawCapture>();
+
+        var baseUrl = configuration?["MercadoPago:BaseUrl"]?.TrimEnd('/')
+                      ?? "https://api.mercadopago.com";
+
+        services.AddHttpClient<IMercadoPagoOrderClient, MercadoPagoOrderClient>((_, client) =>
+        {
+            client.BaseAddress = new Uri($"{baseUrl}/");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+
+        RegisterPixPaymentProvider(services, configuration, baseUrl);
+    }
+
+    private static void RegisterPixPaymentProvider(
+        IServiceCollection services,
+        IConfiguration? configuration,
+        string baseUrl)
+    {
+        var providerName = configuration?["PaymentsPix:Provider"] ?? "Fake";
+
+        if (string.Equals(providerName, "MercadoPago", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddHttpClient<IPixPaymentProvider, MercadoPagoPixPaymentProvider>((_, client) =>
+            {
+                client.BaseAddress = new Uri($"{baseUrl}/");
+                client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            });
+
+            return;
+        }
+
         services.AddScoped<IPixPaymentProvider, FakePixPaymentProvider>();
     }
 }

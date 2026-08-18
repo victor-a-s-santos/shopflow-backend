@@ -1,9 +1,11 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.CartCheckout.Domain.Entities;
 using Vls.Shopflow.CartCheckout.Infrastructure;
 using Vls.Shopflow.Orders.Application.CommandHandlers;
 using Vls.Shopflow.Orders.Application.Commands;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Domain.Entities;
 using Vls.Shopflow.Orders.Infrastructure;
 using Vls.Shopflow.Orders.Infrastructure.Repositories;
@@ -11,6 +13,7 @@ using Vls.Shopflow.Orders.Infrastructure.Services;
 using Vls.Shopflow.Orders.Infrastructure.UnitOfWork;
 using Vls.Shopflow.PaymentsPix.Application.CommandHandlers;
 using Vls.Shopflow.PaymentsPix.Application.Commands;
+using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Application.QueryHandlers;
 using Vls.Shopflow.PaymentsPix.Domain.Exceptions;
 using Vls.Shopflow.PaymentsPix.Infrastructure;
@@ -67,7 +70,7 @@ public sealed class CreatePixPaymentIntegrationTests
         return new PaymentsPixDbContext(options);
     }
 
-    private static async Task<Guid> SeedPendingOrderAsync()
+    internal static async Task<Guid> SeedPendingOrderAsync()
     {
         await using var cartDb = CreateCartCheckoutContext();
         await cartDb.Database.MigrateAsync();
@@ -107,7 +110,22 @@ public sealed class CreatePixPaymentIntegrationTests
         var createOrderHandler = new CreateOrderFromCheckoutSessionCommandHandler(
             new CheckoutSessionReader(cartCheckoutDb),
             new OrderRepository(ordersDb),
+            new Vls.Shopflow.Orders.Infrastructure.Services.PostgresOrderNumberGenerator(ordersDb),
+            new GuestOrderAccessTokenRepository(ordersDb),
+            new GuestOrderAccessTokenHasher(Options.Create(new GuestOrderAccessOptions
+            {
+                Enabled = true,
+                TokenTtlDays = 30,
+                TokenHashSecret = "test-secret"
+            })),
             new OrdersUnitOfWork(ordersDb),
+            Options.Create(new GuestOrderAccessOptions
+            {
+                Enabled = true,
+                TokenTtlDays = 30,
+                TokenHashSecret = "test-secret"
+            }),
+            new OrderEmailIntentRepository(ordersDb),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
 
         var order = await createOrderHandler.Handle(
@@ -136,6 +154,7 @@ public sealed class CreatePixPaymentIntegrationTests
                 paymentRepository,
                 provider,
                 unitOfWork,
+                Options.Create(new MercadoPagoOptions { PixExpirationMinutes = 30 }),
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<CreatePixPaymentForOrderCommandHandler>.Instance),
             new GetPixPaymentByIdQueryHandler(paymentRepository),
             new GetPixPaymentByOrderIdQueryHandler(paymentRepository));

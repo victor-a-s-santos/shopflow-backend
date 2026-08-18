@@ -91,7 +91,7 @@ public sealed class InventoryAtomicOperationsTests
     }
 
     [Fact]
-    public async Task ConfirmReservationAsync_WhenCalledTwice_OnlyFirstSucceeds()
+    public async Task ConfirmReservationAsync_WhenCalledTwice_IsIdempotent()
     {
         if (!await CanConnectAsync())
             return;
@@ -114,9 +114,7 @@ public sealed class InventoryAtomicOperationsTests
         var ops2 = new InventoryAtomicOperations(db2);
 
         await ops1.ConfirmReservationAsync(reservationId, CancellationToken.None);
-
-        var act = () => ops2.ConfirmReservationAsync(reservationId, CancellationToken.None);
-        await act.Should().ThrowAsync<InvalidStockReservationStatusException>();
+        await ops2.ConfirmReservationAsync(reservationId, CancellationToken.None);
 
         await using var verify = CreateContext();
         var updated = await verify.InventoryItems.AsNoTracking()

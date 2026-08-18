@@ -1,3 +1,5 @@
+using Vls.Shopflow.IdentityAccess.Domain.Enums;
+
 namespace Vls.Shopflow.IdentityAccess.Application.DataTransferObjects;
 
 public sealed record CustomerUserDto(
@@ -6,13 +8,20 @@ public sealed record CustomerUserDto(
     string FullName,
     string? Phone,
     bool EmailConfirmed,
-    IReadOnlyList<string> Roles);
+    IReadOnlyList<string> Roles,
+    CustomerAccessStatus AccessStatus,
+    DateTimeOffset? AccessRequestedAt,
+    DateTimeOffset? ApprovedAt);
+
+public sealed record RegisterCustomerFieldError(string Field, string Code, string Message);
 
 public sealed record RegisterCustomerResult(
     bool Succeeded,
     CustomerUserDto? Customer,
     string? ErrorMessage,
-    bool IsDuplicateEmail);
+    bool IsDuplicateEmail,
+    IReadOnlyList<RegisterCustomerFieldError> Errors,
+    string? Message = null);
 
 public sealed record CustomerLoginResult(
     bool Succeeded,

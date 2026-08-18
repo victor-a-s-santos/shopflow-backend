@@ -23,6 +23,8 @@ fi
 echo "==> Build e deploy — ambiente TESTE"
 docker compose build api-test worker-test
 docker compose up -d postgres api-test worker-test caddy
+# Bind-mounted Caddyfile: reload so proxy header changes apply without full recreate.
+docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 
 echo "==> Status"
 docker compose ps api-test worker-test caddy postgres

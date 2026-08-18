@@ -27,7 +27,18 @@ public sealed class CheckoutSession : Entity<Guid>
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? CanceledAt { get; private set; }
 
+    /// <summary>Optional preferred delivery method (Carrier / ExcursionBus / Correios).</summary>
+    public DeliveryMethod? PreferredDeliveryMethod { get; private set; }
+
+    /// <summary>Optional preferred delivery date (validated as ≥ 2 business days after session creation).</summary>
+    public DateOnly? PreferredDeliveryDate { get; private set; }
+
+    /// <summary>Optional customer note for the order (max 1000).</summary>
+    public string? CustomerOrderNote { get; private set; }
+
     public IReadOnlyCollection<CheckoutSessionItem> Items => _items.AsReadOnly();
+
+    public const int CustomerOrderNoteMaxLength = 1000;
 
     private CheckoutSession() { }
 
@@ -43,7 +54,10 @@ public sealed class CheckoutSession : Entity<Guid>
         string addressCity,
         string addressState,
         DateTimeOffset reservationExpiresAt,
-        IReadOnlyList<CheckoutSessionItem> items)
+        IReadOnlyList<CheckoutSessionItem> items,
+        DeliveryMethod? preferredDeliveryMethod = null,
+        DateOnly? preferredDeliveryDate = null,
+        string? customerOrderNote = null)
     {
         if (items.Count == 0)
             throw new InvalidOperationException("Checkout session must contain at least one item.");
@@ -70,7 +84,10 @@ public sealed class CheckoutSession : Entity<Guid>
             Total = subtotal,
             ReservationExpiresAt = reservationExpiresAt,
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            PreferredDeliveryMethod = preferredDeliveryMethod,
+            PreferredDeliveryDate = preferredDeliveryDate,
+            CustomerOrderNote = NormalizeCustomerOrderNote(customerOrderNote)
         };
 
         foreach (var item in items)
@@ -80,6 +97,22 @@ public sealed class CheckoutSession : Entity<Guid>
         }
 
         return session;
+    }
+
+    private static string? NormalizeCustomerOrderNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+            return null;
+
+        var trimmed = note.Trim();
+        if (trimmed.Length > CustomerOrderNoteMaxLength)
+        {
+            throw new ArgumentException(
+                $"Customer order note cannot exceed {CustomerOrderNoteMaxLength} characters.",
+                nameof(note));
+        }
+
+        return trimmed;
     }
 
     public void Cancel()

@@ -100,6 +100,9 @@ public sealed class InventoryAtomicOperations(InventoryDbContext db) : IInventor
             if (reservation is null)
                 throw new StockReservationNotFoundException(reservationId);
 
+            if (reservation.Status == StockReservationStatus.Confirmed)
+                return;
+
             var now = DateTimeOffset.UtcNow;
             var statusUpdated = await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE inventory.stock_reservations
@@ -110,9 +113,18 @@ public sealed class InventoryAtomicOperations(InventoryDbContext db) : IInventor
                 """, ct);
 
             if (statusUpdated == 0)
+            {
+                var current = await db.StockReservations
+                    .AsNoTracking()
+                    .FirstAsync(r => r.Id == reservationId, ct);
+
+                if (current.Status == StockReservationStatus.Confirmed)
+                    return;
+
                 throw new InvalidStockReservationStatusException(
                     reservationId,
                     "Only pending reservations can be confirmed.");
+            }
 
             var inventoryUpdated = await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE inventory.inventory_items

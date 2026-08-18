@@ -1,29 +1,75 @@
 using MediatR;
+using Vls.Shopflow.IdentityAccess.Application.Interfaces;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
+using Vls.Shopflow.IdentityAccess.Infrastructure;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
+using Vls.Shopflow.Orders.Application.Services;
 
 namespace Vls.Shopflow.HttpApi.Endpoints;
 
 public static class OrdersEndpoints
 {
+    public const string OrderAccessTokenHeaderName = "X-ORDER-ACCESS-TOKEN";
+
     public static RouteGroupBuilder MapOrdersEndpoints(this RouteGroupBuilder group)
     {
         var orders = group.MapGroup("/orders").WithTags("Orders");
 
         orders.MapPost("/from-checkout-session", async (
+            HttpContext ctx,
             ISender sender,
+            IStoreAccessPolicy storeAccess,
+            ICurrentCustomerAccessor currentCustomer,
             CreateOrderFromCheckoutSessionRequest request,
             CancellationToken ct) =>
         {
+            var (customer, denied) = await StoreAccessHttp.ResolveCheckoutCustomerAsync(
+                ctx, storeAccess, currentCustomer, ct);
+            if (denied is not null)
+                return denied;
+
+            if (storeAccess.RequireApprovedCustomerForCheckout && customer is null)
+                return StoreAccessHttp.Denied(ctx, storeAccess.EvaluateCheckout(null));
+
             var result = await sender.Send(
-                new CreateOrderFromCheckoutSessionCommand(request.CheckoutSessionId),
+                new CreateOrderFromCheckoutSessionCommand(
+                    request.CheckoutSessionId,
+                    customer?.CustomerId,
+                    IssueGuestAccessToken: storeAccess.AllowGuestCheckout && customer is null),
                 ct);
 
             return Results.Created($"/api/orders/{result.OrderId}", result);
         });
 
-        // Full order data (PII) — backoffice only until guest access token exists (Phase 4).
+        orders.MapGet("/guest/{orderId:guid}/status", async (
+            ISender sender,
+            HttpRequest request,
+            Guid orderId,
+            CancellationToken ct) =>
+        {
+            var accessToken = ReadGuestAccessToken(request);
+            var result = await sender.Send(new GetGuestOrderStatusQuery(orderId, accessToken), ct);
+            return Results.Ok(result);
+        })
+        .RequireRateLimiting(DependencyInjection.GuestOrderStatusRateLimitPolicy)
+        .AllowAnonymous();
+
+        // Preferred guest tracking: orderNumber + token (header preferred; query t/token for email/deep links).
+        orders.MapGet("/public/{orderNumber}", async (
+            ISender sender,
+            HttpRequest request,
+            string orderNumber,
+            CancellationToken ct) =>
+        {
+            var accessToken = ReadGuestAccessToken(request);
+            var result = await sender.Send(new GetPublicOrderStatusQuery(orderNumber, accessToken), ct);
+            return Results.Ok(result);
+        })
+        .RequireRateLimiting(DependencyInjection.GuestOrderStatusRateLimitPolicy)
+        .AllowAnonymous();
+
+        // Full order data (PII) — backoffice only.
         orders.MapGet("/{orderId:guid}", async (
             ISender sender,
             Guid orderId,
@@ -48,4 +94,10 @@ public static class OrdersEndpoints
 
         return group;
     }
+
+    internal static string? ReadGuestAccessToken(HttpRequest request)
+        => GuestOrderAccessTokenLocator.Resolve(
+            request.Headers[OrderAccessTokenHeaderName].FirstOrDefault(),
+            request.Query["t"].FirstOrDefault(),
+            request.Query["token"].FirstOrDefault());
 }

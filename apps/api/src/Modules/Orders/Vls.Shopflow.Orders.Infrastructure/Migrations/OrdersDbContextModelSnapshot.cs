@@ -23,6 +23,216 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.DeliveryBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("BatchNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CustomerEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("CustomerEmailNormalized")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CustomerPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("CustomerPhoneNormalized")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid?>("CustomerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeliveryMethod")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<bool>("HasDifferentDeliveryAddresses")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("InternalNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("ShippedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("TrackingCode")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAdminId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_delivery_batches_BatchNumber");
+
+                    b.HasIndex("CustomerEmailNormalized", "Status")
+                        .HasDatabaseName("IX_delivery_batches_CustomerEmailNormalized_Status");
+
+                    b.HasIndex("CustomerUserId", "Status")
+                        .HasDatabaseName("IX_delivery_batches_CustomerUserId_Status");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("IX_delivery_batches_Status_CreatedAt");
+
+                    b.ToTable("delivery_batches", "orders");
+                });
+
+            modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.DeliveryBatchOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeliveryBatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeliveryBatchId")
+                        .HasDatabaseName("IX_delivery_batch_orders_DeliveryBatchId");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_delivery_batch_orders_OrderId");
+
+                    b.ToTable("delivery_batch_orders", "orders");
+                });
+
+            modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.OrderEmailIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DispatchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "Type");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("email_intents", "orders");
+                });
+
+            modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.GuestOrderAccessToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("TokenHashAlgorithm")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("UsageCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("TokenHash");
+
+                    b.HasIndex("OrderId", "TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("guest_order_access_tokens", "orders");
+                });
+
             modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -47,12 +257,56 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("CustomerOrderNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("CustomerPhone")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<Guid?>("CustomerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FinalDeliveryMethod")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("FulfillmentStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("AwaitingShipment");
+
+                    b.Property<DateTimeOffset?>("FulfillmentUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FulfillmentUpdatedByAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InternalOrderNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<long>("OrderNumber")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("PreferredDeliveryDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PreferredDeliveryMethod")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset?>("ShippedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal?>("ShippingAmount")
@@ -103,6 +357,10 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                     b.Property<decimal>("Total")
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<string>("TrackingCode")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -115,6 +373,19 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
 
                     b.HasIndex("CustomerEmail");
 
+                    b.HasIndex("OrderNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_orders_OrderNumber");
+
+                    b.HasIndex("CustomerUserId", "CreatedAt")
+                        .HasDatabaseName("IX_orders_CustomerUserId_CreatedAt");
+
+                    b.HasIndex("FulfillmentStatus", "CreatedAt")
+                        .HasDatabaseName("IX_orders_FulfillmentStatus_CreatedAt");
+
+                    b.HasIndex("CustomerUserId", "FulfillmentStatus", "CreatedAt")
+                        .HasDatabaseName("IX_orders_CustomerUserId_FulfillmentStatus_CreatedAt");
+
                     b.ToTable("orders", "orders");
                 });
 
@@ -123,8 +394,22 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("EquivalentUnitPrice")
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("PackageDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("PackageLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("PackageSize")
+                        .HasColumnType("integer");
 
                     b.Property<string>("ProductName")
                         .IsRequired()
@@ -133,6 +418,21 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
+
+                    b.Property<string>("QuantityUnitLabel")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SalesDisplaySummary")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SalesMode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool?>("ShowTotalPieces")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("SkuCode")
                         .IsRequired()
@@ -144,6 +444,9 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
 
                     b.Property<decimal>("Subtotal")
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<int?>("TotalPieces")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric(12,2)");
@@ -157,6 +460,24 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                     b.ToTable("order_items", "orders");
                 });
 
+            modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.DeliveryBatchOrder", b =>
+                {
+                    b.HasOne("Vls.Shopflow.Orders.Domain.Entities.DeliveryBatch", null)
+                        .WithMany("Orders")
+                        .HasForeignKey("DeliveryBatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.GuestOrderAccessToken", b =>
+                {
+                    b.HasOne("Vls.Shopflow.Orders.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.OrderItem", b =>
                 {
                     b.HasOne("Vls.Shopflow.Orders.Domain.Entities.Order", null)
@@ -164,6 +485,11 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.DeliveryBatch", b =>
+                {
+                    b.Navigation("Orders");
                 });
 
             modelBuilder.Entity("Vls.Shopflow.Orders.Domain.Entities.Order", b =>

@@ -1,7 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Vls.Shopflow.Catalog.Application.DataTransferObjects;
+using Vls.Shopflow.Catalog.Application.Mappers;
+using Vls.Shopflow.Catalog.Application.Queries;
 using Vls.Shopflow.Catalog.Application.Repositories;
+using Vls.Shopflow.Catalog.Application.Services;
 using Vls.Shopflow.Catalog.Domain.Entities;
+using Vls.Shopflow.Catalog.Domain.Enums;
 
 namespace Vls.Shopflow.Catalog.Infrastructure.Repositories;
 
@@ -24,16 +28,47 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
         return product is null ? null : MapToDetailedDto(product);
     }
 
-    public async Task<PagedProductsDto> GetPagedAsync(int page, int pageSize, CancellationToken ct = default)
+    public async Task<PagedProductsDto> GetPagedAsync(
+        int page,
+        int pageSize,
+        string sort,
+        string? categorySlug,
+        Guid? categoryId,
+        string? q,
+        CancellationToken ct = default)
     {
         page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 100);
+        pageSize = Math.Clamp(pageSize, 1, 48);
+        sort = ProductListSort.Normalize(sort);
 
-        var total = await db.Products.CountAsync(ct);
-
-        var items = await db.Products
+        // Public list: active product with at least one active SKU.
+        var eligible = db.Products
             .AsNoTracking()
-            .OrderBy(p => p.Name)
+            .Where(p => p.IsActive && p.Skus.Any(s => s.IsActive));
+
+        // Category filters apply before count/pagination (exact match; no subcategory tree).
+        if (!string.IsNullOrWhiteSpace(categorySlug))
+        {
+            var slug = categorySlug.Trim().ToLowerInvariant();
+            eligible = eligible.Where(p => p.Category != null && p.Category.Slug.Value == slug);
+        }
+
+        if (categoryId is { } cid && cid != Guid.Empty)
+            eligible = eligible.Where(p => p.CategoryId == cid);
+
+        // Basic name search (AND with category filters).
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var term = q.Trim().ToLowerInvariant();
+            eligible = eligible.Where(p => p.Name.ToLower().Contains(term));
+        }
+
+        var totalItems = await eligible.CountAsync(ct);
+        var totalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)pageSize);
+
+        var ordered = ApplySort(eligible, sort);
+
+        var items = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(p => new
@@ -51,7 +86,15 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
                 {
                     s.IsActive,
                     Regular = s.Price.Regular.Amount,
-                    Promo = s.Price.Promotional != null ? s.Price.Promotional.Amount : (decimal?)null
+                    Promo = s.Price.Promotional != null ? s.Price.Promotional.Amount : (decimal?)null,
+                    SalesMode = s.SalesRule.SalesMode,
+                    MinimumQuantity = s.SalesRule.MinimumQuantity,
+                    QuantityStep = s.SalesRule.QuantityStep,
+                    PackageSize = s.SalesRule.PackageSize,
+                    PackageLabel = s.SalesRule.PackageLabel,
+                    PackageDescription = s.SalesRule.PackageDescription,
+                    QuantityUnitLabel = s.SalesRule.QuantityUnitLabel,
+                    ShowTotalPieces = s.SalesRule.ShowTotalPieces
                 }).ToList(),
                 PrimaryImageUrl = p.Images.Where(i => i.IsPrimary).Select(i => i.Url).FirstOrDefault()
                     ?? p.Images.OrderBy(i => i.SortOrder).Select(i => i.Url).FirstOrDefault()
@@ -62,6 +105,8 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
         {
             decimal? promo = null;
             decimal effective = 0;
+            decimal regularPrice = p.BaseRegular;
+            ProductSalesSummaryDto? salesSummary = null;
 
             if (!p.HasSkus)
             {
@@ -73,35 +118,118 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
                 var actives = p.Skus.Where(s => s.IsActive).ToList();
                 if (actives.Count != 0)
                 {
-                    var regular = actives.Min(s => s.Regular);
+                    regularPrice = actives.Min(s => s.Regular);
                     var promos = actives.Where(s => s.Promo.HasValue).Select(s => s.Promo!.Value);
-
                     promo = promos.Any() ? promos.Min() : null;
-                    effective = promo.HasValue ? Math.Min(regular, promo.Value) : regular;
+                    effective = promo.HasValue ? Math.Min(regularPrice, promo.Value) : regularPrice;
 
-                    return new ProductDto(p.Id, p.Name, p.Slug, p.IsActive, p.HasSkus,
-                        regular,
-                        promo,
-                        effective,
-                        p.CategoryId,
-                        p.CategoryName,
-                        p.PrimaryImageUrl
-                    );
+                    var skuInputs = actives.Select(s =>
+                    {
+                        var skuEffective = s.Promo.HasValue
+                            ? Math.Min(s.Regular, s.Promo.Value)
+                            : s.Regular;
+                        return new ProductSalesSummaryFactory.SkuInput(
+                            s.SalesMode,
+                            s.MinimumQuantity,
+                            s.QuantityStep,
+                            s.PackageSize,
+                            s.PackageLabel,
+                            s.PackageDescription,
+                            s.QuantityUnitLabel,
+                            s.ShowTotalPieces,
+                            skuEffective);
+                    }).ToList();
+
+                    salesSummary = ProductSalesSummaryFactory.FromActiveSkus(skuInputs);
                 }
             }
 
-            return new ProductDto(p.Id, p.Name, p.Slug, p.IsActive, p.HasSkus,
-                p.BaseRegular,
+            return new ProductDto(
+                p.Id,
+                p.Name,
+                p.Slug,
+                p.IsActive,
+                p.HasSkus,
+                regularPrice,
                 promo,
                 effective,
                 p.CategoryId,
                 p.CategoryName,
-                p.PrimaryImageUrl
-            );
-        });
+                p.PrimaryImageUrl,
+                salesSummary);
+        }).ToList();
 
-        return new PagedProductsDto(page, pageSize, total, dtos);
+        return new PagedProductsDto(
+            Items: dtos,
+            Page: page,
+            PageSize: pageSize,
+            TotalItems: totalItems,
+            TotalPages: totalPages,
+            HasNextPage: page < totalPages,
+            HasPreviousPage: page > 1 && totalItems > 0);
     }
+
+    private static IQueryable<Product> ApplySort(IQueryable<Product> query, string sort)
+        => sort switch
+        {
+            ProductListSort.Newest => query
+                .OrderByDescending(p => p.CreatedAt)
+                .ThenBy(p => p.Id),
+
+            ProductListSort.NameAsc => query
+                .OrderBy(p => p.Name)
+                .ThenBy(p => p.Id),
+
+            // Comparable unit price ≈ salesSummary.fromPrice (package uses price/packageSize; SQL division, not AwayFromZero).
+            ProductListSort.PriceAsc => query
+                .OrderBy(p => p.Skus
+                    .Where(s => s.IsActive)
+                    .Min(s =>
+                        (s.SalesRule.SalesMode == SalesMode.FixedPackage
+                         || s.SalesRule.SalesMode == SalesMode.AssortedPackage)
+                        && s.SalesRule.PackageSize != null
+                        && s.SalesRule.PackageSize > 1
+                            ? (s.Price.Promotional != null
+                                ? (s.Price.Promotional.Amount < s.Price.Regular.Amount
+                                    ? s.Price.Promotional.Amount
+                                    : s.Price.Regular.Amount)
+                                : s.Price.Regular.Amount)
+                              / s.SalesRule.PackageSize!.Value
+                            : s.Price.Promotional != null
+                                ? (s.Price.Promotional.Amount < s.Price.Regular.Amount
+                                    ? s.Price.Promotional.Amount
+                                    : s.Price.Regular.Amount)
+                                : s.Price.Regular.Amount))
+                .ThenBy(p => p.Id),
+
+            ProductListSort.PriceDesc => query
+                .OrderByDescending(p => p.Skus
+                    .Where(s => s.IsActive)
+                    .Min(s =>
+                        (s.SalesRule.SalesMode == SalesMode.FixedPackage
+                         || s.SalesRule.SalesMode == SalesMode.AssortedPackage)
+                        && s.SalesRule.PackageSize != null
+                        && s.SalesRule.PackageSize > 1
+                            ? (s.Price.Promotional != null
+                                ? (s.Price.Promotional.Amount < s.Price.Regular.Amount
+                                    ? s.Price.Promotional.Amount
+                                    : s.Price.Regular.Amount)
+                                : s.Price.Regular.Amount)
+                              / s.SalesRule.PackageSize!.Value
+                            : s.Price.Promotional != null
+                                ? (s.Price.Promotional.Amount < s.Price.Regular.Amount
+                                    ? s.Price.Promotional.Amount
+                                    : s.Price.Regular.Amount)
+                                : s.Price.Regular.Amount))
+                .ThenBy(p => p.Id),
+
+            _ => query
+                .OrderByDescending(p => p.IsFeatured)
+                .ThenBy(p => p.DisplayOrder == null)
+                .ThenBy(p => p.DisplayOrder)
+                .ThenByDescending(p => p.CreatedAt)
+                .ThenBy(p => p.Id)
+        };
 
     private IQueryable<Product> LoadDetailedProductQuery()
         => db.Products
@@ -136,32 +264,12 @@ public sealed class ProductReadModel(CatalogDbContext db) : IProductReadModel
             effectivePrice.Regular,
             effectivePrice.Promotional,
             effectivePrice.Effective,
-            product.Skus.Select(s =>
-            {
-                var regular = s.Price.Regular.Amount;
-                var promo = s.Price.Promotional?.Amount;
-                var effective = promo.HasValue
-                    ? Math.Min(regular, promo.Value)
-                    : regular;
-
-                return new SkuDto(
-                    s.Id,
-                    s.Code,
-                    regular,
-                    promo,
-                    effective,
-                    s.IsActive,
-                    s.Attributes.Select(a => new SkuAttributeDto(
-                        a.AttributeDefinitionId,
-                        a.AttributeValueDefinitionId,
-                        a.CustomName,
-                        a.CustomValue,
-                        a.AttributeDefinition?.Name,
-                        a.AttributeValueDefinition?.Name
-                    )).ToList()
-                );
-            }).ToList(),
-            imageDtos
+            product.Skus.Select(SkuDtoMapper.FromEntity).ToList(),
+            imageDtos,
+            product.IsFeatured,
+            product.DisplayOrder,
+            product.CreatedAt,
+            product.Description
         );
     }
 }

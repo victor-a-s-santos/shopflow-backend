@@ -24,6 +24,12 @@ public sealed class UpdateProductCommandHandler(
 
         product.UpdateInfo(cmd.Name, slug, cmd.CategoryId, cmd.IsActive);
 
+        if (cmd.UpdateDescription)
+            product.ChangeDescription(cmd.Description);
+
+        if (cmd.UpdateDisplaySettings)
+            product.ChangeDisplaySettings(cmd.IsFeatured ?? false, cmd.DisplayOrder);
+
         await uow.SaveChangesAsync(cancellationToken);
     }
 }

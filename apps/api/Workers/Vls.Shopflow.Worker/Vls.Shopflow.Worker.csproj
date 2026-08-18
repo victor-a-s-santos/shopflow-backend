@@ -18,5 +18,6 @@
     <ProjectReference Include="..\..\src\Modules\Orders\Vls.Shopflow.Orders.Infrastructure\Vls.Shopflow.Orders.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\PaymentsPix\Vls.Shopflow.PaymentsPix.Infrastructure\Vls.Shopflow.PaymentsPix.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Inventory\Vls.Shopflow.Inventory.Infrastructure\Vls.Shopflow.Inventory.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Notifications\Vls.Shopflow.Notifications.Infrastructure\Vls.Shopflow.Notifications.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

@@ -13,30 +13,44 @@ public sealed class Sku : Entity<Guid>
 
     public string Code { get; private set; } = default!;
     public Price Price { get; private set; } = Price.From(0);
+    public SkuSalesRule SalesRule { get; private set; } = SkuSalesRule.UnitDefault();
     public bool IsActive { get; private set; }
 
     public IReadOnlyCollection<SkuAttribute> Attributes => _attributes.AsReadOnly();
 
     private Sku() {}
 
-    private Sku(Guid productId, string? code, Price price, IEnumerable<SkuAttribute>? attributes, bool active)
+    private Sku(
+        Guid productId,
+        string? code,
+        Price price,
+        IEnumerable<SkuAttribute>? attributes,
+        bool active,
+        SkuSalesRule? salesRule)
     {
         Id = Guid.NewGuid();
         ProductId = productId;
 
         Code = string.IsNullOrWhiteSpace(code)
-            ? $"SKU-{Id.ToString()[..8]}"
+            ? $"SKU-{Id.ToString("N")[..8].ToUpperInvariant()}"
             : code.Trim();
 
         Price = price.Normalize();
+        SalesRule = salesRule ?? SkuSalesRule.UnitDefault();
         IsActive = active;
 
         if (attributes is not null)
             AddAttributes(attributes);
     }
 
-    public static Sku Create(Guid productId, string? code, Price price, IEnumerable<SkuAttribute>? attributes, bool active)
-        => new(productId, code, price, attributes, active);
+    public static Sku Create(
+        Guid productId,
+        string? code,
+        Price price,
+        IEnumerable<SkuAttribute>? attributes,
+        bool active,
+        SkuSalesRule? salesRule = null)
+        => new(productId, code, price, attributes, active, salesRule);
 
     public void AddAttribute(SkuAttribute attribute)
     {
@@ -48,31 +62,30 @@ public sealed class Sku : Entity<Guid>
     public void ChangePrice(Price newPrice)
         => Price = newPrice.Normalize();
 
+    public void ChangeSalesRule(SkuSalesRule salesRule)
+    {
+        ArgumentNullException.ThrowIfNull(salesRule);
+        SalesRule = salesRule;
+    }
+
     public void Activate()
         => IsActive = true;
 
     public void Deactivate()
         => IsActive = false;
 
-    public void ChangeCode(string? code)
+    public void ChangeCode(string code)
     {
-        Code = string.IsNullOrWhiteSpace(code)
-            ? $"SKU-{Id.ToString()[..8]}"
-            : code.Trim();
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        Code = code.Trim();
     }
 
-    /// <summary>
-    /// Removes all attributes from the aggregate. Used before re-adding replacements.
-    /// </summary>
     public void ClearAttributes()
     {
         while (_attributes.Count > 0)
             _attributes.RemoveAt(_attributes.Count - 1);
     }
 
-    /// <summary>
-    /// Replaces SKU attributes with new instances (always new Ids). Does not mutate Sku identity.
-    /// </summary>
     public void ReplaceAttributes(IEnumerable<SkuAttribute> newAttributes)
     {
         var incoming = (newAttributes ?? []).ToList();

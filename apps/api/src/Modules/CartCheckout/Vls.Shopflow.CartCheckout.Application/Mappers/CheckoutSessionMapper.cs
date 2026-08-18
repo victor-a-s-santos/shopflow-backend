@@ -24,7 +24,10 @@ internal static class CheckoutSessionMapper
             new DataTransferObjects.CheckoutPaymentDto(
                 "Pix",
                 "NotImplemented",
-                "Pagamento Pix será integrado no módulo PaymentsPix."));
+                "Pagamento Pix será integrado no módulo PaymentsPix."),
+            session.PreferredDeliveryMethod?.ToString(),
+            session.PreferredDeliveryDate,
+            session.CustomerOrderNote);
 
     public static void EnsureCanCancel(CheckoutSession session)
     {

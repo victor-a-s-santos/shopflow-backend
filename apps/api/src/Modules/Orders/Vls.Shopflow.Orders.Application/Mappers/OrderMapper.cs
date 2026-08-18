@@ -1,13 +1,17 @@
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Domain.Entities;
 
 namespace Vls.Shopflow.Orders.Application.Mappers;
 
 internal static class OrderMapper
 {
-    public static DataTransferObjects.OrderDto ToDto(Order order)
+    public static DataTransferObjects.OrderDto ToDto(
+        Order order,
+        string? guestAccessToken = null,
+        DateTimeOffset? guestAccessTokenExpiresAt = null)
         => new(
             order.Id,
-            order.Id.ToString(),
+            order.FormatOrderNumber(),
             order.CheckoutSessionId,
             order.Status.ToString(),
             new DataTransferObjects.OrderCustomerDto(
@@ -28,11 +32,58 @@ internal static class OrderMapper
                 i.SkuCode,
                 i.Quantity,
                 i.UnitPrice,
-                i.Subtotal)).ToList(),
+                i.Subtotal,
+                OrderItemSalesDisplayMapper.ToDto(i))).ToList(),
             order.Subtotal,
             order.ShippingAmount,
             order.Total,
-            order.CreatedAt);
+            order.CreatedAt,
+            guestAccessToken,
+            guestAccessTokenExpiresAt);
+
+    public static DataTransferObjects.GuestOrderStatusDto ToGuestStatusDto(
+        Order order,
+        Interfaces.OrderPixPaymentStatusSnapshot? payment,
+        GuestOrderAccessToken accessToken,
+        bool canCreateAccount,
+        bool accountExistsForEmail)
+        => new(
+            order.Id,
+            order.FormatOrderNumber(),
+            OrderCustomerStatusProjector.Project(order.Status, payment?.Status),
+            order.Status.ToString(),
+            payment is null
+                ? null
+                : new DataTransferObjects.GuestOrderPaymentStatusDto(
+                    payment.Status,
+                    OrderCustomerStatusProjector.PaymentMethodPix,
+                    payment.Amount,
+                    OrderCustomerStatusProjector.ActivePaymentExpiresAt(payment.Status, payment.ExpiresAt),
+                    payment.PaidAt,
+                    payment.UpdatedAt),
+            order.Items.Select(i => new DataTransferObjects.GuestOrderItemStatusDto(
+                i.ProductName,
+                i.SkuId,
+                i.Quantity,
+                i.UnitPrice,
+                i.Subtotal,
+                Attributes: null,
+                ImageUrl: null,
+                SalesDisplay: OrderItemSalesDisplayMapper.ToDto(i))).ToList(),
+            new DataTransferObjects.GuestOrderTotalsDto(
+                order.Subtotal,
+                Discount: 0m,
+                order.ShippingAmount,
+                order.Total),
+            new DataTransferObjects.GuestOrderMaskedCustomerDto(
+                MaskName(order.CustomerFullName),
+                MaskEmail(order.CustomerEmail)),
+            new DataTransferObjects.GuestOrderAccessMetaDto(
+                accessToken.ExpiresAt,
+                accessToken.LastUsedAt),
+            canCreateAccount,
+            accountExistsForEmail,
+            AdminOrderMapper.ToSafeDeliveryDto(order));
 
     public static void EnsureCheckoutSessionCanCreateOrder(string status, Guid checkoutSessionId)
     {
@@ -42,5 +93,30 @@ internal static class OrderMapper
                 checkoutSessionId,
                 $"Checkout session {checkoutSessionId} cannot create an order because its status is {status}.");
         }
+    }
+
+    internal static string MaskName(string fullName)
+    {
+        var trimmed = fullName.Trim();
+        if (trimmed.Length == 0)
+            return "***";
+
+        if (trimmed.Length == 1)
+            return trimmed + "***";
+
+        return trimmed[..2] + "***";
+    }
+
+    internal static string MaskEmail(string email)
+    {
+        var trimmed = email.Trim();
+        var at = trimmed.IndexOf('@');
+        if (at <= 0 || at == trimmed.Length - 1)
+            return "***";
+
+        var local = trimmed[..at];
+        var domain = trimmed[(at + 1)..];
+        var localMasked = local.Length == 0 ? "***" : $"{char.ToLowerInvariant(local[0])}***";
+        return $"{localMasked}@{domain}";
     }
 }

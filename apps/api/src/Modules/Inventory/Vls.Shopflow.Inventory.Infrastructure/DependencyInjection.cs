@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
         services.AddScoped<IInventoryAtomicOperations, InventoryAtomicOperations>();
         services.AddScoped<IInventoryReadModel, InventoryReadModel>();
+        services.AddScoped<IAdminInventorySkuReadModel, AdminInventorySkuReadModel>();
         services.AddScoped<IStockMovementReadModel, StockMovementReadModel>();
         services.AddScoped<ISkuExistenceChecker, CatalogSkuExistenceChecker>();
     }

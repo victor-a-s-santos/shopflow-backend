@@ -16,26 +16,29 @@ Runbook para publicar o **Shopflow Backend** na VPS existente usando GitHub Acti
 | Push `staging` → rebuild `api-hml` + `worker-hml` | Cloudflare / frontend |
 | `workflow_dispatch` manual (test ou hml) | Mercado Pago |
 | Sync de código para `/opt/shopflow/app` | Envio de `.env` reais |
-| Health check HTTPS das APIs | `docker compose down`, recreate de postgres/caddy |
+| Health check HTTPS das APIs | `docker compose down`, recreate de postgres |
+| `caddy up` + `caddy reload` (Caddyfile bind-mount) | Force-recreate destrutivo do container Caddy |
 
 PaymentsPix permanece Fake/Pending.
+
+A chave SSH do CI é armazenada no GitHub como **Base64** (`VPS_SSH_KEY_B64`) para evitar perda de quebras de linha no secret (erro `libcrypto` / `Permission denied`).
 
 ---
 
 ## 1. Gerar chave SSH exclusiva para GitHub Actions
 
-Na sua máquina local (não na VPS), gere um par **somente** para o CI:
+No Mac (máquina local), gere um par **somente** para o CI:
 
 ```bash
-ssh-keygen -t ed25519 -C "github-actions-shopflow-backend" -f ./shopflow-gha-deploy -N ""
+ssh-keygen -t ed25519 -C "github-actions-shopflow-vps" -f ~/.ssh/shopflow_actions_vps
 ```
 
 Arquivos gerados:
 
 | Arquivo | Uso |
 |---------|-----|
-| `shopflow-gha-deploy` | Chave **privada** → secret `VPS_SSH_KEY` no GitHub |
-| `shopflow-gha-deploy.pub` | Chave **pública** → `authorized_keys` na VPS |
+| `~/.ssh/shopflow_actions_vps` | Chave **privada** → codificar em Base64 → secret `VPS_SSH_KEY_B64` |
+| `~/.ssh/shopflow_actions_vps.pub` | Chave **pública** → `authorized_keys` na VPS |
 
 Não reutilize a chave pessoal do dia a dia. Não commite nenhum dos dois arquivos.
 
@@ -43,65 +46,81 @@ Não reutilize a chave pessoal do dia a dia. Não commite nenhum dos dois arquiv
 
 ## 2. Adicionar a chave pública na VPS
 
-Conecte na VPS com seu usuário de deploy (o mesmo que irá no secret `VPS_USER`) e autorize a chave pública:
+No Mac, copie a pública:
+
+```bash
+cat ~/.ssh/shopflow_actions_vps.pub
+```
+
+Na VPS, conecte com o usuário de deploy (`VPS_USER`) e **adicione** a linha (não apague chaves existentes):
 
 ```bash
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 nano ~/.ssh/authorized_keys
-# cole o conteúdo de shopflow-gha-deploy.pub em uma linha nova
+# cole a linha da .pub em uma linha NOVA no final do arquivo
 chmod 600 ~/.ssh/authorized_keys
 ```
+
+**Importante:** não remova outras entradas de `authorized_keys`. A chave do Actions é adicional.
 
 Confirme que o usuário consegue:
 
 - ler/escrever `/opt/shopflow/app`
-- executar `docker` / `docker compose` (grupo `docker` ou root, conforme o setup atual)
-
-Teste a partir da máquina local:
-
-```bash
-ssh -i ./shopflow-gha-deploy USUARIO@HOST 'cd /opt/shopflow/app/deploy && docker compose ps'
-```
+- executar `docker` / `docker compose`
 
 ---
 
-## 3. Criar secrets no GitHub
+## 3. Gerar o secret Base64 no Mac
 
-No repositório backend: **Settings → Secrets and variables → Actions → New repository secret**.
+```bash
+base64 -i ~/.ssh/shopflow_actions_vps | pbcopy
+```
+
+Isso copia o Base64 da chave privada para o clipboard (uma linha, sem quebras problemáticas).
+
+---
+
+## 4. Criar secrets no GitHub
+
+No repositório backend: **Settings → Secrets and variables → Actions**.
 
 | Secret | Conteúdo |
 |--------|----------|
 | `VPS_HOST` | Hostname ou IP da VPS (sem `user@`) |
 | `VPS_USER` | Usuário SSH de deploy |
-| `VPS_SSH_KEY` | Conteúdo completo da chave **privada** (`shopflow-gha-deploy`), incluindo linhas `BEGIN`/`END` |
+| `VPS_SSH_KEY_B64` | Saída do `base64 -i … \| pbcopy` (chave privada em Base64) |
+
+Remova o secret antigo `VPS_SSH_KEY` se ainda existir (não é mais usado).
 
 Regras:
 
-- Não coloque IP, usuário ou chave no YAML do workflow.
+- Não coloque IP, usuário ou chave no YAML.
 - Não armazene `deploy/.env*` no GitHub.
-- Após cadastrar, apague a chave privada local se não for mais necessária, ou guarde em cofre fora do Git.
+- Não imprima o Base64 nem a chave privada nos logs.
 
 ---
 
-## 4. Como funciona `develop` → teste
+## 5. Como funciona `develop` → teste
 
 1. Push (ou merge) na branch `develop`.
-2. Job `deploy-test` roda com concurrency `shopflow-vps-deploy` (um deploy por vez na VPS).
-3. Checkout do código no runner.
-4. `rsync` para `/opt/shopflow/app`, **excluindo** `.env` reais, `apps/web`, `bin`/`obj`, uploads, dados Docker locais, etc.
+2. Job `deploy-test` roda com concurrency `shopflow-vps-deploy`.
+3. Setup SSH: decodifica `VPS_SSH_KEY_B64` → `~/.ssh/id_ed25519`.
+4. `rsync` com `-e "ssh -i ~/.ssh/id_ed25519 …"` para `/opt/shopflow/app`, excluindo `.env` reais, `apps/web`, etc.
 5. Na VPS, em `/opt/shopflow/app/deploy`:
    - `docker compose config`
    - `docker compose build --no-cache api-test worker-test`
    - `docker compose up -d --force-recreate --no-deps api-test worker-test`
+   - `docker compose up -d caddy`
+   - `docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile`
 6. Health: `curl -fsS https://api-teste.vipassessoriadigital.com.br/health`
 7. Em falha: `docker compose logs --tail=100 api-test worker-test`
 
-`--no-deps` evita recriar `postgres` e `caddy`. Volumes (uploads, DataProtection, Postgres) permanecem.
+`--no-deps` evita recriar `postgres` ao forçar recreate da API/worker. O Caddy **não** é recriado com a API (bind-mount do Caddyfile), então o workflow garante `up -d caddy` + `caddy reload` para aplicar mudanças de proxy (`X-Forwarded-*`) sem derrubar TLS desnecessariamente. Volumes permanecem.
 
 ---
 
-## 5. Como funciona `staging` → HML
+## 6. Como funciona `staging` → HML
 
 Igual ao fluxo de teste, com job `deploy-hml`:
 
@@ -112,96 +131,113 @@ Igual ao fluxo de teste, com job `deploy-hml`:
 
 ---
 
-## 6. Deploy manual (`workflow_dispatch`)
+## 7. Deploy manual (`workflow_dispatch`)
 
 1. GitHub → **Actions** → workflow **Deploy VPS**
 2. **Run workflow**
-3. Escolha:
-   - `test` → mesmo fluxo do job de teste
-   - `hml` → mesmo fluxo do job de HML
-4. A branch selecionada no dropdown do Actions é a que será sincronizada.
-
-Use isso para republicar sem novo commit, ou para validar secrets após a configuração inicial.
+3. Escolha `test` ou `hml`
+4. A branch selecionada no dropdown é a sincronizada
 
 ---
 
-## 7. Como validar logs
+## 8. Como testar localmente (Mac → VPS)
 
-### No GitHub Actions
+Substitua `IP_DA_VPS` / usuário conforme seus secrets:
 
-Abra a run falha/sucesso → steps **Build and recreate…** e **Health check…**.
+```bash
+ssh -i ~/.ssh/shopflow_actions_vps root@IP_DA_VPS
+```
 
-### Na VPS
+Ou, se `VPS_USER` não for root:
+
+```bash
+ssh -i ~/.ssh/shopflow_actions_vps USUARIO@IP_DA_VPS 'cd /opt/shopflow/app/deploy && docker compose ps'
+```
+
+Se o login local com essa chave falhar, o Actions também falhará.
+
+---
+
+## 9. Como validar no Actions
+
+1. Push em `develop` (ou **Run workflow** com `test`).
+2. Abra a run → steps **Setup SSH**, **Sync code**, **Build and recreate…**, **Health check…**.
+3. Sucesso esperado no health: JSON com `"status":"ok"`.
+4. Em falha de health, o job imprime `docker compose logs --tail=100` dos serviços do ambiente.
+
+Na VPS:
 
 ```bash
 cd /opt/shopflow/app/deploy
-
 docker compose ps
-docker compose logs --tail=100 api-test worker-test
-docker compose logs --tail=100 api-hml worker-hml
-
 curl -fsS https://api-teste.vipassessoriadigital.com.br/health
 curl -fsS https://api-hml.vipassessoriadigital.com.br/health
 ```
 
 ---
 
-## 8. Rollback simples
+## 10. Troubleshooting
 
-Como as imagens são buildadas no deploy a partir do código sincronizado:
+### `Load key …: error in libcrypto`
 
-1. No GitHub, faça checkout/revert do commit bom na branch (`develop` ou `staging`).
-2. Push (ou rode `workflow_dispatch` nessa branch).
-3. O workflow reconstrói e recreia só os serviços do ambiente.
+Causa comum: secret com chave PEM colada e quebras de linha corrompidas.
 
-Alternativa manual na VPS (sem Actions):
+Correção:
 
-```bash
-cd /opt/shopflow/app
-# restaure o código desejado (git checkout de tag/commit, se a pasta for um clone)
-cd deploy
-docker compose build --no-cache api-test worker-test   # ou api-hml worker-hml
-docker compose up -d --force-recreate --no-deps api-test worker-test
-```
+1. Use **apenas** `VPS_SSH_KEY_B64` (Base64 da privada).
+2. Regenere o secret no Mac: `base64 -i ~/.ssh/shopflow_actions_vps | pbcopy`
+3. Cole o valor inteiro no secret (sem aspas, sem espaços extras).
+4. Remova o secret antigo `VPS_SSH_KEY` se ainda existir.
+
+### `Permission denied (publickey)`
+
+- Pública correspondente não está em `~/.ssh/authorized_keys` do **mesmo** usuário (`VPS_USER`).
+- Chave errada (privada Base64 de outro par).
+- Teste local: `ssh -i ~/.ssh/shopflow_actions_vps USUARIO@HOST`.
+- Não apague outras chaves ao editar `authorized_keys`; apenas **adicione** a linha da `.pub`.
+
+### `rsync error code 255`
+
+Quase sempre falha de SSH (auth ou host). Resolva `libcrypto` / `publickey` primeiro. Confira `VPS_HOST`, `VPS_USER` e que o step Setup SSH terminou sem erro.
+
+---
+
+## 11. Rollback simples
+
+1. Revert/checkout do commit bom em `develop` ou `staging`.
+2. Push (ou `workflow_dispatch`).
+3. O workflow reconstrói só os serviços do ambiente.
 
 Não use `docker compose down`. Não remova volumes.
 
 ---
 
-## 9. Cuidados para não vazar secrets
+## 12. Cuidados com secrets
 
-- O rsync **nunca** envia `deploy/.env`, `deploy/.env.test`, `deploy/.env.hml`.
-- Com `--delete`, arquivos excluídos no rsync **não** são apagados no destino (rsync não usa `--delete-excluded`).
-- O workflow falha cedo se `.env` / `.env.test` ou `.env.hml` estiverem ausentes na VPS.
-- Não imprima connection strings nos logs do Actions.
-- Rotacione a chave SSH do CI se ela vazar.
+- Rsync nunca envia `deploy/.env`, `.env.test`, `.env.hml`.
+- Arquivos excluídos no rsync não são apagados no destino (`--delete` sem `--delete-excluded`).
+- Não imprima a chave nem o Base64 nos logs.
+- Rotacione o par SSH do CI se vazar.
 - Frontend (`apps/web`) é excluído do sync.
 
 ---
 
-## 10. Limitação: pasta única na VPS
+## 13. Limitação: pasta única na VPS
 
-A VPS usa **um único** diretório de código: `/opt/shopflow/app`.
-
-| Efeito | Detalhe |
-|--------|---------|
-| Filesystem | O último deploy (develop **ou** staging) deixa o código daquela branch no disco |
-| Containers | `api-test` / `api-hml` (e workers) são **imagens separadas**, buildadas no momento do deploy de cada ambiente |
-| Risco | Deploy de `staging` sobrescreve arquivos no disco usados como contexto de build; o ambiente teste continua rodando a imagem anterior até o próximo deploy de `develop` |
-| Mitigação | Concurrency única evita dois deploys ao mesmo tempo; não misture mudanças incompatíveis de compose entre branches sem coordenar |
-
-Uploads e chaves DataProtection ficam em **volumes Docker**, não no sync do rsync.
+`/opt/shopflow/app` é compartilhado. O último deploy deixa o código da branch mais recente no disco; containers `api-test` / `api-hml` são imagens separadas buildadas no momento do deploy. Concurrency única evita dois deploys ao mesmo tempo.
 
 ---
 
 ## Checklist de configuração (uma vez)
 
-- [ ] Par de chaves SSH exclusivo gerado
-- [ ] Pública em `~/.ssh/authorized_keys` do `VPS_USER`
-- [ ] Secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` no GitHub
-- [ ] `/opt/shopflow/app/deploy/.env`, `.env.test`, `.env.hml` já existem na VPS
-- [ ] Branches `develop` e `staging` existem no remote
-- [ ] Workflow `.github/workflows/deploy-vps.yml` na branch padrão (e mergeado nas branches de deploy)
+- [ ] `ssh-keygen … -f ~/.ssh/shopflow_actions_vps`
+- [ ] Pública **adicionada** (sem apagar outras) em `authorized_keys` na VPS
+- [ ] `base64 -i ~/.ssh/shopflow_actions_vps | pbcopy` → secret `VPS_SSH_KEY_B64`
+- [ ] Secrets `VPS_HOST`, `VPS_USER` mantidos
+- [ ] Secret antigo `VPS_SSH_KEY` removido
+- [ ] Teste local `ssh -i ~/.ssh/shopflow_actions_vps …` OK
+- [ ] `.env` / `.env.test` / `.env.hml` existem em `/opt/shopflow/app/deploy`
+- [ ] Workflow atualizado mergeado em `develop` / `staging`
 
 ---
 

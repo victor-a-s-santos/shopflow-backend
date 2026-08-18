@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Vls.Shopflow.Orders.Application.Interfaces;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Infrastructure.Repositories;
 using Vls.Shopflow.Orders.Infrastructure.Services;
 using Vls.Shopflow.Orders.Infrastructure.UnitOfWork;
@@ -14,6 +16,7 @@ public static class DependencyInjection
     public static IServiceCollection AddOrdersModule(
         this IServiceCollection services,
         string connectionString,
+        IConfiguration? configuration = null,
         bool enableSensitiveLoggingOnDev = false)
     {
         services.AddDbContext<OrdersDbContext>(opt =>
@@ -27,6 +30,11 @@ public static class DependencyInjection
                 opt.EnableSensitiveDataLogging();
         });
 
+        if (configuration is not null)
+            services.Configure<GuestOrderAccessOptions>(configuration.GetSection(GuestOrderAccessOptions.SectionName));
+        else
+            services.Configure<GuestOrderAccessOptions>(_ => { });
+
         RegisterServices(services);
         return services;
     }
@@ -39,13 +47,27 @@ public static class DependencyInjection
         var cs = configuration.GetConnectionString("Orders")
                  ?? configuration.GetConnectionString("Catalog")
                  ?? throw new InvalidOperationException("ConnectionStrings:Orders or Catalog not configured.");
-        return services.AddOrdersModule(cs, enableSensitiveLoggingOnDev);
+        return services.AddOrdersModule(cs, configuration, enableSensitiveLoggingOnDev);
     }
 
     private static void RegisterServices(IServiceCollection services)
     {
         services.AddScoped<IOrdersUnitOfWork, OrdersUnitOfWork>();
         services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IOrderNumberGenerator, PostgresOrderNumberGenerator>();
+        services.AddScoped<IDeliveryBatchNumberGenerator, PostgresDeliveryBatchNumberGenerator>();
+        services.AddScoped<IDeliveryBatchRepository, DeliveryBatchRepository>();
+        services.AddScoped<IDeliveryBatchReadModel, DeliveryBatchReadModel>();
+        services.AddScoped<IAdminOrderReadModel, AdminOrderReadModel>();
+        services.AddScoped<ICustomerOrderReadModel, CustomerOrderReadModel>();
+        services.AddScoped<IOrderEmailIntentRepository, OrderEmailIntentRepository>();
+        services.AddScoped<IGuestOrderAccessTokenRepository, GuestOrderAccessTokenRepository>();
+        services.AddScoped<IGuestOrderAccessGate, GuestOrderAccessGate>();
         services.AddScoped<ICheckoutSessionReader, CheckoutSessionReader>();
+        services.AddScoped<IOrderPixPaymentStatusReader, NullOrderPixPaymentStatusReader>();
+        services.AddScoped<IAdminOrderPixPaymentReader, NullAdminOrderPixPaymentReader>();
+        services.AddScoped<ICustomerOrderPixPaymentReader, NullCustomerOrderPixPaymentReader>();
+        services.AddScoped<IOrderEmailNotifier, NullOrderEmailNotifier>();
+        services.AddSingleton<IGuestOrderAccessTokenHasher, GuestOrderAccessTokenHasher>();
     }
 }

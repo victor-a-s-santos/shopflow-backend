@@ -45,6 +45,8 @@ public sealed class CustomerAuthIntegrationTests : IClassFixture<ShopflowWebAppl
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("email").GetString().Should().Be(email);
         body.GetProperty("emailConfirmed").GetBoolean().Should().BeFalse();
+        body.GetProperty("approvalStatus").GetString().Should().Be("Approved");
+        body.GetProperty("accessStatus").GetString().Should().Be("Approved");
     }
 
     [Fact]

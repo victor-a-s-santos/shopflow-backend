@@ -1,3 +1,5 @@
+using Vls.Shopflow.Orders.Domain.Constants;
+
 namespace Vls.Shopflow.Orders.Domain.Exceptions;
 
 public sealed class OrderNotFoundException : Exception
@@ -47,4 +49,87 @@ public sealed class OrderNotFoundByCheckoutSessionException : Exception
     public OrderNotFoundByCheckoutSessionException(Guid checkoutSessionId)
         : base($"No order was found for checkout session {checkoutSessionId}.")
         => CheckoutSessionId = checkoutSessionId;
+}
+
+/// <summary>
+/// Opaque denial for guest order access — same message whether order/token is missing or invalid.
+/// </summary>
+public sealed class GuestOrderAccessDeniedException : Exception
+{
+    public string Code { get; }
+
+    public GuestOrderAccessDeniedException(
+        string code = GuestOrderErrorCodes.OrderNotFoundOrAccessDenied)
+        : base("Order access denied.")
+        => Code = code;
+}
+
+public sealed class GuestOrderAccessTokenExpiredException : Exception
+{
+    public const string ErrorCode = GuestOrderErrorCodes.GuestOrderTokenExpired;
+
+    public GuestOrderAccessTokenExpiredException()
+        : base("Order access denied.")
+    {
+    }
+}
+
+public sealed class GuestOrderAccessMisconfiguredException : Exception
+{
+    public GuestOrderAccessMisconfiguredException(string message)
+        : base(message)
+    {
+    }
+}
+
+/// <summary>
+/// Guest tried to create an account but the order email already has a customer account.
+/// </summary>
+public sealed class GuestOrderAccountAlreadyExistsException : Exception
+{
+    public const string ErrorCode = GuestOrderErrorCodes.AccountAlreadyExists;
+    public const string RedirectTo = "/login";
+
+    public GuestOrderAccountAlreadyExistsException()
+        : base("Já existe uma conta vinculada a este e-mail. Entre para adicionar este pedido ao seu histórico.")
+    {
+    }
+}
+
+/// <summary>
+/// Claim denied for a logged-in customer (e.g. email mismatch) without leaking order details.
+/// </summary>
+public sealed class GuestOrderClaimForbiddenException : Exception
+{
+    public const string ErrorCode = GuestOrderErrorCodes.CustomerEmailDoesNotMatchOrder;
+
+    public GuestOrderClaimForbiddenException()
+        : base("Unable to claim this order.")
+    {
+    }
+}
+
+public sealed class OrderAlreadyLinkedToAnotherCustomerException : Exception
+{
+    public const string ErrorCode = GuestOrderErrorCodes.OrderLinkedToAnotherCustomer;
+
+    public Guid OrderId { get; }
+
+    public OrderAlreadyLinkedToAnotherCustomerException(Guid orderId)
+        : base("This order cannot be linked.")
+        => OrderId = orderId;
+}
+
+/// <summary>
+/// Identity password rules failed during guest create-account.
+/// </summary>
+public sealed class PasswordRequirementsNotMetException : Exception
+{
+    public const string ErrorCode = GuestOrderErrorCodes.PasswordRequirementsNotMet;
+
+    public IReadOnlyList<(string Field, string Message)> Errors { get; }
+
+    public PasswordRequirementsNotMetException(IReadOnlyList<(string Field, string Message)> errors)
+        : base("A senha não atende aos requisitos.")
+        => Errors = errors;
 }

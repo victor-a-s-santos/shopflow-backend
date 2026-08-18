@@ -78,8 +78,19 @@ namespace Vls.Shopflow.CartCheckout.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("CustomerOrderNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("CustomerPhone")
                         .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateOnly?>("PreferredDeliveryDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PreferredDeliveryMethod")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
@@ -116,8 +127,22 @@ namespace Vls.Shopflow.CartCheckout.Infrastructure.Migrations
                     b.Property<Guid>("CheckoutSessionId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("EquivalentUnitPrice")
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<Guid>("InventoryReservationId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("PackageDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("PackageLabel")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("PackageSize")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
@@ -135,6 +160,21 @@ namespace Vls.Shopflow.CartCheckout.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<string>("QuantityUnitLabel")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SalesDisplaySummary")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SalesMode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool?>("ShowTotalPieces")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("SkuCode")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -145,6 +185,9 @@ namespace Vls.Shopflow.CartCheckout.Infrastructure.Migrations
 
                     b.Property<decimal>("Subtotal")
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<int?>("TotalPieces")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric(12,2)");

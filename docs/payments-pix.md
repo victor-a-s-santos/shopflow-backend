@@ -5,24 +5,23 @@ Módulo responsável por registrar intenções/cobranças Pix associadas a pedid
 ## Escopo MVP (backend)
 
 - Criar `PixPayment` para `Order` com status `PendingPayment`
-- Provider abstrato (`IPixPaymentProvider`) com implementação `FakePixPaymentProvider`
+- Provider abstrato (`IPixPaymentProvider`) com implementações:
+  - **`FakePixPaymentProvider`** — dev sem API externa
+  - **`MercadoPagoPixPaymentProvider`** — Checkout API Orders (`POST /v1/orders`)
+- Webhook Mercado Pago (`POST /api/payments/pix/webhooks/mercado-pago`) com **`mercadopago-sdk` WebhookSignatureValidator** (query `data.id` as-is) + oráculo manual + diagnóstico `application_id`/`user_id`/fingerprint; `GET /v1/orders/{id}`; simulação → `SimulatorEvent` 200
+- Em `processed`/`accredited`: PixPayment Paid + Order Paid + confirmação de reserva Inventory
 - `PixPayment` nasce com status **`Pending`**
 - Amount copiado do `Total` do pedido (sem recalcular)
 - Endpoint idempotente: se já existir pagamento `Pending` para o pedido, retorna o existente (200)
-- **Sem** gateway real, QR Code real, copia-e-cola real ou webhook
-- **Sem** marcar `Order` como `Paid`
-- **Sem** confirmar reserva de estoque no Inventory
+- Com Mercado Pago: retorna **QR/copia-e-cola reais** (`qr_code`, `qr_code_base64`; `ticket_url` em campo separado)
 - Expiração automática de `PixPayment` `Pending` via worker (ver `docs/expiration-worker.md`)
-- **Sem** integração frontend nesta etapa
 
 ## Fora do escopo nesta etapa
 
-- Mercado Pago, Pagar.me, Asaas, Efí ou banco real
-- Webhook de confirmação de pagamento
-- Endpoint `simulate-paid` (próxima etapa dev/sandbox)
-- E-mail/WhatsApp
-- Admin de pagamentos
-- Conciliação financeira
+- Endpoint `simulate-paid`
+- Integração frontend (Public Key / QR UI)
+- Reembolso, chargeback, cartão, boleto
+- Pagar.me, Asaas, Efí ou banco real
 
 ## Fluxo — criar pagamento Pix
 
@@ -73,16 +72,34 @@ PaymentsPix **consulta** Order para validar existência, status e total. **Não 
 IPixPaymentProvider.CreatePixChargeAsync(PixChargeRequest)
 ```
 
-Implementação atual: `FakePixPaymentProvider`
+Seleção via `PaymentsPix:Provider` (`Fake` | `MercadoPago`).
+
+### FakePixPaymentProvider
 
 | Campo | Comportamento fake |
 |-------|-------------------|
 | `provider` | `Fake` |
-| `providerPaymentId` | `fake-dev-{orderId}` |
+| `providerOrderId` | `fake-ord-{orderId}` |
+| `providerTransactionId` | `fake-pay-{orderId}` |
 | `qrCode` | `null` |
 | `qrCodeImageUrl` | `null` |
 | `copyPasteCode` | `null` |
 | `status` | `Pending` |
+
+### MercadoPagoPixPaymentProvider
+
+| Campo | Comportamento |
+|-------|---------------|
+| `provider` | `MercadoPago` |
+| `providerOrderId` | ORD… (`POST /v1/orders`) |
+| `providerTransactionId` | PAY… |
+| `copyPasteCode` | `qr_code` (EMV copia e cola) |
+| `qrCode` | `qr_code_base64` (data URI), se houver |
+| `qrCodeImageUrl` | `null` (`ticket_url` não é imagem) |
+| `ticketUrl` | `ticket_url` |
+| `status` | `Pending` até webhook Orders |
+
+Ver `docs/payments/MP-PIX-002-orders-provider-and-webhook.md`.
 
 ## Estratégia idempotente (pagamento duplicado)
 
@@ -95,8 +112,9 @@ Se já existir `PixPayment` com status `Pending` para o mesmo `orderId`, o endpo
 | Método | Path | Status | Descrição |
 |--------|------|--------|-----------|
 | `POST` | `/api/payments/pix/orders/{orderId}` | 201 / 200 | Cria ou retorna PixPayment Pending |
-| `GET` | `/api/payments/pix/{paymentId}` | 200 | Consulta por ID |
-| `GET` | `/api/payments/pix/by-order/{orderId}` | 200 | Consulta mais recente do pedido |
+| `POST` | `/api/payments/pix/webhooks/mercado-pago` | 200 / 401 / 503 | Webhook Orders (assinatura + GET order; simulação painéis = 200 Ignored/LookupFailed) |
+| `GET` | `/api/payments/pix/{paymentId}` | 200 | Consulta por ID (admin) |
+| `GET` | `/api/payments/pix/by-order/{orderId}` | 200 | Consulta mais recente do pedido (admin) |
 
 ### Response — pagamento criado (201 ou 200 idempotente)
 
@@ -141,6 +159,12 @@ Se já existir `PixPayment` com status `Pending` para o mesmo `orderId`, o endpo
 
 ## Próximos passos
 
-1. Plug provider real (Mercado Pago, etc.) implementando `IPixPaymentProvider`
-2. Webhook de confirmação → marcar `PixPayment` Paid + `Order` Paid + confirmar reserva Inventory
-3. Endpoint dev `simulate-paid` (sandbox) com documentação explícita
+1. Integração frontend (QR/copia-e-cola + polling de status via Guest Order Access Token)
+2. Notificação por e-mail ao confirmar pagamento
+3. Refund/chargeback
+
+Guest status: `docs/security/SEC-006-guest-order-access-token.md`  
+Webhook + provider Orders: `docs/payments/MP-PIX-002-orders-provider-and-webhook.md`  
+Captura temporária webhook bruto (Testing/HML): `docs/payments/MP-PIX-003-webhook-raw-capture-temporary.md`  
+Orders + webhook + `notification_url` opcional + reconciliação: `docs/payments/MP-PIX-002-orders-provider-and-webhook.md`  
+Notas históricas do provider: `docs/payments-mercado-pago-pix.md`

@@ -46,7 +46,11 @@ public sealed class ProductReadModelTests
         await setup.Database.MigrateAsync();
 
         var slug = Slug.From($"test-product-{Guid.NewGuid():N}"[..24]);
-        var product = Product.CreateWithSkus("Produto Teste", slug, null);
+        var product = Product.CreateWithSkus(
+            "Produto Teste",
+            slug,
+            null,
+            description: "Descrição de teste");
         var sku = Sku.Create(
             product.Id,
             "SKU-TEST",
@@ -64,11 +68,14 @@ public sealed class ProductReadModelTests
         var bySlug = await readModel.GetBySlugAsync(slug.Value, CancellationToken.None);
 
         byId.Should().NotBeNull();
-        byId!.Skus.Should().ContainSingle(s =>
+        byId!.Description.Should().Be("Descrição de teste");
+        byId.IsActive.Should().BeTrue();
+        byId.Skus.Should().ContainSingle(s =>
             s.Code == "SKU-TEST" && s.RegularPrice == 120m && s.PromotionalPrice == 99m);
 
         bySlug.Should().NotBeNull();
         bySlug!.Slug.Should().Be(slug.Value);
+        bySlug.Description.Should().Be("Descrição de teste");
         bySlug.Skus.Should().ContainSingle(s => s.Code == "SKU-TEST");
     }
 

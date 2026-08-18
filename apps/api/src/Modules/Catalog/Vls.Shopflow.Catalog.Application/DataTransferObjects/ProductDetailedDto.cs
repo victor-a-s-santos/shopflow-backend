@@ -12,5 +12,8 @@ public sealed record ProductDetailedDto(
     decimal? PromotionalPrice,
     decimal EffectivePrice,
     IReadOnlyList<SkuDto> Skus,
-    IReadOnlyList<ProductImageDto> Images
-);
+    IReadOnlyList<ProductImageDto> Images,
+    bool IsFeatured = false,
+    int? DisplayOrder = null,
+    DateTimeOffset? CreatedAt = null,
+    string? Description = null);

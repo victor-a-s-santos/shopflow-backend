@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Vls.Shopflow.PaymentsPix.Domain\Vls.Shopflow.PaymentsPix.Domain.csproj" />
+    <ProjectReference Include="..\..\Orders\Vls.Shopflow.Orders.Application\Vls.Shopflow.Orders.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Domain\Vls.Shopflow.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Application\Vls.Shopflow.BuildingBlocks.Application.csproj" />
   </ItemGroup>
@@ -10,6 +11,7 @@
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="MediatR" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
 
   <PropertyGroup>

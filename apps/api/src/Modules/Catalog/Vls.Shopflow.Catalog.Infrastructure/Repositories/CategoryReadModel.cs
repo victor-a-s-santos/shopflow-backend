@@ -11,7 +11,7 @@ public sealed class CategoryReadModel(CatalogDbContext db) : ICategoryReadModel
         return await db.Categories
             .AsNoTracking()
             .OrderBy(c => c.Name)
-            .Select(c => new CategoryDto(c.Id, c.Name))
+            .Select(c => new CategoryDto(c.Id, c.Name, c.Slug.Value))
             .ToListAsync(ct);
     }
 }

@@ -8,7 +8,7 @@ Módulo responsável por criar e consultar pedidos a partir de sessões de check
 - Pedido nasce com status **`PendingPayment`**
 - Snapshot imutável de cliente, endereço, itens e totais da sessão
 - Uma `CheckoutSession` gera **no máximo um** `Order`
-- Checkout convidado permitido (sem `CustomerId`)
+- Checkout convidado **configurável** (`Checkout:AllowGuest`); cliente atual desliga novos guests. Pedidos antigos sem `CustomerUserId` permanecem. Ver `docs/orders/guest-order-access.md`.
 - **Sem** pagamento real, Pix, cobrança ou confirmação de estoque vendido
 - Expiração automática via worker quando pagamento não ocorre (ver `docs/expiration-worker.md`)
 
@@ -66,21 +66,25 @@ Ao criar um `Order` nesta etapa:
 | Ação | Comportamento |
 |------|----------------|
 | Reservar estoque novamente | **Não** — evita duplicidade |
-| Confirmar reserva (venda) | **Não** — aguarda webhook Pix real |
+| Confirmar reserva (venda) | **Sim** — via webhook Mercado Pago `approved` |
 | Cancelar reserva | **Não** no Orders — feito por CartCheckout (cancel) ou worker de expiração |
 | Alterar status da CheckoutSession | **Não** — sem semântica artificial |
 
-A confirmação definitiva da reserva (venda) será tratada quando o **webhook Pix real** marcar o pedido como `Paid`.
+A confirmação definitiva da reserva (venda) ocorre quando o **webhook Pix** marca o pedido como `Paid` (`docs/payments/MP-PIX-002-webhook-confirmation.md`).
 
 Pedidos `PendingPayment` com sessão/Pix vencidos são marcados como **`Expired`** pelo worker (`docs/expiration-worker.md`), com liberação de reserva no Inventory.
 
 ## Endpoints
 
-| Método | Path | Status | Descrição |
-|--------|------|--------|-----------|
-| `POST` | `/api/orders/from-checkout-session` | 201 | Cria pedido `PendingPayment` |
-| `GET` | `/api/orders/{orderId}` | 200 | Consulta pedido por ID |
-| `GET` | `/api/orders/by-checkout-session/{checkoutSessionId}` | 200 | Consulta pedido por sessão |
+| Método | Path | Auth | Descrição |
+|--------|------|------|-----------|
+| `POST` | `/api/orders/from-checkout-session` | Público (checkout) | Cria pedido `PendingPayment` + `guestAccessToken` (uma vez) |
+| `GET` | `/api/orders/guest/{orderId}/status` | Header `X-ORDER-ACCESS-TOKEN` | Status limitado (sem PII sensível) |
+| `GET` | `/api/orders/{orderId}` | Backoffice | Consulta completa |
+| `GET` | `/api/orders/by-checkout-session/{checkoutSessionId}` | Backoffice | Consulta por sessão |
+
+Guest token: [`docs/security/SEC-006-guest-order-access-token.md`](./security/SEC-006-guest-order-access-token.md), [`docs/orders/ORD-002-guest-order-status.md`](./orders/ORD-002-guest-order-status.md).
+
 
 ### Request — criar pedido
 
@@ -125,7 +129,9 @@ Pedidos `PendingPayment` com sessão/Pix vencidos são marcados como **`Expired`
   "subtotal": 200,
   "shipping": null,
   "total": 200,
-  "createdAt": "2026-05-23T12:00:00Z"
+  "createdAt": "2026-05-23T12:00:00Z",
+  "guestAccessToken": "<token-bruto-apenas-nesta-resposta>",
+  "guestAccessTokenExpiresAt": "2026-06-22T12:00:00Z"
 }
 ```
 
@@ -134,22 +140,24 @@ Pedidos `PendingPayment` com sessão/Pix vencidos são marcados como **`Expired`
 | Status | Situação |
 |--------|----------|
 | 400 | Request inválido (`checkoutSessionId` ausente) |
+| 401 | Guest status: token ausente/inválido/expirado/revogado |
 | 404 | Checkout session não encontrada; pedido não encontrado |
 | 409 | Sessão em status inválido; pedido já existe para a sessão |
 
 ## Banco de dados
 
 - Schema: `orders`
-- Tabelas: `orders.orders`, `orders.order_items`
+- Tabelas: `orders.orders`, `orders.order_items`, `orders.guest_order_access_tokens`
 - History table: `orders.__EFMigrationsHistory`
 - Constraint: `checkout_session_id` **unique**
-- Índices: `customer_email`, `created_at`
+- Índices: `customer_email`, `created_at`, token hash / orderId
 
 ## Integração cross-module
 
-| Porta (Orders.Application) | Implementação (Orders.Infrastructure) |
-|----------------------------|----------------------------------------|
-| `ICheckoutSessionReader` | `CheckoutSessionReader` — lê `CartCheckoutDbContext` (read-only) |
+| Porta (Orders.Application) | Implementação |
+|----------------------------|---------------|
+| `ICheckoutSessionReader` | `CheckoutSessionReader` (CartCheckout) |
+| `IOrderPixPaymentStatusReader` | `OrderPixPaymentStatusReader` (PaymentsPix) |
 
 Orders **não** referencia Inventory diretamente.
 
@@ -157,10 +165,11 @@ Orders **não** referencia Inventory diretamente.
 
 | Projeto | Cobertura |
 |---------|-----------|
-| `Vls.Shopflow.Orders.UnitTests` | Domain + Application handlers |
+| `Vls.Shopflow.Orders.UnitTests` | Domain + create/guest status handlers + hasher |
 | `Vls.Shopflow.Orders.IntegrationTests` | Persistência real com PostgreSQL (`SHOPFLOW_TEST_DB`) |
 
 ## Próximos passos
 
-1. Webhook Pix real → marcar `Order` `Paid` + confirmar reserva Inventory
-2. IdentityCustomer backend (opcional para compra)
+1. Frontend: guardar `guestAccessToken` e consultar `/orders/guest/{id}/status`
+2. Notificação por e-mail ao confirmar pagamento
+3. Enrichment de attributes/image no status guest (opcional)

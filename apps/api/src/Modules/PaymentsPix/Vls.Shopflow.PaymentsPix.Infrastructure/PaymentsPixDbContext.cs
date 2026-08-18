@@ -6,6 +6,7 @@ namespace Vls.Shopflow.PaymentsPix.Infrastructure;
 public sealed class PaymentsPixDbContext : DbContext
 {
     public DbSet<PixPayment> PixPayments => Set<PixPayment>();
+    public DbSet<MercadoPagoWebhookEvent> MercadoPagoWebhookEvents => Set<MercadoPagoWebhookEvent>();
 
     public PaymentsPixDbContext(DbContextOptions<PaymentsPixDbContext> options) : base(options) { }
 

@@ -7,6 +7,14 @@ internal static class PixPaymentMapper
     public const string PreparationMessage =
         "Pagamento Pix criado em modo preparação. Gateway real ainda não integrado.";
 
+    public const string MercadoPagoMessage =
+        "Pix gerado. Aguardando pagamento.";
+
+    public static string ResolveMessage(Domain.Enums.PixPaymentProviderType provider)
+        => provider == Domain.Enums.PixPaymentProviderType.MercadoPago
+            ? MercadoPagoMessage
+            : PreparationMessage;
+
     public static DataTransferObjects.PixPaymentDto ToDto(PixPayment payment)
         => new(
             payment.Id,
@@ -17,9 +25,10 @@ internal static class PixPaymentMapper
             payment.QrCode,
             payment.QrCodeImageUrl,
             payment.CopyPasteCode,
+            payment.TicketUrl,
             payment.ExpiresAt,
             payment.CreatedAt,
-            PreparationMessage);
+            ResolveMessage(payment.Provider));
 
     public static void EnsureOrderCanReceivePixPayment(string status, Guid orderId)
     {

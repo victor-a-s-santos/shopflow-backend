@@ -1,9 +1,11 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Vls.Shopflow.PaymentsPix.Application.CommandHandlers;
 using Vls.Shopflow.PaymentsPix.Application.Commands;
 using Vls.Shopflow.PaymentsPix.Application.Interfaces;
+using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Application.Repositories;
 using Vls.Shopflow.PaymentsPix.Domain.Entities;
 using Vls.Shopflow.PaymentsPix.Domain.Enums;
@@ -16,6 +18,56 @@ public sealed class CreatePixPaymentForOrderCommandHandlerTests
     private static OrderPaymentSnapshot PendingOrder(Guid orderId, decimal total = 200m)
         => new(orderId, "PendingPayment", total, "João Silva", "joao@email.com");
 
+    private static PixChargeResponse FakeCharge(Guid orderId, DateTimeOffset? expiresAt = null)
+        => new(
+            PixPaymentProviderType.Fake,
+            $"fake-ord-{orderId:N}",
+            $"fake-pay-{orderId:N}",
+            null,
+            null,
+            null,
+            null,
+            "pending",
+            "fake",
+            "pending",
+            "fake",
+            orderId.ToString("D"),
+            orderId.ToString("D"),
+            expiresAt ?? DateTimeOffset.UtcNow.AddMinutes(30),
+            PixPaymentStatus.Pending);
+
+    private static PixPayment ExistingPending(Guid orderId)
+        => PixPayment.CreatePending(
+            orderId,
+            100m,
+            PixPaymentProviderType.Fake,
+            "fake-ord",
+            "fake-pay",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            orderId.ToString("D"),
+            orderId.ToString("D"),
+            DateTimeOffset.UtcNow.AddMinutes(30));
+
+    private static CreatePixPaymentForOrderCommandHandler CreateHandler(
+        IOrderPaymentReader orderReader,
+        IPixPaymentRepository repository,
+        IPixPaymentProvider? provider = null,
+        IPaymentsPixUnitOfWork? uow = null)
+        => new(
+            orderReader,
+            repository,
+            provider ?? Mock.Of<IPixPaymentProvider>(),
+            uow ?? Mock.Of<IPaymentsPixUnitOfWork>(),
+            Options.Create(new MercadoPagoOptions { PixExpirationMinutes = 30 }),
+            NullLogger<CreatePixPaymentForOrderCommandHandler>.Instance);
+
     [Fact]
     public async Task Handle_WithValidOrder_CreatesPendingPixPayment()
     {
@@ -26,14 +78,7 @@ public sealed class CreatePixPaymentForOrderCommandHandlerTests
 
         var provider = new Mock<IPixPaymentProvider>();
         provider.Setup(x => x.CreatePixChargeAsync(It.IsAny<PixChargeRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PixChargeResponse(
-                PixPaymentProviderType.Fake,
-                "fake-dev-id",
-                null,
-                null,
-                null,
-                DateTimeOffset.UtcNow.AddMinutes(30),
-                PixPaymentStatus.Pending));
+            .ReturnsAsync(FakeCharge(orderId));
 
         PixPayment? captured = null;
         var repository = new Mock<IPixPaymentRepository>();
@@ -46,12 +91,7 @@ public sealed class CreatePixPaymentForOrderCommandHandlerTests
         var uow = new Mock<IPaymentsPixUnitOfWork>();
         uow.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
-        var handler = new CreatePixPaymentForOrderCommandHandler(
-            orderReader.Object,
-            repository.Object,
-            provider.Object,
-            uow.Object,
-            NullLogger<CreatePixPaymentForOrderCommandHandler>.Instance);
+        var handler = CreateHandler(orderReader.Object, repository.Object, provider.Object, uow.Object);
 
         var result = await handler.Handle(
             new CreatePixPaymentForOrderCommand(orderId),
@@ -65,6 +105,7 @@ public sealed class CreatePixPaymentForOrderCommandHandlerTests
 
         captured.Should().NotBeNull();
         captured!.Status.Should().Be(PixPaymentStatus.Pending);
+        captured.ProviderOrderId.Should().StartWith("fake-ord-");
     }
 
     [Fact]
@@ -79,12 +120,7 @@ public sealed class CreatePixPaymentForOrderCommandHandlerTests
         repository.Setup(x => x.GetPendingByOrderIdAsync(orderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((PixPayment?)null);
 
-        var handler = new CreatePixPaymentForOrderCommandHandler(
-            orderReader.Object,
-            repository.Object,
-            Mock.Of<IPixPaymentProvider>(),
-            Mock.Of<IPaymentsPixUnitOfWork>(),
-            NullLogger<CreatePixPaymentForOrderCommandHandler>.Instance);
+        var handler = CreateHandler(orderReader.Object, repository.Object);
 
         var act = () => handler.Handle(
             new CreatePixPaymentForOrderCommand(orderId),
@@ -105,12 +141,7 @@ public sealed class CreatePixPaymentForOrderCommandHandlerTests
         repository.Setup(x => x.GetPendingByOrderIdAsync(orderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((PixPayment?)null);
 
-        var handler = new CreatePixPaymentForOrderCommandHandler(
-            orderReader.Object,
-            repository.Object,
-            Mock.Of<IPixPaymentProvider>(),
-            Mock.Of<IPaymentsPixUnitOfWork>(),
-            NullLogger<CreatePixPaymentForOrderCommandHandler>.Instance);
+        var handler = CreateHandler(orderReader.Object, repository.Object);
 
         var act = () => handler.Handle(
             new CreatePixPaymentForOrderCommand(orderId),
@@ -123,26 +154,13 @@ public sealed class CreatePixPaymentForOrderCommandHandlerTests
     public async Task Handle_WhenPendingPaymentExists_ReturnsExisting()
     {
         var orderId = Guid.NewGuid();
-        var existing = PixPayment.CreatePending(
-            orderId,
-            100m,
-            PixPaymentProviderType.Fake,
-            "fake-dev-id",
-            null,
-            null,
-            null,
-            DateTimeOffset.UtcNow.AddMinutes(30));
+        var existing = ExistingPending(orderId);
 
         var repository = new Mock<IPixPaymentRepository>();
         repository.Setup(x => x.GetPendingByOrderIdAsync(orderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
-        var handler = new CreatePixPaymentForOrderCommandHandler(
-            Mock.Of<IOrderPaymentReader>(),
-            repository.Object,
-            Mock.Of<IPixPaymentProvider>(),
-            Mock.Of<IPaymentsPixUnitOfWork>(),
-            NullLogger<CreatePixPaymentForOrderCommandHandler>.Instance);
+        var handler = CreateHandler(Mock.Of<IOrderPaymentReader>(), repository.Object);
 
         var result = await handler.Handle(
             new CreatePixPaymentForOrderCommand(orderId),
@@ -165,12 +183,7 @@ public sealed class CreatePixPaymentForOrderCommandHandlerTests
         repository.Setup(x => x.GetPendingByOrderIdAsync(orderId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((PixPayment?)null);
 
-        var handler = new CreatePixPaymentForOrderCommandHandler(
-            orderReader.Object,
-            repository.Object,
-            Mock.Of<IPixPaymentProvider>(),
-            Mock.Of<IPaymentsPixUnitOfWork>(),
-            NullLogger<CreatePixPaymentForOrderCommandHandler>.Instance);
+        var handler = CreateHandler(orderReader.Object, repository.Object);
 
         var act = () => handler.Handle(
             new CreatePixPaymentForOrderCommand(orderId),

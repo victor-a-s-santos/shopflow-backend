@@ -59,6 +59,7 @@ Sem alteração estrutural — escrita já protegida com `Backoffice` na Fase 1/
 | `/api/inventory/skus/{id}/add\|remove` | POST | Inventory | Admin | Admin | Mantido |
 | `/api/inventory/skus/{id}/reserve` | POST | Inventory | ~~Público~~ | Interno / admin técnico | **Removido** |
 | `/api/inventory/reservations/{id}/confirm\|cancel` | POST | Inventory | ~~Público~~ | Interno / admin técnico | **Removido** |
+| `/api/admin/inventory/skus/availability` | POST | Inventory | — | Admin (CSRF) | **Criado** — batch read-only |
 | `/api/admin/inventory/skus/{id}/reserve` | POST | Inventory | — | Admin técnico | **Criado** |
 | `/api/admin/inventory/reservations/{id}/confirm\|cancel` | POST | Inventory | — | Admin técnico | **Criado** |
 | `/api/checkout/sessions` | POST | CartCheckout | Público checkout | Público checkout | Mantido |
@@ -89,6 +90,7 @@ Sem alteração estrutural — escrita já protegida com `Backoffice` na Fase 1/
 ### Inventory (gestão)
 - GET `/api/inventory/skus/{id}/movements`
 - POST create/add/remove stock
+- POST `/api/admin/inventory/skus/availability` (batch read-only)
 
 ### Inventory (técnico — reserva)
 - POST `/api/admin/inventory/skus/{id}/reserve`

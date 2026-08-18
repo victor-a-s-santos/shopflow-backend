@@ -1,13 +1,13 @@
 # Shopflow — Estado atual do projeto
 
-> Última atualização: junho/2026. Baseado no código em `apps/api`, `apps/web` e `docs/`.
+> Última atualização: julho/2026. Baseado no código em `apps/api`, `apps/web` e `docs/`.
 > Se este arquivo divergir do código, **o código prevalece**.
 
 ## Visão geral
 
 Shopflow é um e-commerce modular em monorepo: backend .NET (monólito modular) + frontend React (Vite). O foco atual é operação de catálogo/estoque no admin, vitrine funcional, carrinho local e checkout integrado com sessão real (`CartCheckout`). O módulo **Orders** backend MVP cria pedidos `PendingPayment` a partir de sessões de checkout — **sem integração frontend ainda**.
 
-**Decisão de produto fixa:** checkout como convidado é permitido e prioritário. Login/cadastro são opcionais e preparados apenas visualmente.
+**Decisão de produto (ADR):** loja configurável via `StoreAccess:Mode`. Cliente atual (TESTE/HML/PROD) = `Closed` (`PrivateCatalogApprovedOnly`) + aprovação administrativa + `Checkout:AllowGuest=false`. Development/testes de regressão permanecem `Open` com catálogo público e guest. Ver `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md` e `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`.
 
 ---
 
@@ -51,7 +51,8 @@ Shopflow é um e-commerce modular em monorepo: backend .NET (monólito modular) 
 | `worker` | — | Expiração de checkout/pedidos/Pix pendentes |
 | `web` | 8080 | Vite dev — proxy `/api` → API |
 
-Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
+Upload de imagens: **Cloudflare R2** (S3-compatible) quando `Storage__Provider=CloudflareR2`; fallback local `wwwroot/uploads`. Ver `docs/integrations/cloudflare-r2-product-images.md`. Backfill local→R2 só TEST manual (`R2ImageBackfill__Enabled`).
+
 
 ---
 
@@ -61,8 +62,8 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 
 | Módulo | Backend | Frontend | Testes |
 |--------|---------|----------|--------|
-| **Catalog** | CRUD produtos/SKUs, categorias, atributos, imagens, by-slug; **demo seed** 10 produtos / 94 SKUs | Admin produtos + vitrine + detalhe | Unit + integration (cobertura parcial) |
-| **Inventory** | Estoque, movimentações, reserva/confirm/cancel, constraints atômicos | Admin estoque completo | Unit + integration (incl. concorrência) |
+| **Orders** | Create from checkout, guest status+token, admin/customer lists, **guest claim**, **salesDisplay snapshot** em itens (`docs/orders/order-item-sales-snapshot.md`) | Checkout→pedido, status guest, Meus pedidos, claim pós-Pix; FE pedidos ainda sem salesDisplay | Unit + integration |
+| **Inventory** | Estoque, movimentações, reserva/confirm/cancel, constraints atômicos; **batch availability** Backoffice | Admin estoque completo; Product Edit ainda pode usar GET N+1 até wiring | Unit + integration (incl. concorrência) |
 
 ### Parcial
 
@@ -70,12 +71,13 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 |--------|--------------|-------------|
 | **CartCheckout (backend)** | `POST/GET /api/checkout/sessions`, cancelamento, reserva de estoque na criação, compensação em falha parcial, **worker de expiração** | Confirmar sessão (pagamento real), shipping |
 | **CartCheckout (frontend)** | UI 4 etapas, `POST /api/checkout/sessions`, reserva real, cria pedido + Pix Pending | Shipping |
-| **Orders (backend)** | `POST/GET` orders; pedido `PendingPayment`; expiração via worker | Confirmação de reserva (webhook), admin/conta |
-| **PaymentsPix (backend)** | `POST/GET` Pix; provider fake; `PixPayment` Pending; idempotente; expiração via worker | Gateway real, QR, webhook, marcar Order Paid, confirmar estoque |
+| **Orders (backend)** | create + guest status; `orderNumber`; Admin/Customer orders; **guest claim** create-account/claim com codes oficiais + Identity password errors; Paid via Pix | Frontend pós-Pix (conta opcional), “Meus pedidos”, claim UI |
+| **PaymentsPix (backend)** | Fake + **Mercado Pago Orders API**; webhook via **mercadopago-sdk** + oráculo manual; `SendNotificationUrlInOrderCreate` (painel vs payload); reconciliação Worker `GET /v1/orders` (fallback); Paid só `processed`/`accredited` | Frontend QR |
+| **Notifications / Brevo** | `orders.email_intents` + dispatcher + outbox `notifications.email_outbox` + `EmailOutboxWorker` + templates HTML PT-BR; auth confirm/reset; order/paid/ship/deliver; **aprovação de cadastro (Fase 3)** | Validar em TESTE com Brevo sandbox + ApiKey na VPS; FE deep-links / pending-approval |
 | **Orders (frontend)** | Integrado no checkout (`PendingPayment`) | Conta/admin ainda visual/fake |
 | **PaymentsPix (frontend)** | Integrado no checkout (intenção Pix Pending) | QR real, pagamento confirmado |
 | **Cart (frontend)** | CRUD local por `skuId`, drawer, persistência | Sincronização com backend (não previsto ainda) |
-| **IdentityAccess (backend)** | Admin + Customer auth, CSRF, policies `Backoffice`/`Customer`, 30 testes | Frontend customer auth; Account; guest order token |
+| **IdentityAccess (backend)** | Admin + Customer auth, CSRF, policies `Backoffice`/`Customer`, **StoreAccess Open/Closed + CustomerAccessStatus (Fase 1)** + e-mails de aprovação (Fase 3) | Frontend Fase 2 (guards, login unificado, tela de aprovações) |
 | **Admin Dashboard** | Contagem real de produtos | Pedidos (156) e atividade recente são **hardcoded/fake** |
 
 ### Visual-only (frontend preparado, backend parcial)
@@ -88,19 +90,22 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 
 ### Scaffold (solução .NET, sem implementação)
 
-| Módulo | Estado |
-|--------|--------|
-| **Shipping** | Scaffold vazio |
+| Módulo | Estado | Pendente |
+|--------|--------|----------|
+| **Shipping** | Scaffold + **postal code lookup** (`GET /api/integrations/postal-code/br/{cep}`, ViaCEP no backend) | Frete calculado |
+| **Orders / Fulfillment** | Fase 2+3: preferência + `FulfillmentStatus` + admin ship/deliver + **DeliveryBatch** (`docs/orders/delivery-batch-phase-3.md`) | FE admin/checkout |
+
 
 ### Pendente
 
-- Gateway Pix real + webhook
-- Shipping (frete)
-- Frontend integração customer auth (backend pronto)
-- Storage externo de imagens (R2/S3)
+- Delivery/Fulfillment frontend (checkout + admin remessa)
+- Shipping / frete calculado
+- Frontend integração customer auth (backend pronto) — parcialmente wired
+- Storage externo de imagens (R2) — **feito** (`docs/integrations/cloudflare-r2-product-images.md`); backfill TEST manual documentado (`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`)
 - CI/CD pipeline
-- Guest Order Access Token + Account orders
+- FE guest tracking hidratar `?t=` do e-mail (EMAIL-002; backend aceita `t` no public status); páginas confirm/reset email
 - Testes HttpApi end-to-end
+- Chat nativo (após WhatsApp CTA)
 
 ---
 
@@ -109,6 +114,12 @@ Upload de imagens: filesystem local (`wwwroot/uploads`), não R2/S3.
 Base: `http://localhost:5127/api`
 
 ### Catalog (14 endpoints)
+
+`GET /catalog/products` — paginação (`page`/`pageSize`/`hasNextPage`), `sort`, filtros server-side `categorySlug`/`categoryId`/`q` (antes do count), `salesSummary` por item. `GET /catalog/categories` inclui `slug`. Docs: `product-list-pagination-and-ordering.md`, `product-list-sales-summary.md`.
+
+`GET /admin/catalog/products` — Backoffice; produtos ativos/inativos/sem SKU; filtros `status`/`featured`/`q`/`categorySlug`; DTO resumido para tabela. Doc: `admin-products-listing.md`.
+
+Product `description` (varchar 4000, opcional) + `isActive` no create/update/detail (`ProductDetailedDto`). Create: `isActive` omitido → true. Update: `description` omitida preserva; `""` limpa. Doc: `admin-product-contract.md`.
 
 ```
 GET    /catalog/attributes
@@ -127,7 +138,9 @@ DELETE /catalog/products/{productId}/variants/{skuId}
 POST   /catalog/products/{id}/images
 ```
 
-### Inventory (8 endpoints)
+### Inventory
+
+`GET /admin/inventory/skus` — Backoffice; listagem SKU-cêntrica com estoque, filtros `status`/`stockStatus`/`q`/`categorySlug`, sorts operacionais. Doc: `admin-inventory-skus-listing.md`.
 
 ```
 GET    /inventory/skus/{skuId}
@@ -135,9 +148,11 @@ GET    /inventory/skus/{skuId}/movements
 POST   /inventory/skus/{skuId}
 POST   /inventory/skus/{skuId}/add
 POST   /inventory/skus/{skuId}/remove
-POST   /inventory/skus/{skuId}/reserve
-POST   /inventory/reservations/{reservationId}/confirm
-POST   /inventory/reservations/{reservationId}/cancel
+GET    /admin/inventory/skus
+POST   /admin/inventory/skus/availability
+POST   /admin/inventory/skus/{skuId}/reserve
+POST   /admin/inventory/reservations/{reservationId}/confirm
+POST   /admin/inventory/reservations/{reservationId}/cancel
 ```
 
 ### Checkout (3 endpoints)
@@ -156,7 +171,14 @@ GET    /orders/{orderId}
 GET    /orders/by-checkout-session/{checkoutSessionId}
 ```
 
-### PaymentsPix (3 endpoints)
+### PaymentsPix (4 endpoints)
+
+| Método | Path | Auth |
+|--------|------|------|
+| POST | `/api/payments/pix/orders/{orderId}` | Público |
+| POST | `/api/payments/pix/webhooks/mercado-pago` | Público + `x-signature` |
+| GET | `/api/payments/pix/{paymentId}` | Backoffice |
+| GET | `/api/payments/pix/by-order/{orderId}` | Backoffice |
 
 ```
 POST   /payments/pix/orders/{orderId}
@@ -229,7 +251,7 @@ Registradas em `apps/web/src/App.tsx`:
 | Funcionalidade | Real | Simulado / stub / visual |
 |----------------|------|--------------------------|
 | Listagem e CRUD de produtos | ✓ API | |
-| Upload de imagem | ✓ local disk | |
+| Upload de imagem | ✓ R2 (prod) / local (dev) | |
 | Estoque e reservas (API) | ✓ API | |
 | Sessão de checkout (API) | ✓ API | |
 | Finalizar compra na UI | ✓ sessão + pedido + Pix Pending | |
@@ -272,6 +294,7 @@ Detalhes: `docs/testing.md`.
 | Arquivo | Conteúdo |
 |---------|----------|
 | `docs/architecture.md` | Arquitetura modular, módulos, integrações |
+| `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md` | Design atacado/pacotes/múltiplos (sem código ainda) |
 | `docs/catalog.md` | API Catalog |
 | `docs/catalog-demo-seed.md` | Carga demo loja de roupas |
 | `docs/inventory.md` | API Inventory |
@@ -282,8 +305,16 @@ Detalhes: `docs/testing.md`.
 | `docs/next-steps.md` | Roadmap (pode estar desatualizado — ver `docs/ai-context/next-actions.md`) |
 | `docs/ai-context/*` | Contexto para IA (este arquivo) |
 | `docs/security/*` | Identity admin + customer (SEC-004, SEC-005) |
-
 | `docs/prompts/*` | Templates GPT / Lovable / Cursor |
+
+### Design pendente de implementação — wholesale sales rules
+
+Design técnico pronto em `docs/architecture/WHOLESALE-SALES-RULES-DESIGN.md`:
+
+- Regra de venda no **SKU** (`SalesMode`: Unit / MinimumQuantity / MultipleQuantity / FixedPackage / AssortedPackage).
+- Pacote MVP = **SKU próprio** (estoque em pacotes); composição multi-SKU = pós-MVP.
+- `quantity` sempre = unidades do SKU vendido; enforcement no `CreateCheckoutSession`.
+- Nenhuma feature implementada ainda (Fase 0 = docs).
 
 ---
 

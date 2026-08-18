@@ -25,22 +25,34 @@ public static class CustomerAuthEndpoints
 
             if (!result.Succeeded || result.Customer is null)
             {
-                var status = result.IsDuplicateEmail
-                    ? StatusCodes.Status409Conflict
-                    : StatusCodes.Status400BadRequest;
+                if (result.IsDuplicateEmail)
+                {
+                    return Results.Json(
+                        new
+                        {
+                            code = "ACCOUNT_ALREADY_EXISTS",
+                            message = result.ErrorMessage ?? "Já existe uma conta com este e-mail."
+                        },
+                        statusCode: StatusCodes.Status409Conflict);
+                }
+
+                var errors = result.Errors
+                    .GroupBy(e => e.Field)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(e => e.Message).Distinct().ToArray());
+
                 return Results.Json(
-                    new { message = result.ErrorMessage ?? "Unable to complete registration." },
-                    statusCode: status);
+                    new
+                    {
+                        code = "PASSWORD_REQUIREMENTS_NOT_MET",
+                        message = result.ErrorMessage ?? "A senha não atende aos requisitos.",
+                        errors
+                    },
+                    statusCode: StatusCodes.Status400BadRequest);
             }
 
-            return Results.Created("/api/auth/customer/me", new
-            {
-                customerId = result.Customer.CustomerId,
-                email = result.Customer.Email,
-                fullName = result.Customer.FullName,
-                phone = result.Customer.Phone,
-                emailConfirmed = result.Customer.EmailConfirmed
-            });
+            return Results.Created("/api/auth/customer/me", CustomerResponseMapper.ToRegisterResponse(result.Customer, result.Message));
         })
         .RequireRateLimiting(DependencyInjection.CustomerRegisterRateLimitPolicy)
         .DisableAntiforgery();
@@ -59,15 +71,7 @@ public static class CustomerAuthEndpoints
                     new { message = result.ErrorMessage ?? "Invalid email or password." },
                     statusCode: StatusCodes.Status401Unauthorized);
 
-            return Results.Ok(new
-            {
-                customerId = result.Customer.CustomerId,
-                email = result.Customer.Email,
-                fullName = result.Customer.FullName,
-                phone = result.Customer.Phone,
-                emailConfirmed = result.Customer.EmailConfirmed,
-                roles = result.Customer.Roles
-            });
+            return Results.Ok(CustomerResponseMapper.ToAuthResponse(result.Customer));
         })
         .RequireRateLimiting(DependencyInjection.CustomerLoginRateLimitPolicy)
         .DisableAntiforgery();
@@ -85,15 +89,7 @@ public static class CustomerAuthEndpoints
             if (user is null)
                 return Results.Unauthorized();
 
-            return Results.Ok(new
-            {
-                customerId = user.CustomerId,
-                email = user.Email,
-                fullName = user.FullName,
-                phone = user.Phone,
-                emailConfirmed = user.EmailConfirmed,
-                roles = user.Roles
-            });
+            return Results.Ok(CustomerResponseMapper.ToAuthResponse(user));
         })
         .RequireAuthorization(AuthPolicies.Customer);
 

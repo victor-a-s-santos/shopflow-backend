@@ -119,6 +119,111 @@ public sealed class EndpointExposureIntegrationTests : IClassFixture<ShopflowWeb
     }
 
     [Fact]
+    public async Task InventorySkuAvailabilityBatch_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/admin/inventory/skus/availability",
+            new { skuIds = new[] { Guid.NewGuid() } });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task InventorySkuAvailabilityBatch_AsCustomer_ReturnsForbiddenOrUnauthorized()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = await _factory.CreateAuthenticatedCustomerClientAsync();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/admin/inventory/skus/availability",
+            new { skuIds = new[] { Guid.NewGuid() } });
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task InventorySkuAvailabilityBatch_AdminWithoutCsrf_Returns400()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/admin/inventory/skus/availability",
+            new { skuIds = new[] { Guid.NewGuid() } });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task InventorySkuAvailabilityBatch_AdminWithCsrf_Returns200PreservingOrder()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+        var csrf = await client.GetFromJsonAsync<JsonElement>("/api/auth/csrf");
+        var token = csrf.GetProperty("token").GetString();
+
+        var skuA = Guid.NewGuid();
+        var skuB = Guid.NewGuid();
+
+        var batchRequest = new HttpRequestMessage(HttpMethod.Post, "/api/admin/inventory/skus/availability")
+        {
+            Content = JsonContent.Create(new { skuIds = new[] { skuA, skuB, skuA } })
+        };
+        batchRequest.Headers.Add("X-CSRF-TOKEN", token);
+
+        var response = await client.SendAsync(batchRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = body.GetProperty("items");
+        items.GetArrayLength().Should().Be(3);
+
+        items[0].GetProperty("skuId").GetGuid().Should().Be(skuA);
+        items[1].GetProperty("skuId").GetGuid().Should().Be(skuB);
+        items[2].GetProperty("skuId").GetGuid().Should().Be(skuA);
+
+        // Random SKUs have no inventory row — exists=false, no side effects.
+        for (var i = 0; i < 3; i++)
+        {
+            items[i].GetProperty("exists").GetBoolean().Should().BeFalse();
+            items[i].GetProperty("availableQuantity").ValueKind.Should().Be(JsonValueKind.Null);
+            items[i].GetProperty("quantityOnHand").ValueKind.Should().Be(JsonValueKind.Null);
+            items[i].GetProperty("reservedQuantity").ValueKind.Should().Be(JsonValueKind.Null);
+        }
+    }
+
+    [Fact]
+    public async Task InventorySkuAvailabilityBatch_EmptyPayload_Returns400()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+        var csrf = await client.GetFromJsonAsync<JsonElement>("/api/auth/csrf");
+        var token = csrf.GetProperty("token").GetString();
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/admin/inventory/skus/availability")
+        {
+            Content = JsonContent.Create(new { skuIds = Array.Empty<Guid>() })
+        };
+        request.Headers.Add("X-CSRF-TOKEN", token);
+
+        var response = await client.SendAsync(request);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task OrderById_WithoutLogin_Returns401()
     {
         if (!await _factory.CanConnectToDatabaseAsync())
@@ -129,6 +234,188 @@ public sealed class EndpointExposureIntegrationTests : IClassFixture<ShopflowWeb
         var response = await client.GetAsync($"/api/orders/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminOrdersList_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/admin/orders");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminOrdersDetail_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/api/admin/orders/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminOrdersList_AsCustomer_ReturnsForbiddenOrUnauthorized()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = await _factory.CreateAuthenticatedCustomerClientAsync();
+
+        var response = await client.GetAsync("/api/admin/orders");
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminOrdersList_AsAdmin_Returns200()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+
+        var response = await client.GetAsync("/api/admin/orders?page=1&pageSize=20");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task AdminCatalogProductsList_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/admin/catalog/products");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminCatalogProductsList_AsCustomer_ReturnsForbiddenOrUnauthorized()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = await _factory.CreateAuthenticatedCustomerClientAsync();
+
+        var response = await client.GetAsync("/api/admin/catalog/products");
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminCatalogProductsList_AsAdmin_Returns200()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+
+        var response = await client.GetAsync("/api/admin/catalog/products?page=1&pageSize=20");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task AdminInventorySkusList_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/admin/inventory/skus");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminInventorySkusList_AsCustomer_ReturnsForbiddenOrUnauthorized()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = await _factory.CreateAuthenticatedCustomerClientAsync();
+
+        var response = await client.GetAsync("/api/admin/inventory/skus");
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminInventorySkusList_AsAdmin_Returns200()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+
+        var response = await client.GetAsync("/api/admin/inventory/skus?page=1&pageSize=20");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task CustomerOrdersList_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync("/api/customer/orders");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task CustomerOrdersDetail_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"/api/customer/orders/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task CustomerOrdersList_AsAdmin_ReturnsForbiddenOrUnauthorized()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+
+        var response = await client.GetAsync("/api/customer/orders");
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task CustomerOrdersList_AsCustomer_Returns200()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = await _factory.CreateAuthenticatedCustomerClientAsync();
+
+        var response = await client.GetAsync("/api/customer/orders?page=1&pageSize=10");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -158,8 +445,28 @@ public sealed class EndpointExposureIntegrationTests : IClassFixture<ShopflowWeb
     }
 
     [Fact]
+    public async Task StoreAccess_WithoutLogin_ReturnsDevelopmentPolicy()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/store/access");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("mode").GetString().Should().Be("Open");
+        body.GetProperty("storeAccessMode").GetString().Should().Be("PublicCatalogAndGuestCheckout");
+        body.GetProperty("allowGuest").GetBoolean().Should().BeTrue();
+        body.GetProperty("allowGuestCheckout").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Health_WithoutLogin_Returns200WithOkStatus()
     {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
         var client = _factory.CreateClient();
 
         var response = await client.GetAsync("/health");

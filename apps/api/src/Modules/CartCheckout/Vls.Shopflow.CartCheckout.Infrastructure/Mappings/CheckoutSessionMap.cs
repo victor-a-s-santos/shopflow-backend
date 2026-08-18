@@ -36,6 +36,12 @@ internal sealed class CheckoutSessionMap : IEntityTypeConfiguration<CheckoutSess
         map.Property(x => x.UpdatedAt).IsRequired();
         map.Property(x => x.CanceledAt);
 
+        map.Property(x => x.PreferredDeliveryMethod)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        map.Property(x => x.PreferredDeliveryDate);
+        map.Property(x => x.CustomerOrderNote).HasMaxLength(1000);
+
         map.HasMany(x => x.Items)
             .WithOne()
             .HasForeignKey(x => x.CheckoutSessionId)
@@ -66,6 +72,16 @@ internal sealed class CheckoutSessionItemMap : IEntityTypeConfiguration<Checkout
         map.Property(x => x.UnitPrice).HasColumnType("numeric(12,2)").IsRequired();
         map.Property(x => x.Subtotal).HasColumnType("numeric(12,2)").IsRequired();
         map.Property(x => x.InventoryReservationId).IsRequired();
+
+        map.Property(x => x.SalesMode).HasMaxLength(32);
+        map.Property(x => x.PackageSize);
+        map.Property(x => x.PackageLabel).HasMaxLength(200);
+        map.Property(x => x.PackageDescription).HasMaxLength(1000);
+        map.Property(x => x.QuantityUnitLabel).HasMaxLength(64);
+        map.Property(x => x.ShowTotalPieces);
+        map.Property(x => x.TotalPieces);
+        map.Property(x => x.EquivalentUnitPrice).HasColumnType("numeric(12,2)");
+        map.Property(x => x.SalesDisplaySummary).HasMaxLength(200);
 
         map.HasIndex(x => x.CheckoutSessionId);
         map.HasIndex(x => x.SkuId);

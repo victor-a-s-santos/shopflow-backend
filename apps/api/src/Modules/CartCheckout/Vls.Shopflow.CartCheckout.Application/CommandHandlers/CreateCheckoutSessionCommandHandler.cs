@@ -7,6 +7,7 @@ using Vls.Shopflow.CartCheckout.Application.Repositories;
 using Vls.Shopflow.CartCheckout.Application.Services;
 using Vls.Shopflow.CartCheckout.Application.DataTransferObjects;
 using Vls.Shopflow.CartCheckout.Domain.Entities;
+using Vls.Shopflow.CartCheckout.Domain.Enums;
 using Vls.Shopflow.CartCheckout.Domain.Exceptions;
 
 namespace Vls.Shopflow.CartCheckout.Application.CommandHandlers;
@@ -40,6 +41,12 @@ public sealed class CreateCheckoutSessionCommandHandler(
                 if (!pricing.SkuIsActive || !pricing.ProductIsActive)
                     throw new InactiveSkuException(line.SkuId);
 
+                // quantity = units of the sold SKU (packages or pieces). Never × packageSize.
+                CheckoutSalesRuleValidator.EnsurePurchaseQuantityAllowed(
+                    line.SkuId,
+                    line.Quantity,
+                    pricing.SalesRule);
+
                 var reservationId = await inventoryReservation.ReserveAsync(
                     line.SkuId,
                     line.Quantity,
@@ -47,6 +54,11 @@ public sealed class CreateCheckoutSessionCommandHandler(
                     cancellationToken);
 
                 reservationIds.Add(reservationId);
+
+                var salesSnapshot = LineSalesSnapshotFactory.Capture(
+                    pricing.SalesRule,
+                    line.Quantity,
+                    pricing.UnitPrice);
 
                 sessionItems.Add(CheckoutSessionItem.Create(
                     pricing.ProductId,
@@ -56,7 +68,15 @@ public sealed class CreateCheckoutSessionCommandHandler(
                     pricing.SkuCode,
                     line.Quantity,
                     pricing.UnitPrice,
-                    reservationId));
+                    reservationId,
+                    salesSnapshot));
+            }
+
+            DeliveryMethod? preferredMethod = null;
+            if (!string.IsNullOrWhiteSpace(command.PreferredDeliveryMethod)
+                && Enum.TryParse<DeliveryMethod>(command.PreferredDeliveryMethod.Trim(), ignoreCase: true, out var parsed))
+            {
+                preferredMethod = parsed;
             }
 
             var session = CheckoutSession.CreatePending(
@@ -71,7 +91,10 @@ public sealed class CreateCheckoutSessionCommandHandler(
                 command.Address.City,
                 command.Address.State,
                 expiresAt,
-                sessionItems);
+                sessionItems,
+                preferredMethod,
+                command.PreferredDeliveryDate,
+                command.CustomerOrderNote);
 
             await repository.AddAsync(session, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);

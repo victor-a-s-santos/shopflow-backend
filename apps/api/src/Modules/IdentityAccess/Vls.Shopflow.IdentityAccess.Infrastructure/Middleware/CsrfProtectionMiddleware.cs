@@ -19,7 +19,8 @@ public sealed class CsrfProtectionMiddleware(RequestDelegate next)
         "/api/auth/customer/forgot-password",
         "/api/auth/customer/reset-password",
         "/api/auth/customer/confirm-email",
-        "/api/webhooks/"
+        "/api/webhooks/",
+        "/api/payments/pix/webhooks/"
     ];
 
     public async Task InvokeAsync(HttpContext context, IAntiforgery antiforgery)
@@ -56,6 +57,13 @@ public sealed class CsrfProtectionMiddleware(RequestDelegate next)
         var path = context.Request.Path.Value ?? string.Empty;
         if (ExcludedPathPrefixes.Any(prefix =>
                 path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        // Anonymous guest create-account (token proves possession); claim stays CSRF-protected.
+        if (path.Contains("/customer/orders/guest/", StringComparison.OrdinalIgnoreCase)
+            && path.EndsWith("/create-account", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }

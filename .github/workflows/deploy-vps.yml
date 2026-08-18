@@ -39,13 +39,13 @@ jobs:
 
       - name: Setup SSH
         env:
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          echo "$VPS_SSH_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
@@ -57,6 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
             --exclude '.git' \
             --exclude '.cursor' \
             --exclude '**/bin/' \
@@ -82,7 +83,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -euo pipefail
-          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
             "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
           set -euo pipefail
           cd "$REMOTE_DEPLOY_DIR"
@@ -95,6 +96,10 @@ jobs:
           docker compose config
           docker compose build --no-cache api-test worker-test
           docker compose up -d --force-recreate --no-deps api-test worker-test
+          # Caddyfile is bind-mounted; recreate alone does not reload running Caddy.
+          # Ensure caddy is up, then reload so X-Forwarded-* changes take effect.
+          docker compose up -d caddy
+          docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
           docker compose ps
           EOF
 
@@ -104,7 +109,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -euo pipefail
-          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
             "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
           set -euo pipefail
           cd "$REMOTE_DEPLOY_DIR"
@@ -136,13 +141,13 @@ jobs:
 
       - name: Setup SSH
         env:
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          echo "$VPS_SSH_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
@@ -154,6 +159,7 @@ jobs:
         run: |
           set -euo pipefail
           rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
             --exclude '.git' \
             --exclude '.cursor' \
             --exclude '**/bin/' \
@@ -179,7 +185,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -euo pipefail
-          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
             "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
           set -euo pipefail
           cd "$REMOTE_DEPLOY_DIR"
@@ -192,6 +198,10 @@ jobs:
           docker compose config
           docker compose build --no-cache api-hml worker-hml
           docker compose up -d --force-recreate --no-deps api-hml worker-hml
+          # Caddyfile is bind-mounted; recreate alone does not reload running Caddy.
+          # Ensure caddy is up, then reload so X-Forwarded-* changes take effect.
+          docker compose up -d caddy
+          docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
           docker compose ps
           EOF
 
@@ -201,7 +211,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -euo pipefail
-          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
             "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
           set -euo pipefail
           cd "$REMOTE_DEPLOY_DIR"

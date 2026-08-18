@@ -26,6 +26,22 @@ public class SkuAttribute : Entity<Guid>
             AttributeValueDefinitionId = valueId,
         };
 
+    /// <summary>
+    /// Custom value for a known attribute definition (AllowCustomValues = true).
+    /// <paramref name="customName"/> is the free-text value (e.g. "Variadas").
+    /// </summary>
+    public static SkuAttribute FromDefinitionCustom(Guid definitionId, string customName)
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            AttributeDefinitionId = definitionId,
+            CustomName = customName,
+        };
+
+    /// <summary>
+    /// Legacy free-form attribute without a global definition (tests / seed only).
+    /// Prefer <see cref="FromDefinitionCustom"/> for admin API payloads.
+    /// </summary>
     public static SkuAttribute FromCustom(string name, string value)
         => new()
         {

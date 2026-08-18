@@ -20,13 +20,15 @@ public static class CatalogEndpoints
         {
             var dto = await sender.Send(new GetAllAttributeDefinitionsQuery(), ct);
             return Results.Ok(dto);
-        });
+        })
+        .RequireApprovedCatalogAccess();
         
         cat.MapGet("/categories", async (ISender sender, CancellationToken ct) =>
         {
             var result = await sender.Send(new GetAllCategoriesQuery(), ct);
             return Results.Ok(result);
-        });
+        })
+        .RequireApprovedCatalogAccess();
 
         // -------------------------------------------------------
         // CREATE VARIANT PRODUCT
@@ -38,7 +40,11 @@ public static class CatalogEndpoints
             var id = await sender.Send(new CreateVariantProductCommand(
                 req.Name,
                 req.Slug,
-                req.CategoryId
+                req.CategoryId,
+                req.IsFeatured,
+                req.DisplayOrder,
+                req.Description,
+                req.IsActive
             ), ct);
 
             return Results.Created($"/api/catalog/products/{id}", new { id });
@@ -57,8 +63,9 @@ public static class CatalogEndpoints
                 req.Code,
                 req.RegularPrice,
                 req.PromotionalPrice,
-                req.Attributes, // agora é List<SkuAttributeCreateDto>
-                req.Active
+                req.Attributes,
+                req.Active,
+                req.SalesRule
             ), ct);
 
             return Results.Created($"/api/catalog/products/{productId}/variants/{skuId}", new { skuId });
@@ -96,12 +103,22 @@ public static class CatalogEndpoints
         cat.MapPut("/products/{id:guid}",
             async (ISender sender, Guid id, UpdateProductRequest req, CancellationToken ct) =>
             {
+                // Only touch display / description when the client sends the field
+                // (avoids wiping values on older admin clients that omit them).
+                var updateDisplay = req.Display is not null;
+                // null/omitted → preserve; "" or text → apply (empty clears).
+                var updateDescription = req.Description is not null;
                 await sender.Send(new UpdateProductCommand(
                     id,
                     req.Name,
                     req.Slug,
                     req.CategoryId,
-                    req.IsActive
+                    req.IsActive,
+                    req.Display?.IsFeatured,
+                    req.Display?.DisplayOrder,
+                    updateDisplay,
+                    req.Description,
+                    updateDescription
                 ), ct);
                 return Results.NoContent();
             })
@@ -133,7 +150,8 @@ public static class CatalogEndpoints
                     req.RegularPrice,
                     req.PromotionalPrice,
                     req.Attributes,
-                    req.Active
+                    req.Active,
+                    req.SalesRule
                 ), ct);
                 return Results.NoContent();
             })
@@ -160,7 +178,8 @@ public static class CatalogEndpoints
         {
             var dto = await sender.Send(new GetProductBySlugQuery(slug), ct);
             return dto is null ? Results.NotFound() : Results.Ok(dto);
-        });
+        })
+        .RequireApprovedCatalogAccess();
 
         // -------------------------------------------------------
         // GET PRODUCT BY ID
@@ -171,28 +190,54 @@ public static class CatalogEndpoints
         {
             var dto = await sender.Send(new GetProductByIdQuery(id), ct);
             return dto is null ? Results.NotFound() : Results.Ok(dto);
-        });
+        })
+        .RequireApprovedCatalogAccess();
 
         // -------------------------------------------------------
         // GET PAGED PRODUCTS
         // -------------------------------------------------------
 
         cat.MapGet("/products",
-            async (ISender sender, int page = 1, int pageSize = 20, CancellationToken ct = default) =>
+            async (
+                ISender sender,
+                int page = 1,
+                int pageSize = 16,
+                string? sort = null,
+                string? categorySlug = null,
+                Guid? categoryId = null,
+                string? q = null,
+                CancellationToken ct = default) =>
         {
-            var dto = await sender.Send(new GetProductsQuery(page, pageSize), ct);
+            var dto = await sender.Send(
+                new GetProductsQuery(
+                    page,
+                    pageSize,
+                    sort ?? ProductListSort.Default,
+                    categorySlug,
+                    categoryId,
+                    q),
+                ct);
             return Results.Ok(dto);
-        });
+        })
+        .RequireApprovedCatalogAccess();
 
         // -------------------------------------------------------
-        // PRODUCT IMAGES (multipart)
+        // PRODUCT IMAGES (multipart upload + manage)
         // -------------------------------------------------------
 
         cat.MapPost("/products/{id:guid}/images",
                 async (ISender sender, Guid id, IFormFile file, CancellationToken ct) =>
                 {
-                    if (file.Length == 0)
-                        return Results.BadRequest(new { message = "No file uploaded." });
+                    if (file is null || file.Length == 0)
+                    {
+                        return Results.ValidationProblem(
+                            new Dictionary<string, string[]>
+                            {
+                                ["file"] = ["Nenhum arquivo enviado."]
+                            },
+                            title: "Validation failed",
+                            statusCode: StatusCodes.Status400BadRequest);
+                    }
 
                     await using var stream = file.OpenReadStream();
                     var dto = await sender.Send(new UploadProductImageCommand(
@@ -207,6 +252,22 @@ public static class CatalogEndpoints
             .DisableAntiforgery()
             .Accepts<IFormFile>("multipart/form-data");
 
+        cat.MapDelete("/products/{productId:guid}/images/{imageId:guid}",
+                async (ISender sender, Guid productId, Guid imageId, CancellationToken ct) =>
+                {
+                    await sender.Send(new DeleteProductImageCommand(productId, imageId), ct);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization(AuthPolicies.Backoffice);
+
+        cat.MapPost("/products/{productId:guid}/images/{imageId:guid}/primary",
+                async (ISender sender, Guid productId, Guid imageId, CancellationToken ct) =>
+                {
+                    await sender.Send(new SetPrimaryProductImageCommand(productId, imageId), ct);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization(AuthPolicies.Backoffice);
+
         return group;
     }
 }
@@ -216,24 +277,38 @@ public static class CatalogEndpoints
 public sealed record CreateVariantProductRequest(
     string Name,
     string Slug,
-    Guid? CategoryId);
+    Guid? CategoryId,
+    bool IsFeatured = false,
+    int? DisplayOrder = null,
+    string? Description = null,
+    /// <summary>When null/omitted, defaults to true. Explicit false creates inactive product.</summary>
+    bool? IsActive = null);
 
 public sealed record AddVariantRequest(
     string? Code,
     decimal RegularPrice,
     decimal? PromotionalPrice,
     IReadOnlyList<SkuAttributeCreateDto>? Attributes,
-    bool Active = true);
+    bool Active = true,
+    SkuSalesRuleWriteDto? SalesRule = null);
 
 public sealed record UpdateProductRequest(
     string Name,
     string? Slug,
     Guid? CategoryId,
-    bool IsActive);
+    bool IsActive,
+    ProductDisplaySettingsRequest? Display = null,
+    /// <summary>Null/omitted preserves. Empty string clears. Non-empty sets.</summary>
+    string? Description = null);
+
+public sealed record ProductDisplaySettingsRequest(
+    bool IsFeatured = false,
+    int? DisplayOrder = null);
 
 public sealed record UpdateVariantRequest(
     string? Code,
     decimal RegularPrice,
     decimal? PromotionalPrice,
     IReadOnlyList<SkuAttributeCreateDto>? Attributes,
-    bool Active = true);
+    bool Active = true,
+    SkuSalesRuleWriteDto? SalesRule = null);

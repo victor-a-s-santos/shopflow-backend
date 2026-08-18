@@ -1,5 +1,8 @@
 using FluentValidation;
 using Vls.Shopflow.CartCheckout.Application.Commands;
+using Vls.Shopflow.CartCheckout.Domain.Entities;
+using Vls.Shopflow.CartCheckout.Domain.Enums;
+using Vls.Shopflow.CartCheckout.Domain.Services;
 
 namespace Vls.Shopflow.CartCheckout.Application.Validators;
 
@@ -27,6 +30,26 @@ public sealed class CreateCheckoutSessionCommandValidator : AbstractValidator<Cr
             item.RuleFor(i => i.SkuId).NotEmpty();
             item.RuleFor(i => i.Quantity).GreaterThan(0);
         });
+
+        RuleFor(x => x.PreferredDeliveryMethod)
+            .Must(s => Enum.TryParse<DeliveryMethod>(s!.Trim(), ignoreCase: true, out _))
+            .When(x => !string.IsNullOrWhiteSpace(x.PreferredDeliveryMethod))
+            .WithErrorCode("INVALID_DELIVERY_METHOD")
+            .WithMessage("preferredDeliveryMethod must be Carrier, ExcursionBus, or Correios.");
+
+        RuleFor(x => x.PreferredDeliveryDate)
+            .Must(d => d is null
+                       || DeliveryDatePolicy.IsValidPreferredDeliveryDate(
+                           DateOnly.FromDateTime(DateTime.UtcNow),
+                           d.Value))
+            .WithErrorCode(DeliveryDatePolicy.DeliveryDateTooSoonCode)
+            .WithMessage(DeliveryDatePolicy.DeliveryDateTooSoonMessage);
+
+        RuleFor(x => x.CustomerOrderNote)
+            .MaximumLength(CheckoutSession.CustomerOrderNoteMaxLength)
+            .When(x => !string.IsNullOrWhiteSpace(x.CustomerOrderNote))
+            .WithErrorCode("CUSTOMER_ORDER_NOTE_TOO_LONG")
+            .WithMessage("A observação do cliente deve ter no máximo 1000 caracteres.");
     }
 }
 

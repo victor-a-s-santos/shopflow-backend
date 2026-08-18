@@ -9,30 +9,58 @@ public sealed class Product : Entity<Guid>
     private readonly List<Sku> _skus = new();
     private readonly List<ProductImage> _images = new();
 
+    public const int MaxDescriptionLength = 4000;
+
     public string Name { get; private set; } = default!;
     public Slug Slug { get; private set; } = default!;
     public Guid? CategoryId { get; private set; }
     public Category? Category { get; private set; }
+
+    /// <summary>Optional long-form product description (admin + PDP).</summary>
+    public string? Description { get; private set; }
+
     public bool IsActive { get; private set; }
     public bool HasSkus { get; private set; }
     public Price BasePrice { get; private set; } = Price.From(0);
+
+    /// <summary>Storefront highlight — featured products sort first on the public list.</summary>
+    public bool IsFeatured { get; private set; }
+
+    /// <summary>Manual storefront order (lower first). Null = after manually ordered products.</summary>
+    public int? DisplayOrder { get; private set; }
+
+    /// <summary>Creation timestamp used for novelty sort. Never use UpdatedAt for vitrine order.</summary>
+    public DateTimeOffset CreatedAt { get; private set; }
 
     public IReadOnlyCollection<Sku> Skus => _skus.AsReadOnly();
     public IReadOnlyCollection<ProductImage> Images => _images.AsReadOnly();
 
     private Product() { }
 
-    public static Product CreateWithSkus(string name, Slug slug, Guid? categoryId)
+    public static Product CreateWithSkus(
+        string name,
+        Slug slug,
+        Guid? categoryId,
+        bool isFeatured = false,
+        int? displayOrder = null,
+        string? description = null,
+        bool isActive = true)
     {
+        ValidateDisplayOrder(displayOrder);
+
         return new Product
         {
             Id = Guid.NewGuid(),
             Name = name.Trim(),
             Slug = slug,
             CategoryId = categoryId,
-            IsActive = true,
+            Description = NormalizeDescription(description),
+            IsActive = isActive,
             HasSkus = true,
-            BasePrice = Price.From(0)
+            BasePrice = Price.From(0),
+            IsFeatured = isFeatured,
+            DisplayOrder = displayOrder,
+            CreatedAt = DateTimeOffset.UtcNow
         };
     }
 
@@ -71,14 +99,55 @@ public sealed class Product : Entity<Guid>
         IsActive = isActive;
     }
 
+    /// <summary>
+    /// Sets description after trim; whitespace/empty becomes null.
+    /// Throws if longer than <see cref="MaxDescriptionLength"/>.
+    /// </summary>
+    public void ChangeDescription(string? description)
+        => Description = NormalizeDescription(description);
+
+    public static string? NormalizeDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return null;
+
+        var trimmed = description.Trim();
+        if (trimmed.Length > MaxDescriptionLength)
+        {
+            throw new ArgumentException(
+                $"Description cannot exceed {MaxDescriptionLength} characters.",
+                nameof(description));
+        }
+
+        return trimmed;
+    }
+
+    public void ChangeDisplaySettings(bool isFeatured, int? displayOrder)
+    {
+        ValidateDisplayOrder(displayOrder);
+        IsFeatured = isFeatured;
+        DisplayOrder = displayOrder;
+    }
+
+    private static void ValidateDisplayOrder(int? displayOrder)
+    {
+        if (displayOrder is < 0)
+            throw new ArgumentOutOfRangeException(nameof(displayOrder), "DisplayOrder cannot be negative.");
+    }
+
     public Sku? GetSku(Guid skuId) => _skus.FirstOrDefault(s => s.Id == skuId);
 
     public void RemoveSku(Guid skuId) => _skus.RemoveAll(s => s.Id == skuId);
+
+    public const int MaxImages = 10;
 
     public void AddImage(ProductImage image)
     {
         if (image.ProductId != Id)
             throw new InvalidOperationException("Image does not belong to this product.");
+
+        if (_images.Count >= MaxImages)
+            throw new InvalidOperationException($"Product cannot have more than {MaxImages} images.");
 
         var isFirst = _images.Count == 0;
         if (isFirst || image.IsPrimary)
@@ -91,7 +160,21 @@ public sealed class Product : Entity<Guid>
         _images.Add(image);
     }
 
-    public void RemoveImage(Guid imageId) => _images.RemoveAll(i => i.Id == imageId);
+    public void RemoveImage(Guid imageId)
+    {
+        var removed = _images.FirstOrDefault(i => i.Id == imageId);
+        if (removed is null)
+            return;
+
+        var wasPrimary = removed.IsPrimary;
+        _images.Remove(removed);
+
+        if (wasPrimary && _images.Count > 0)
+        {
+            var next = _images.OrderBy(i => i.SortOrder).First();
+            PromoteImageToPrimary(next.Id);
+        }
+    }
 
     public void PromoteImageToPrimary(Guid imageId)
     {

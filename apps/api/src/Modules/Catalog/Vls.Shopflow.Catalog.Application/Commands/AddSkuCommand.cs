@@ -9,4 +9,15 @@ public sealed record AddSkuCommand(
     decimal RegularPrice,
     decimal? PromotionalPrice,
     IReadOnlyList<SkuAttributeCreateDto>? Attributes,
-    bool Active = true) : ICommand<Guid>;
+    bool Active = true,
+    SkuSalesRuleWriteDto? SalesRule = null) : ICommand<Guid>;
+
+public sealed record UpdateSkuCommand(
+    Guid ProductId,
+    Guid SkuId,
+    string? Code,
+    decimal RegularPrice,
+    decimal? PromotionalPrice,
+    IReadOnlyList<SkuAttributeCreateDto>? Attributes,
+    bool Active,
+    SkuSalesRuleWriteDto? SalesRule = null) : ICommand;

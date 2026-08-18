@@ -237,6 +237,8 @@ Para redefinir a senha via variável de ambiente (procedimento explícito e temp
 
 Mantenha `SHOPFLOW_ADMIN_RESET_PASSWORD=false` no dia a dia. Use `true` apenas durante rotação de senha.
 
+Script one-shot (TESTE): `deploy/scripts/rotate-admin-teste-and-disable-dangerous-flags.sh` — rotaciona senha, desliga raw capture e reset; grava a senha só em `/root/.shopflow_admin_teste_password_tmp` na VPS (não imprime). Copie para o cofre e apague o arquivo.
+
 ---
 
 ## Checklist pós-deploy
@@ -263,6 +265,7 @@ Mantenha `SHOPFLOW_ADMIN_RESET_PASSWORD=false` no dia a dia. Use `true` apenas d
 | Preflight sem `Access-Control-Allow-Origin` | Restart `api-test` ou `api-hml` após atualizar `.env.*`; validar com `curl -X OPTIONS` acima |
 | API crash: admin seed required | Definir `SHOPFLOW_ADMIN_EMAIL` e `SHOPFLOW_ADMIN_PASSWORD` em `.env.test` / `.env.hml` e redeploy |
 | Senha admin não muda após alterar `.env` | Usuário já existe — ativar `SHOPFLOW_ADMIN_RESET_PASSWORD=true` temporariamente (ver seção Admin seed) |
+| `GET /api/auth/csrf` 500 — SecurePolicy Always / not SSL | API atrás do Caddy sem `X-Forwarded-Proto`; conferir `deploy/caddy/Caddyfile` e `UseForwardedHeaders` no `Program.cs`; se o Caddyfile mudou, garantir `caddy reload` (CI já faz) |
 
 ---
 

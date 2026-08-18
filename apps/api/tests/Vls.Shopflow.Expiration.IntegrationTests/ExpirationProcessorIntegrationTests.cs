@@ -17,6 +17,7 @@ using Vls.Shopflow.Inventory.Infrastructure;
 using Vls.Shopflow.Inventory.Infrastructure.Repositories;
 using Vls.Shopflow.Orders.Application.CommandHandlers;
 using Vls.Shopflow.Orders.Application.Commands;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Domain.Enums;
 using Vls.Shopflow.Orders.Infrastructure;
 using Vls.Shopflow.Orders.Infrastructure.Repositories;
@@ -24,6 +25,7 @@ using Vls.Shopflow.Orders.Infrastructure.Services;
 using Vls.Shopflow.Orders.Infrastructure.UnitOfWork;
 using Vls.Shopflow.PaymentsPix.Application.CommandHandlers;
 using Vls.Shopflow.PaymentsPix.Application.Commands;
+using Vls.Shopflow.PaymentsPix.Application.Options;
 using Vls.Shopflow.PaymentsPix.Domain.Enums;
 using Vls.Shopflow.PaymentsPix.Infrastructure;
 using Vls.Shopflow.PaymentsPix.Infrastructure.Providers;
@@ -167,7 +169,22 @@ public sealed class ExpirationProcessorIntegrationTests
         var createOrderHandler = new CreateOrderFromCheckoutSessionCommandHandler(
             new CheckoutSessionReader(cartDb),
             new OrderRepository(ordersDb),
+            new Vls.Shopflow.Orders.Infrastructure.Services.PostgresOrderNumberGenerator(ordersDb),
+            new GuestOrderAccessTokenRepository(ordersDb),
+            new GuestOrderAccessTokenHasher(Options.Create(new GuestOrderAccessOptions
+            {
+                Enabled = true,
+                TokenTtlDays = 30,
+                TokenHashSecret = "test-secret"
+            })),
             new OrdersUnitOfWork(ordersDb),
+            Options.Create(new GuestOrderAccessOptions
+            {
+                Enabled = true,
+                TokenTtlDays = 30,
+                TokenHashSecret = "test-secret"
+            }),
+            new OrderEmailIntentRepository(ordersDb),
             NullLogger<CreateOrderFromCheckoutSessionCommandHandler>.Instance);
 
         var order = await createOrderHandler.Handle(
@@ -179,6 +196,7 @@ public sealed class ExpirationProcessorIntegrationTests
             new PixPaymentRepository(paymentsDb),
             new FakePixPaymentProvider(),
             new PaymentsPixUnitOfWork(paymentsDb),
+            Options.Create(new MercadoPagoOptions { PixExpirationMinutes = 30 }),
             NullLogger<CreatePixPaymentForOrderCommandHandler>.Instance);
 
         var pix = await createPixHandler.Handle(

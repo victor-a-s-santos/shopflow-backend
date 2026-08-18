@@ -10,6 +10,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
+using Vls.Shopflow.IdentityAccess.Application.Options;
+using Vls.Shopflow.IdentityAccess.Application.Services;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Identity;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Middleware;
@@ -25,6 +27,9 @@ public static class DependencyInjection
     public const string CustomerRegisterRateLimitPolicy = "customer-register";
     public const string CustomerForgotPasswordRateLimitPolicy = "customer-forgot-password";
     public const string CustomerResetPasswordRateLimitPolicy = "customer-reset-password";
+    public const string GuestOrderStatusRateLimitPolicy = "guest-order-status";
+    public const string GuestOrderClaimRateLimitPolicy = "guest-order-claim";
+    public const string PostalCodeLookupRateLimitPolicy = "postal-code-lookup";
     public const string CorsPolicyName = "AllowFrontend";
 
     public static IServiceCollection AddIdentityAccessModule(
@@ -84,6 +89,9 @@ public static class DependencyInjection
     {
         services.Configure<AdminAuthOptions>(configuration.GetSection(AdminAuthOptions.SectionName));
         services.Configure<CustomerAuthOptions>(configuration.GetSection(CustomerAuthOptions.SectionName));
+        services.Configure<StoreAccessOptions>(configuration.GetSection(StoreAccessOptions.SectionName));
+        services.Configure<CheckoutAccessOptions>(configuration.GetSection(CheckoutAccessOptions.SectionName));
+        services.Configure<CustomerAccessOptions>(configuration.GetSection(CustomerAccessOptions.SectionName));
         services.Configure<ShopflowDataProtectionOptions>(configuration.GetSection(ShopflowDataProtectionOptions.SectionName));
         services.Configure<AdminSeedOptions>(configuration.GetSection(AdminSeedOptions.SectionName));
 
@@ -270,6 +278,48 @@ public static class DependencyInjection
                         PermitLimit = environment.IsDevelopment() ? 100 : 5,
                         QueueLimit = 0
                     }));
+
+            var guestOrderRateLimit = configuration.GetValue("GuestOrderAccess:RateLimitPerMinute", 30);
+            if (guestOrderRateLimit <= 0)
+                guestOrderRateLimit = 30;
+            if (environment.IsDevelopment() && guestOrderRateLimit < 100)
+                guestOrderRateLimit = Math.Max(guestOrderRateLimit, 100);
+
+            options.AddPolicy(GuestOrderStatusRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = guestOrderRateLimit,
+                        QueueLimit = 0
+                    }));
+
+            options.AddPolicy(GuestOrderClaimRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = guestOrderRateLimit,
+                        QueueLimit = 0
+                    }));
+
+            var postalCodeRateLimit = configuration.GetValue("PostalCodeLookup:RateLimitPerMinute", 60);
+            if (postalCodeRateLimit <= 0)
+                postalCodeRateLimit = 60;
+            if (environment.IsDevelopment() && postalCodeRateLimit < 100)
+                postalCodeRateLimit = Math.Max(postalCodeRateLimit, 100);
+
+            options.AddPolicy(PostalCodeLookupRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = postalCodeRateLimit,
+                        QueueLimit = 0
+                    }));
         });
 
         services.AddHttpContextAccessor();
@@ -282,6 +332,12 @@ public static class DependencyInjection
         services.AddScoped<ICustomerSignInService, CustomerSignInService>();
         services.AddScoped<ICurrentCustomerAccessor, CurrentCustomerAccessor>();
         services.AddScoped<ICustomerPasswordService, CustomerPasswordService>();
+        services.AddScoped<ICustomerApprovalAdminService, CustomerApprovalAdminService>();
+        services.AddScoped<LoggingCustomerAccessNotifier>();
+        services.AddScoped<ICustomerAccessNotifier>(sp => sp.GetRequiredService<LoggingCustomerAccessNotifier>());
+        services.AddScoped<ICustomerPendingApprovalNotifier>(sp =>
+            sp.GetRequiredService<LoggingCustomerAccessNotifier>());
+        services.AddSingleton<IStoreAccessPolicy, StoreAccessPolicy>();
     }
 
 }

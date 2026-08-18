@@ -9,6 +9,10 @@ public interface IPixPaymentRepository
 
     Task<PixPayment?> GetByIdAsync(Guid paymentId, CancellationToken cancellationToken);
 
+    Task<PixPayment?> GetByProviderPaymentIdAsync(string providerPaymentId, CancellationToken cancellationToken);
+
+    Task<PixPayment?> GetByProviderOrderIdAsync(string providerOrderId, CancellationToken cancellationToken);
+
     Task<PixPayment?> GetPendingByOrderIdAsync(Guid orderId, CancellationToken cancellationToken);
 
     Task<PixPayment?> GetLatestByOrderIdAsync(Guid orderId, CancellationToken cancellationToken);
@@ -17,6 +21,23 @@ public interface IPixPaymentRepository
         DateTimeOffset asOfUtc,
         DateTimeOffset createdBeforeUtc,
         int batchSize,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Pending MercadoPago Pix with ProviderOrderId, created on/after <paramref name="createdAfterUtc"/>.
+    /// </summary>
+    Task<IReadOnlyList<PixPayment>> GetPendingMercadoPagoForReconciliationBatchAsync(
+        DateTimeOffset createdAfterUtc,
+        int batchSize,
+        CancellationToken cancellationToken);
+}
+
+public interface IMercadoPagoWebhookEventRepository
+{
+    Task AddAsync(MercadoPagoWebhookEvent webhookEvent, CancellationToken cancellationToken);
+
+    Task<MercadoPagoWebhookEvent?> GetByProviderEventIdAsync(
+        string providerEventId,
         CancellationToken cancellationToken);
 }
 

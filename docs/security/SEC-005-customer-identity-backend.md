@@ -14,8 +14,8 @@ O Shopflow estende o módulo `IdentityAccess` com endpoints de cliente, role `Cu
 |------|-------|
 | JWT | Não utilizado |
 | Token no frontend | Não — apenas cookie HttpOnly |
-| Schema DB | Reutiliza `identity` (sem migration nova) |
-| Checkout convidado | Inalterado — endpoints públicos |
+| Schema DB | Reutiliza `identity` (`CustomerAccessStatus` na Fase 1 store-access) |
+| Checkout convidado | Controlado por `Checkout:AllowGuest` / `AllowGuestCheckout` — ver `docs/architecture/STORE-ACCESS-CUSTOMER-APPROVAL-DESIGN.md` |
 
 ---
 

@@ -4,7 +4,7 @@ Módulo responsável por criar e consultar sessões de checkout, reservar estoqu
 
 ## Escopo atual
 
-- `POST /api/checkout/sessions` — cria `CheckoutSession` `Pending` com reserva de estoque por item
+- `POST /api/checkout/sessions` — cria `CheckoutSession` `Pending` com reserva de estoque por item; valida `salesRule` do SKU (`quantity` = unidades do SKU; pacote não multiplica `packageSize` na reserva — ver `docs/catalog/sales-rules-contract.md`)
 - `GET /api/checkout/sessions/{id}` — consulta sessão
 - `POST /api/checkout/sessions/{id}/cancel` — cancela sessão `Pending` e libera reservas
 - TTL de reserva: **15 minutos** (`ReservationExpiresAt` na criação)
@@ -18,7 +18,7 @@ Módulo responsável por criar e consultar sessões de checkout, reservar estoqu
 - IdentityCustomer (backend)
 - Pagamento integrado neste módulo (Orders + PaymentsPix)
 
-**Checkout convidado:** não exige login customer. `POST /api/checkout/sessions` e fluxos downstream permanecem públicos (ver SEC-005).
+**Checkout convidado:** controlado por `Checkout:AllowGuest` / `AllowGuestCheckout`. Cliente atual = desligado. Ver `docs/checkout/checkout-session.md` e `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`. Tracking legado de pedidos guest permanece (`docs/orders/guest-order-access.md`).
 
 ## Fluxo — criar sessão
 
@@ -112,5 +112,5 @@ Detalhes: `docs/expiration-worker.md`.
 
 ## Próximos passos
 
-1. Gateway Pix + webhook → confirmar reserva (venda) em vez de expirar
+1. Frontend: status Paid via Guest Order Access Token (`SEC-006`)
 2. Shipping no snapshot da sessão

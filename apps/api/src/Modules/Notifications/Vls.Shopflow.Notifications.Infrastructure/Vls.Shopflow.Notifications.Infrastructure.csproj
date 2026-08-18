@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Vls.Shopflow.Notifications.Application\Vls.Shopflow.Notifications.Application.csproj" />
     <ProjectReference Include="..\Vls.Shopflow.Notifications.Domain\Vls.Shopflow.Notifications.Domain.csproj" />
+    <ProjectReference Include="..\..\IdentityAccess\Vls.Shopflow.IdentityAccess.Application\Vls.Shopflow.IdentityAccess.Application.csproj" />
+    <ProjectReference Include="..\..\Orders\Vls.Shopflow.Orders.Application\Vls.Shopflow.Orders.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Domain\Vls.Shopflow.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Application\Vls.Shopflow.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Vls.Shopflow.BuildingBlocks.Infrastructure\Vls.Shopflow.BuildingBlocks.Infrastructure.csproj" />
@@ -14,6 +16,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
