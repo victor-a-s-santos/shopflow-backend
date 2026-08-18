@@ -1,0 +1,21 @@
+# PRODUÇÃO — VPS exclusiva. Não usar na VPS de TESTE/HML.
+# DNS: registro A/AAAA de api.vipassessoriadigital.com.br → IP da VPS PROD.
+#
+# X-Forwarded-* is required so ASP.NET sees HTTPS (Secure antiforgery/auth cookies)
+# when TLS terminates at Caddy/Cloudflare and the API container speaks plain HTTP.
+#
+# Caddy reverse_proxy already sets/augments by default:
+#   - X-Forwarded-For   (client IP; do NOT override with header_up — breaks append/anti-spoof)
+#   - X-Forwarded-Proto
+#   - X-Forwarded-Host
+# The explicit header_up below reinforces Proto/Host/Real-IP for clarity and TLS scheme.
+# Behind Cloudflare, configure trusted_proxies with CF ranges if you need the real
+# client IP in X-Forwarded-For (otherwise Caddy uses the Cloudflare edge IP).
+
+api.vipassessoriadigital.com.br {
+	reverse_proxy api-prod:8080 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+}

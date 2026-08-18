@@ -61,7 +61,7 @@ Storage__R2__PublicBaseUrl=https://assets-teste.vipassessoriadigital.com.br
 Storage__R2__KeyPrefix=products
 ```
 
-Placeholders: `deploy/.env.test.example`, `deploy/.env.prod.example`, raiz `.env.example`.
+Placeholders: `deploy/.env.test.example`, `deploy/.env.prod.example` (VPS PROD), raiz `.env.example`.
 
 Development: `Storage__Provider=Local` (wwwroot/uploads). Compat: `Uploads__*` ainda preenche Local se vazio.
 

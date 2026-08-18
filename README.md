@@ -1,6 +1,6 @@
 # Shopflow Backend
 
-Backend do e-commerce modular Shopflow (API HTTP, worker de expiração, deploy teste/HML e documentação de infraestrutura).
+Backend do e-commerce modular Shopflow (API HTTP, worker de expiração, deploy teste/HML/PROD e documentação de infraestrutura).
 
 O frontend (`apps/web`) vive em **outro repositório** e não faz parte deste projeto.
 
@@ -10,7 +10,7 @@ O frontend (`apps/web`) vive em **outro repositório** e não faz parte deste pr
 - **ASP.NET Core Minimal APIs**
 - **EF Core** + **PostgreSQL 16**
 - **Docker Compose**
-- **Caddy** (TLS / reverse proxy nos ambientes teste e HML)
+- **Caddy** (TLS / reverse proxy nos ambientes teste, HML e PROD)
 - **Worker de expiração** (checkout / pedidos / pagamentos)
 
 ## Estrutura
@@ -28,8 +28,10 @@ O frontend (`apps/web`) vive em **outro repositório** e não faz parte deste pr
 │       └── seed-assets/catalog-products/
 ├── deploy/
 │   ├── docker-compose.yml
+│   ├── docker-compose.prod.yml
 │   ├── .env.test.example
 │   ├── .env.hml.example
+│   ├── .env.prod.example
 │   ├── caddy/
 │   ├── postgres/
 │   └── scripts/
@@ -77,7 +79,7 @@ dotnet restore
 dotnet test
 ```
 
-## Validar Docker Compose (deploy teste/HML)
+## Validar Docker Compose (deploy teste/HML e PROD)
 
 Não executa containers — só valida a configuração:
 
@@ -88,6 +90,10 @@ cp .env.test.example .env.test       # se ainda não existir
 cp .env.hml.example .env.hml         # se ainda não existir
 docker compose config
 docker compose config --services
+
+cp .env.prod.example .env.prod       # se ainda não existir
+docker compose -f docker-compose.prod.yml config
+docker compose -f docker-compose.prod.yml config --services
 ```
 
 ## Deploy teste / HML
@@ -103,13 +109,14 @@ Arquitetura e scripts em [deploy/README.md](deploy/README.md). Resumo:
 Documentação:
 
 - [docs/infra/RUNBOOK-001-vps-setup-deploy.md](docs/infra/RUNBOOK-001-vps-setup-deploy.md)
-- [docs/infra/RUNBOOK-004-github-actions-vps-deploy.md](docs/infra/RUNBOOK-004-github-actions-vps-deploy.md) — deploy automático (GitHub Actions → VPS)
+- [docs/infra/RUNBOOK-004-github-actions-vps-deploy.md](docs/infra/RUNBOOK-004-github-actions-vps-deploy.md) — deploy automático TESTE/HML
+- [docs/infra/RUNBOOK-006-production-vps-setup.md](docs/infra/RUNBOOK-006-production-vps-setup.md) — VPS e deploy PROD (`main`)
 - [docs/infra/DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md](docs/infra/DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md)
 - Preparo deste repositório: [docs/infra/REPO-001-backend-github-setup.md](docs/infra/REPO-001-backend-github-setup.md)
 
 ## Secrets
 
-- **Nunca** commitar `deploy/.env`, `deploy/.env.test`, `deploy/.env.hml` ou qualquer `.env` real.
+- **Nunca** commitar `deploy/.env`, `deploy/.env.test`, `deploy/.env.hml`, `deploy/.env.prod` ou qualquer `.env` real.
 - Use apenas os arquivos `*.example` versionados.
 - Não versionar cookies, tokens, chaves DataProtection, dumps ou uploads de runtime.
 

@@ -31,9 +31,12 @@ temp/
 .env.*
 !.env.example
 !*.env.example
+!.env.*.example
 deploy/.env
 deploy/.env.test
 deploy/.env.hml
+deploy/.env.prod
+!deploy/.env.prod.example
 apps/api/.env
 apps/api/.env.*
 !apps/api/.env.example
