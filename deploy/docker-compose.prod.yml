@@ -1,0 +1,95 @@
+# Stack exclusiva de PRODUÇÃO (VPS própria).
+# Não usar este arquivo na VPS de TESTE/HML.
+# Uso: docker compose -f docker-compose.prod.yml up -d --build
+#
+# ADR: docs/infra/ADR-005-production-infrastructure.md
+
+name: shopflow-prod
+
+services:
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: shopflow-caddy-prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api-prod
+    networks:
+      - shopflow
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: shopflow-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-prod.sql:/docker-entrypoint-initdb.d/init-prod.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shopflow
+
+  api-prod:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: shopflow-api-prod
+    restart: unless-stopped
+    env_file:
+      - path: .env.prod
+        required: true
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_ENVIRONMENT: Production
+    volumes:
+      - shopflow_dataprotection_prod:/app/dataprotection-keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - shopflow
+
+  worker-prod:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile.worker
+    container_name: shopflow-worker-prod
+    restart: unless-stopped
+    env_file:
+      - path: .env.prod
+        required: true
+    environment:
+      DOTNET_ENVIRONMENT: Production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api-prod:
+        condition: service_started
+    networks:
+      - shopflow
+
+networks:
+  shopflow:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  shopflow_dataprotection_prod:
+    name: shopflow_dataprotection_prod

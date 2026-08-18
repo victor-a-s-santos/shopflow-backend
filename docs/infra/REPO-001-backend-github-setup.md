@@ -33,7 +33,7 @@ Documento de preparação do **Shopflow Backend** para versionamento em um repos
 
 - `apps/web/` e qualquer artefato exclusivo do frontend
 - `node_modules/`, `bin/`, `obj/`, `dist/`, `build/`
-- `.env` reais (`deploy/.env`, `.env.test`, `.env.hml`, root `.env`, etc.)
+- `.env` reais (`deploy/.env`, `.env.test`, `.env.hml`, `.env.prod`, root `.env`, etc.)
 - Cookies, tokens, senhas, connection strings reais
 - Secrets de Cloudflare ou de banco
 - `dataprotection-keys/`, `uploads/`, dumps (`*.sql` de backup, `*.dump`, `*.bak`)
@@ -75,24 +75,26 @@ Esperado: linha do `.gitignore` ignorando `apps/web/`.
 git check-ignore -v deploy/.env
 git check-ignore -v deploy/.env.test
 git check-ignore -v deploy/.env.hml
+git check-ignore -v deploy/.env.prod
 git check-ignore -v .env
 
 # Examples DEVEM permanecer versionáveis (sem output de ignore, ou apenas se não existirem localmente):
 git check-ignore -v deploy/.env.test.example || true
 git check-ignore -v deploy/.env.hml.example || true
+git check-ignore -v deploy/.env.prod.example || true
 git check-ignore -v deploy/.env.example || true
 git check-ignore -v .env.example || true
 ```
 
 Esperado:
 
-- `.env`, `.env.test`, `.env.hml` → **ignorados**
+- `.env`, `.env.test`, `.env.hml`, `.env.prod` → **ignorados**
 - `*.example` → **não** ignorados
 
 Se um `.env` já estiver no índice:
 
 ```bash
-git rm --cached -- .env deploy/.env deploy/.env.test deploy/.env.hml 2>/dev/null || true
+git rm --cached -- .env deploy/.env deploy/.env.test deploy/.env.hml deploy/.env.prod 2>/dev/null || true
 ```
 
 ---

@@ -1,8 +1,12 @@
-# Deploy Shopflow — teste e homologação
+# Deploy Shopflow — teste, homologação e produção
 
-Infraestrutura Docker Compose para publicar as APIs de **teste** e **homologação** em uma VPS única, com Caddy (TLS) e PostgreSQL compartilhado.
+Infraestrutura Docker Compose para publicar as APIs de **teste** e **homologação** em uma VPS, e **produção** em VPS exclusiva.
 
-Documentação da decisão: [docs/infra/ADR-002-deploy-docker-compose-vps.md](../docs/infra/ADR-002-deploy-docker-compose-vps.md)
+Documentação da decisão TESTE/HML: [docs/infra/ADR-002-deploy-docker-compose-vps.md](../docs/infra/ADR-002-deploy-docker-compose-vps.md)
+
+Documentação da decisão PROD: [docs/infra/ADR-005-production-infrastructure.md](../docs/infra/ADR-005-production-infrastructure.md)
+
+**Produção (VPS exclusiva):** [docs/infra/RUNBOOK-006-production-vps-setup.md](../docs/infra/RUNBOOK-006-production-vps-setup.md)
 
 **Validação pré-deploy:** [docs/infra/DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md](../docs/infra/DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md)
 
@@ -12,17 +16,23 @@ Documentação da decisão: [docs/infra/ADR-002-deploy-docker-compose-vps.md](..
 
 ```
 deploy/
-├── caddy/Caddyfile          # reverse proxy (api-teste, api-hml)
-├── postgres/init-databases.sql
+├── caddy/Caddyfile          # reverse proxy TESTE/HML (api-teste, api-hml)
+├── caddy/Caddyfile.prod     # reverse proxy PROD (api.vipassessoriadigital.com.br)
+├── postgres/init-databases.sql   # shopflow_test + shopflow_hml
+├── postgres/init-prod.sql        # shopflow_prod (só VPS PROD)
 ├── scripts/
 │   ├── deploy-test.sh       # api-test + worker-test
 │   ├── deploy-hml.sh        # api-hml + worker-hml
+│   ├── deploy-prod.sh       # api-prod + worker-prod (compose.prod)
 │   ├── migrate-test.sh
-│   └── migrate-hml.sh
-├── docker-compose.yml       # postgres, caddy, api-*, worker-*
+│   ├── migrate-hml.sh
+│   └── migrate-prod.sh
+├── docker-compose.yml       # TESTE/HML: postgres, caddy, api-*, worker-*
+├── docker-compose.prod.yml  # PROD exclusivo: postgres, caddy, api-prod, worker-prod
 ├── .env.example             # Postgres (interpolação do Compose)
 ├── .env.test.example        # api-test + worker-test
-└── .env.hml.example         # api-hml + worker-hml
+├── .env.hml.example         # api-hml + worker-hml
+└── .env.prod.example        # api-prod + worker-prod
 ```
 
 ## Pré-requisitos
@@ -39,9 +49,10 @@ Três arquivos de ambiente, cada um com responsabilidade distinta:
 
 | Arquivo | Uso | Versionado |
 |---------|-----|------------|
-| `.env` | Credenciais do Postgres (interpolação no `docker-compose.yml`) | Não |
+| `.env` | Credenciais do Postgres (interpolação no Compose) | Não |
 | `.env.test` | API teste, worker teste, CORS, admin seed, demo seed, DataProtection | Não |
 | `.env.hml` | API HML, worker HML, CORS, admin seed, demo seed, DataProtection | Não |
+| `.env.prod` | API/worker PROD (só VPS PROD + `docker-compose.prod.yml`) | Não |
 
 ```bash
 cd deploy
@@ -58,7 +69,7 @@ Edite os três arquivos e substitua os placeholders:
 
 A senha em `.env` deve ser a mesma usada nas connection strings de `.env.test` e `.env.hml`.
 
-Nunca commite `.env`, `.env.test` ou `.env.hml`. Os arquivos reais na VPS devem conter **senhas fortes** distintas dos placeholders dos `.example`.
+Nunca commite `.env`, `.env.test`, `.env.hml` ou `.env.prod`. Os arquivos reais na VPS devem conter **senhas fortes** distintas dos placeholders dos `.example`.
 
 ### Admin seed
 
@@ -233,9 +244,38 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 | API crash no startup (admin seed) | Defina `SHOPFLOW_ADMIN_EMAIL` e `SHOPFLOW_ADMIN_PASSWORD` em `.env.test` ou `.env.hml` |
 | `GET /api/auth/csrf` 500 — Antiforgery SecurePolicy=Always but request is not SSL | Confirme `X-Forwarded-Proto` no Caddyfile, redeploy Caddy + API, e que `UseForwardedHeaders` está ativo |
 
+## Produção (VPS exclusiva)
+
+PROD **não** entra no `docker-compose.yml` de TESTE/HML. Usa arquivo e VPS próprios.
+
+| Item | Valor |
+|------|--------|
+| Compose | `docker-compose.prod.yml` (`name: shopflow-prod`) |
+| Caddy | `caddy/Caddyfile.prod` → `api.vipassessoriadigital.com.br` |
+| Banco | `shopflow_prod` (`postgres/init-prod.sql`) |
+| Env | `.env` (Postgres) + `.env.prod` (API/worker) |
+| DataProtection | volume `shopflow_dataprotection_prod` |
+| Deploy | `./scripts/deploy-prod.sh` |
+| CI | [`.github/workflows/deploy-prod.yml`](../.github/workflows/deploy-prod.yml) — `main` → PROD |
+| Secrets CI | `VPS_PROD_HOST`, `VPS_PROD_USER`, `VPS_PROD_SSH_KEY_B64` (nunca os de TESTE/HML) |
+
+Validar o Compose **sem** subir containers:
+
+```bash
+cd deploy
+cp .env.example .env                 # se ainda não existir
+cp .env.prod.example .env.prod       # se ainda não existir
+docker compose -f docker-compose.prod.yml config
+docker compose -f docker-compose.prod.yml config --services
+```
+
+Serviços esperados: `caddy`, `postgres`, `api-prod`, `worker-prod`.
+
+Checklist e comandos da VPS nova: [RUNBOOK-006](../docs/infra/RUNBOOK-006-production-vps-setup.md).
+
 ## O que não está incluído
 
-- Produção
-- Cloudflare
-- GitHub Actions (preparado para deploy manual)
-- Frontend nos subdomínios `teste` / `hml`
+- Subir PROD nesta pasta com o `docker-compose.yml` de TESTE/HML
+- Kubernetes / K3s
+- Frontend no Caddy (Pages no Cloudflare)
+- Backup automático agendado (estratégia documentada no RUNBOOK-006; implementar cron antes do go-live)

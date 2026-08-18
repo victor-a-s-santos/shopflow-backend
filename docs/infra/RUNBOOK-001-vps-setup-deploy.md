@@ -2,6 +2,8 @@
 
 Runbook operacional para ambientes **teste** e **homologação** do Shopflow.
 
+Produção (VPS exclusiva, não este runbook): [RUNBOOK-006-production-vps-setup.md](./RUNBOOK-006-production-vps-setup.md)
+
 **Decisões de arquitetura:** [ADR-001-ambientes-teste-homologacao.md](./ADR-001-ambientes-teste-homologacao.md), [ADR-002-deploy-docker-compose-vps.md](./ADR-002-deploy-docker-compose-vps.md)
 
 **Deploy (Compose, scripts, variáveis):** [deploy/README.md](../../deploy/README.md)

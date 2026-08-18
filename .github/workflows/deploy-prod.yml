@@ -1,0 +1,118 @@
+name: Deploy PROD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shopflow-vps-prod-deploy
+  cancel-in-progress: false
+
+env:
+  REMOTE_APP_DIR: /opt/shopflow/app
+  REMOTE_DEPLOY_DIR: /opt/shopflow/app/deploy
+
+jobs:
+  deploy-prod:
+    name: Deploy produção (main)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          VPS_PROD_SSH_KEY_B64: ${{ secrets.VPS_PROD_SSH_KEY_B64 }}
+          VPS_PROD_HOST: ${{ secrets.VPS_PROD_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$VPS_PROD_SSH_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_PROD_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sync code to VPS PROD (preserve remote .env)
+        env:
+          VPS_PROD_HOST: ${{ secrets.VPS_PROD_HOST }}
+          VPS_PROD_USER: ${{ secrets.VPS_PROD_USER }}
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
+            --exclude '.git' \
+            --exclude '.cursor' \
+            --exclude '**/bin/' \
+            --exclude '**/obj/' \
+            --exclude '.DS_Store' \
+            --exclude 'node_modules' \
+            --exclude 'apps/web' \
+            --exclude 'deploy/.env' \
+            --exclude 'deploy/.env.test' \
+            --exclude 'deploy/.env.hml' \
+            --exclude 'deploy/.env.prod' \
+            --exclude 'apps/api/wwwroot/uploads' \
+            --exclude 'backups' \
+            --exclude 'postgres-data' \
+            --exclude 'caddy-data' \
+            --exclude 'caddy-config' \
+            --exclude 'dataprotection-keys' \
+            --exclude 'uploads' \
+            ./ "${VPS_PROD_USER}@${VPS_PROD_HOST}:${REMOTE_APP_DIR}/"
+
+      - name: Build and recreate api-prod / worker-prod
+        env:
+          VPS_PROD_HOST: ${{ secrets.VPS_PROD_HOST }}
+          VPS_PROD_USER: ${{ secrets.VPS_PROD_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_PROD_USER}@${VPS_PROD_HOST}" \
+            "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+
+          if [[ ! -f .env || ! -f .env.prod ]]; then
+            echo "Arquivos .env ou .env.prod ausentes na VPS PROD. Não sobrescrever via CI."
+            exit 1
+          fi
+
+          docker compose -f docker-compose.prod.yml config
+          docker compose -f docker-compose.prod.yml build --no-cache api-prod worker-prod
+          docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps api-prod worker-prod
+          # Caddyfile.prod is bind-mounted; recreate alone does not reload running Caddy.
+          docker compose -f docker-compose.prod.yml up -d caddy
+          docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+          docker compose -f docker-compose.prod.yml ps
+          EOF
+
+      - name: Health check api-prod
+        env:
+          VPS_PROD_HOST: ${{ secrets.VPS_PROD_HOST }}
+          VPS_PROD_USER: ${{ secrets.VPS_PROD_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_PROD_USER}@${VPS_PROD_HOST}" \
+            "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS https://api.vipassessoriadigital.com.br/health; then
+              echo
+              echo "Health check OK (api-prod)"
+              exit 0
+            fi
+            echo "Aguardando API produção... tentativa ${i}/10"
+            sleep 6
+          done
+
+          echo "Health check falhou (api-prod)"
+          docker compose -f docker-compose.prod.yml logs --tail=100 api-prod worker-prod || true
+          exit 1
+          EOF

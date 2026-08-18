@@ -12,7 +12,7 @@ Runbook para publicar o **Shopflow Backend** na VPS existente usando GitHub Acti
 
 | Inclui | Não inclui |
 |--------|------------|
-| Push `develop` → rebuild `api-test` + `worker-test` | Produção |
+| Push `develop` → rebuild `api-test` + `worker-test` | Produção (workflow e secrets separados) |
 | Push `staging` → rebuild `api-hml` + `worker-hml` | Cloudflare / frontend |
 | `workflow_dispatch` manual (test ou hml) | Mercado Pago |
 | Sync de código para `/opt/shopflow/app` | Envio de `.env` reais |
@@ -246,3 +246,4 @@ Não use `docker compose down`. Não remova volumes.
 - [RUNBOOK-001-vps-setup-deploy.md](./RUNBOOK-001-vps-setup-deploy.md)
 - [DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md](./DEPLOY-003-validacao-admin-customer-worker-demo-catalog.md)
 - [ADR-002-deploy-docker-compose-vps.md](./ADR-002-deploy-docker-compose-vps.md)
+- Produção: [RUNBOOK-006-production-vps-setup.md](./RUNBOOK-006-production-vps-setup.md) e [`.github/workflows/deploy-prod.yml`](../../.github/workflows/deploy-prod.yml) — secrets `VPS_PROD_*`, não reutilizar `VPS_HOST` / `VPS_SSH_KEY_B64`
