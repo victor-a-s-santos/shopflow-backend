@@ -178,8 +178,8 @@ public sealed class AdminAuthIntegrationTests : IClassFixture<ShopflowWebApplica
 public class ShopflowWebApplicationFactory : WebApplicationFactory<Program>
 {
     public const string AdminEmail = "admin.integration@test.local";
-    public const string AdminPassword = "TestAdmin123";
-    public const string CustomerPassword = "CustomerPass123";
+    public const string AdminPassword = "TestAdmin@123";
+    public const string CustomerPassword = "CustomerPass@123";
 
     public CapturingIdentityEmailSender EmailSender { get; } = new();
 
@@ -205,6 +205,7 @@ public class ShopflowWebApplicationFactory : WebApplicationFactory<Program>
                 ["SHOPFLOW_ADMIN_EMAIL"] = AdminEmail,
                 ["SHOPFLOW_ADMIN_PASSWORD"] = AdminPassword,
                 ["SHOPFLOW_ADMIN_NAME"] = "Integration Admin",
+                ["SHOPFLOW_ADMIN_RESET_PASSWORD"] = "true",
                 ["SHOPFLOW_DEMO_USERS_ENABLED"] = "false",
                 ["DataProtection:KeysPath"] = Path.Combine(Path.GetTempPath(), "shopflow-test-dataprotection"),
                 ["AllowedOrigins:0"] = "http://localhost",

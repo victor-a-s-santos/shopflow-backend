@@ -36,7 +36,7 @@ public sealed class CustomerAuthIntegrationTests : IClassFixture<ShopflowWebAppl
         var response = await client.PostAsJsonAsync("/api/auth/customer/register", new
         {
             email,
-            password = "CustomerPass123",
+            password = "CustomerPass@123",
             fullName = "Test Customer",
             phone = "11999999999"
         });
@@ -60,7 +60,7 @@ public sealed class CustomerAuthIntegrationTests : IClassFixture<ShopflowWebAppl
         var payload = new
         {
             email,
-            password = "CustomerPass123",
+            password = "CustomerPass@123",
             fullName = "Dup Customer",
             phone = "11999999999"
         };
@@ -173,7 +173,7 @@ public sealed class CustomerAuthIntegrationTests : IClassFixture<ShopflowWebAppl
         {
             email,
             token,
-            newPassword = "NewCustomerPass456"
+            newPassword = "NewCustomerPass@456"
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -181,7 +181,7 @@ public sealed class CustomerAuthIntegrationTests : IClassFixture<ShopflowWebAppl
         var loginResponse = await client.PostAsJsonAsync("/api/auth/customer/login", new
         {
             email,
-            password = "NewCustomerPass456"
+            password = "NewCustomerPass@456"
         });
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
     }

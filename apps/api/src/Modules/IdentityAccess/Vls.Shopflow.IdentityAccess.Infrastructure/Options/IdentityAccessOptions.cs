@@ -46,13 +46,13 @@ public sealed class DemoUsersSeedOptions
 
     public string AdminEmail { get; set; } = "admin@teste.com.br";
 
-    public string AdminPassword { get; set; } = "Admin123";
+    public string AdminPassword { get; set; } = "Shopflow@123";
 
     public string AdminName { get; set; } = "Admin Teste";
 
     public string CustomerEmail { get; set; } = "teste@teste.com.br";
 
-    public string CustomerPassword { get; set; } = "Teste123";
+    public string CustomerPassword { get; set; } = "Shopflow@123";
 
     public string CustomerName { get; set; } = "Cliente Teste";
 }

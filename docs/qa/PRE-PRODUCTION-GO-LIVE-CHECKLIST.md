@@ -68,6 +68,7 @@ Notas:
 
 - Raw capture tem **hard gate** em `IsProduction()` no código; mesmo assim a flag deve ficar `false`.
 - Reset de senha admin: usar `true` **somente** durante rotação temporária (RUNBOOK-001); desligar antes de smoke/go-live.
+- Cadastro/reset customer: senha forte (8+, maiúscula, minúscula, dígito, especial). Exemplo só em LOCAL/TESTE: `Shopflow@123`.
 
 ## Mercado Pago / Pix
 

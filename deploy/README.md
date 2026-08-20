@@ -96,8 +96,8 @@ Com `SHOPFLOW_DEMO_USERS_ENABLED=true` (e **nunca** em Production), o startup cr
 
 | Papel | Login | Senha (default) |
 |-------|-------|-----------------|
-| Admin (Owner) | `admin@teste.com.br` no `/admin/login` | `Admin123` |
-| Cliente Approved | `teste@teste.com.br` no `/login` da loja | `Teste123` |
+| Admin (Owner) | `admin@teste.com.br` no `/admin/login` | `Shopflow@123` |
+| Cliente Approved | `teste@teste.com.br` no `/login` da loja | `Shopflow@123` |
 
 O cliente nasce **Approved** (loja Closed). `SHOPFLOW_DEMO_USERS_RESET_PASSWORD=false` no dia a dia; use `true` só para regravar essas senhas. Em HML/PROD deixe `SHOPFLOW_DEMO_USERS_ENABLED=false`.
 

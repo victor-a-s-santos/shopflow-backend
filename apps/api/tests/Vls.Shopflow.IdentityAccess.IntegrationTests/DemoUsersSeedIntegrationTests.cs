@@ -48,7 +48,7 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
         admin!.IsStaff.Should().BeTrue();
         admin.AccessStatus.Should().Be(CustomerAccessStatus.Approved);
         (await userManager.IsInRoleAsync(admin, AuthRoles.Owner)).Should().BeTrue();
-        (await userManager.CheckPasswordAsync(admin, "Admin123")).Should().BeTrue();
+        (await userManager.CheckPasswordAsync(admin, "Shopflow@123")).Should().BeTrue();
 
         var customer = await userManager.FindByEmailAsync(customerEmail);
         customer.Should().NotBeNull();
@@ -57,7 +57,7 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
         customer.AccessStatus.Should().Be(CustomerAccessStatus.Approved);
         customer.ApprovedAt.Should().NotBeNull();
         (await userManager.IsInRoleAsync(customer, AuthRoles.Customer)).Should().BeTrue();
-        (await userManager.CheckPasswordAsync(customer, "Teste123")).Should().BeTrue();
+        (await userManager.CheckPasswordAsync(customer, "Shopflow@123")).Should().BeTrue();
     }
 
     [Fact]
@@ -80,11 +80,11 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["SHOPFLOW_ADMIN_EMAIL"] = primaryAdminEmail,
-                ["SHOPFLOW_ADMIN_PASSWORD"] = "PrimaryAdmin1",
+                ["SHOPFLOW_ADMIN_PASSWORD"] = "PrimaryAdmin@1",
                 ["SHOPFLOW_DEMO_ADMIN_EMAIL"] = adminEmail,
-                ["SHOPFLOW_DEMO_ADMIN_PASSWORD"] = "Admin123",
+                ["SHOPFLOW_DEMO_ADMIN_PASSWORD"] = "Shopflow@123",
                 ["SHOPFLOW_DEMO_CUSTOMER_EMAIL"] = customerEmail,
-                ["SHOPFLOW_DEMO_CUSTOMER_PASSWORD"] = "Teste123"
+                ["SHOPFLOW_DEMO_CUSTOMER_PASSWORD"] = "Shopflow@123"
             })
             .Build();
 
@@ -145,12 +145,12 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["SHOPFLOW_ADMIN_EMAIL"] = primaryAdminEmail,
-                ["SHOPFLOW_ADMIN_PASSWORD"] = "PrimaryAdmin1",
+                ["SHOPFLOW_ADMIN_PASSWORD"] = "PrimaryAdmin@1",
                 ["SHOPFLOW_DEMO_USERS_ENABLED"] = "true",
                 ["SHOPFLOW_DEMO_ADMIN_EMAIL"] = demoAdminEmail,
-                ["SHOPFLOW_DEMO_ADMIN_PASSWORD"] = "Admin123",
+                ["SHOPFLOW_DEMO_ADMIN_PASSWORD"] = "Shopflow@123",
                 ["SHOPFLOW_DEMO_CUSTOMER_EMAIL"] = customerEmail,
-                ["SHOPFLOW_DEMO_CUSTOMER_PASSWORD"] = "Teste123"
+                ["SHOPFLOW_DEMO_CUSTOMER_PASSWORD"] = "Shopflow@123"
             })
             .Build();
 
@@ -174,7 +174,7 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
 
         var adminEmail = $"demo-pending-admin-{Guid.NewGuid():N}@teste.local";
         var customerEmail = $"demo-pending-customer-{Guid.NewGuid():N}@teste.local";
-        const string originalPassword = "OriginalPass1";
+        const string originalPassword = "OriginalPass@1";
 
         using var scope = _factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ShopflowUser>>();
@@ -210,7 +210,7 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
         customer!.AccessStatus.Should().Be(CustomerAccessStatus.Approved);
         customer.EmailConfirmed.Should().BeTrue();
         (await userManager.CheckPasswordAsync(customer, originalPassword)).Should().BeTrue();
-        (await userManager.CheckPasswordAsync(customer, "Teste123")).Should().BeFalse();
+        (await userManager.CheckPasswordAsync(customer, "Shopflow@123")).Should().BeFalse();
     }
 
     [Fact]
@@ -231,7 +231,7 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
         await IdentityAccessDbContextSeed.SeedAsync(
             userManager,
             roleManager,
-            BuildDemoConfig(adminEmail, customerEmail, enabled: true, adminPassword: "FirstPass1", customerPassword: "FirstPass1"),
+            BuildDemoConfig(adminEmail, customerEmail, enabled: true, adminPassword: "FirstPass@1", customerPassword: "FirstPass@1"),
             StubHostEnvironment.Development(),
             logger);
 
@@ -243,17 +243,17 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
                 customerEmail,
                 enabled: true,
                 resetPasswords: true,
-                adminPassword: "Admin123",
-                customerPassword: "Teste123"),
+                adminPassword: "Shopflow@123",
+                customerPassword: "Shopflow@123"),
             StubHostEnvironment.Development(),
             logger);
 
         var admin = await userManager.FindByEmailAsync(adminEmail);
         var customer = await userManager.FindByEmailAsync(customerEmail);
-        (await userManager.CheckPasswordAsync(admin!, "FirstPass1")).Should().BeFalse();
-        (await userManager.CheckPasswordAsync(admin!, "Admin123")).Should().BeTrue();
-        (await userManager.CheckPasswordAsync(customer!, "FirstPass1")).Should().BeFalse();
-        (await userManager.CheckPasswordAsync(customer!, "Teste123")).Should().BeTrue();
+        (await userManager.CheckPasswordAsync(admin!, "FirstPass@1")).Should().BeFalse();
+        (await userManager.CheckPasswordAsync(admin!, "Shopflow@123")).Should().BeTrue();
+        (await userManager.CheckPasswordAsync(customer!, "FirstPass@1")).Should().BeFalse();
+        (await userManager.CheckPasswordAsync(customer!, "Shopflow@123")).Should().BeTrue();
     }
 
     private static IConfiguration BuildDemoConfig(
@@ -261,8 +261,8 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
         string customerEmail,
         bool enabled,
         bool resetPasswords = false,
-        string adminPassword = "Admin123",
-        string customerPassword = "Teste123")
+        string adminPassword = "Shopflow@123",
+        string customerPassword = "Shopflow@123")
     {
         return new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>

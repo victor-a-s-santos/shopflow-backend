@@ -377,6 +377,10 @@ public static class IdentityAccessDbContextSeed
             throw new InvalidOperationException($"Failed to reset {label} password: {errors}");
         }
 
+        // Password rotation should clear lockouts from prior failed attempts (esp. local/TESTE).
+        await userManager.ResetAccessFailedCountAsync(user);
+        await userManager.SetLockoutEndDateAsync(user, null);
+
         logger.LogInformation("{Label} password reset for {Email}.", label, normalizedEmail);
     }
 

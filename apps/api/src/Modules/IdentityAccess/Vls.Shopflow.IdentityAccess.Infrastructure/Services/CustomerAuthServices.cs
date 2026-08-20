@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Vls.Shopflow.IdentityAccess.Application.DataTransferObjects;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
+using Vls.Shopflow.IdentityAccess.Application.Security;
 using Vls.Shopflow.IdentityAccess.Application.Services;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Domain.Enums;
@@ -96,7 +97,7 @@ public sealed class CustomerRegistrationService(
                 false,
                 null,
                 fieldErrors.Count > 0
-                    ? "A senha não atende aos requisitos."
+                    ? CustomerPasswordPolicy.SummaryMessage
                     : "Unable to complete registration.",
                 IsDuplicateEmail: false,
                 fieldErrors);
@@ -150,20 +151,10 @@ public sealed class CustomerRegistrationService(
             _ => "password"
         };
 
-        var message = error.Code switch
-        {
-            "PasswordTooShort" => "Use pelo menos 8 caracteres.",
-            "PasswordRequiresDigit" => "Use pelo menos um número.",
-            "PasswordRequiresLower" => "Use pelo menos uma letra minúscula.",
-            "PasswordRequiresUpper" => "Use pelo menos uma letra maiúscula.",
-            "PasswordRequiresNonAlphanumeric" => "Use pelo menos um caractere especial.",
-            "PasswordRequiresUniqueChars" => "Use mais caracteres distintos na senha.",
-            _ => string.IsNullOrWhiteSpace(error.Description)
-                ? "Não foi possível concluir o cadastro."
-                : error.Description
-        };
-
-        return new RegisterCustomerFieldError(field, error.Code, message);
+        return new RegisterCustomerFieldError(
+            field,
+            CustomerPasswordPolicy.MapIdentityErrorCode(error.Code),
+            CustomerPasswordPolicy.MapIdentityErrorMessage(error.Code, error.Description));
     }
 
     internal static async Task<CustomerUserDto> MapCustomerDtoAsync(UserManager<ShopflowUser> userManager, ShopflowUser user)
@@ -373,7 +364,7 @@ public sealed class CustomerPasswordService(
         return new GenericMessageResult(ForgotPasswordMessage);
     }
 
-    public async Task<(bool Succeeded, string? ErrorMessage)> ResetPasswordAsync(
+    public async Task<ResetCustomerPasswordResult> ResetPasswordAsync(
         string email,
         string token,
         string newPassword,
@@ -381,20 +372,35 @@ public sealed class CustomerPasswordService(
     {
         var user = await userManager.FindByEmailAsync(email.Trim());
         if (user is null || user.IsStaff || !await userManager.IsInRoleAsync(user, AuthRoles.Customer))
-            return (false, GenericFailure);
+            return new ResetCustomerPasswordResult(false, GenericFailure);
 
         var result = await userManager.ResetPasswordAsync(user, token, newPassword);
         if (!result.Succeeded)
         {
+            var passwordErrors = result.Errors
+                .Where(e => e.Code.StartsWith("Password", StringComparison.Ordinal))
+                .Select(CustomerRegistrationService.MapIdentityError)
+                .ToList();
+
             logger.LogWarning(
                 "Password reset failed for {Email}: {Errors}",
                 email,
                 string.Join("; ", result.Errors.Select(e => e.Description)));
-            return (false, GenericFailure);
+
+            if (passwordErrors.Count > 0)
+            {
+                return new ResetCustomerPasswordResult(
+                    false,
+                    CustomerPasswordPolicy.SummaryMessage,
+                    CustomerPasswordPolicy.TooWeakCode,
+                    passwordErrors);
+            }
+
+            return new ResetCustomerPasswordResult(false, GenericFailure);
         }
 
         await userManager.UpdateSecurityStampAsync(user);
-        return (true, null);
+        return new ResetCustomerPasswordResult(true, null);
     }
 
     public async Task<(bool Succeeded, string? ErrorMessage)> ConfirmEmailAsync(
