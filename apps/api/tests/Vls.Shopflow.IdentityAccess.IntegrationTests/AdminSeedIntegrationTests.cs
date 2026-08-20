@@ -25,8 +25,8 @@ public sealed class AdminSeedIntegrationTests : IClassFixture<ShopflowWebApplica
             return;
 
         var email = $"admin-reset-{Guid.NewGuid():N}@test.local";
-        const string originalPassword = "OriginalPass1";
-        const string newPassword = "NewResetPass2";
+        const string originalPassword = "OriginalPass@1";
+        const string newPassword = "NewResetPass@2";
 
         using var scope = _factory.Services.CreateScope();
         var services = scope.ServiceProvider;
@@ -65,8 +65,8 @@ public sealed class AdminSeedIntegrationTests : IClassFixture<ShopflowWebApplica
             return;
 
         var email = $"admin-skip-{Guid.NewGuid():N}@test.local";
-        const string originalPassword = "OriginalPass1";
-        const string otherPassword = "OtherPass123";
+        const string originalPassword = "OriginalPass@1";
+        const string otherPassword = "OtherPass@123";
 
         using var scope = _factory.Services.CreateScope();
         var services = scope.ServiceProvider;

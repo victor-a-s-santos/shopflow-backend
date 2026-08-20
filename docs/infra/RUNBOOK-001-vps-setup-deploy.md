@@ -166,7 +166,11 @@ Em **Testing** e **Staging**, `SHOPFLOW_ADMIN_EMAIL` e `SHOPFLOW_ADMIN_PASSWORD`
 | Homologação (`Staging`) | `deploy/.env.hml` | `admin-hml@vipassessoriadigital.com.br` | Forte, definida na VPS |
 | Development (local) | `.env` na raiz | Qualquer (ex.: `.env.example`) | Opcional — seed só roda se configurado |
 
-Requisitos da senha: mínimo 8 caracteres, 1 dígito, 1 minúscula.
+Requisitos da senha (admin seed + cadastro customer): mínimo 8 caracteres, letra maiúscula, minúscula, dígito e caractere especial.
+
+### Usuários demo (TESTE)
+
+Com `SHOPFLOW_DEMO_USERS_ENABLED=true` no `.env.test`, o startup também cria `admin@teste.com.br` / `Shopflow@123` (Owner) e `teste@teste.com.br` / `Shopflow@123` (cliente **Approved**). Não ligar em HML/PROD. `SHOPFLOW_DEMO_USERS_RESET_PASSWORD=false` no dia a dia.
 
 Após alterar `.env.test` ou `.env.hml`:
 
