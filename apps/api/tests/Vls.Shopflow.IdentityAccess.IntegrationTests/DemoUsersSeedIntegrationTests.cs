@@ -61,6 +61,45 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
     }
 
     [Fact]
+    public async Task SeedAsync_WhenTestingAndFlagUnset_CreatesDemoUsers()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var primaryAdminEmail = $"primary-testing-{Guid.NewGuid():N}@teste.local";
+        var adminEmail = $"demo-testing-admin-{Guid.NewGuid():N}@teste.local";
+        var customerEmail = $"demo-testing-customer-{Guid.NewGuid():N}@teste.local";
+
+        using var scope = _factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ShopflowUser>>();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ShopflowRole>>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("DemoUsersSeedIntegrationTests");
+
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SHOPFLOW_ADMIN_EMAIL"] = primaryAdminEmail,
+                ["SHOPFLOW_ADMIN_PASSWORD"] = "PrimaryAdmin1",
+                ["SHOPFLOW_DEMO_ADMIN_EMAIL"] = adminEmail,
+                ["SHOPFLOW_DEMO_ADMIN_PASSWORD"] = "Admin123",
+                ["SHOPFLOW_DEMO_CUSTOMER_EMAIL"] = customerEmail,
+                ["SHOPFLOW_DEMO_CUSTOMER_PASSWORD"] = "Teste123"
+            })
+            .Build();
+
+        await IdentityAccessDbContextSeed.SeedAsync(
+            userManager,
+            roleManager,
+            config,
+            StubHostEnvironment.Testing(),
+            logger);
+
+        (await userManager.FindByEmailAsync(adminEmail)).Should().NotBeNull();
+        (await userManager.FindByEmailAsync(customerEmail)).Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task SeedAsync_WhenDemoDisabled_DoesNotCreateUsers()
     {
         if (!await _factory.CanConnectToDatabaseAsync())
@@ -248,6 +287,8 @@ public sealed class DemoUsersSeedIntegrationTests : IClassFixture<ShopflowWebApp
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 
         public static StubHostEnvironment Development() => new() { EnvironmentName = Environments.Development };
+
+        public static StubHostEnvironment Testing() => new() { EnvironmentName = "Testing" };
 
         public static StubHostEnvironment Production() => new() { EnvironmentName = Environments.Production };
     }

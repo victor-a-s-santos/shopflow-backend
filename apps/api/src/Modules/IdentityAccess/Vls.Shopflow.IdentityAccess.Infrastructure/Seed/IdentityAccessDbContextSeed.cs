@@ -90,7 +90,7 @@ public static class IdentityAccessDbContextSeed
         }
 
         var options = ReadDemoUsersOptions(configuration);
-        if (!options.Enabled)
+        if (!IsDemoUsersEnabled(configuration, environment, options))
         {
             logger.LogInformation("Demo users seed skipped: SHOPFLOW_DEMO_USERS_ENABLED is not true.");
             return;
@@ -308,6 +308,23 @@ public static class IdentityAccessDbContextSeed
 
         if (!await userManager.IsInRoleAsync(user, AuthRoles.Customer))
             await userManager.AddToRoleAsync(user, AuthRoles.Customer);
+    }
+
+    private static bool IsDemoUsersEnabled(
+        IConfiguration configuration,
+        IHostEnvironment environment,
+        DemoUsersSeedOptions options)
+    {
+        var raw = configuration["SHOPFLOW_DEMO_USERS_ENABLED"]
+                  ?? Environment.GetEnvironmentVariable("SHOPFLOW_DEMO_USERS_ENABLED");
+        if (bool.TryParse(raw, out var enabled))
+            return enabled;
+
+        if (options.Enabled)
+            return true;
+
+        // TESTE (Testing) liga o seed sem flag explícita; HML/PROD continuam off.
+        return string.Equals(environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase);
     }
 
     private static DemoUsersSeedOptions ReadDemoUsersOptions(IConfiguration configuration)
