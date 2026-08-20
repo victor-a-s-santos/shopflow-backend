@@ -205,6 +205,7 @@ public class ShopflowWebApplicationFactory : WebApplicationFactory<Program>
                 ["SHOPFLOW_ADMIN_EMAIL"] = AdminEmail,
                 ["SHOPFLOW_ADMIN_PASSWORD"] = AdminPassword,
                 ["SHOPFLOW_ADMIN_NAME"] = "Integration Admin",
+                ["SHOPFLOW_DEMO_USERS_ENABLED"] = "false",
                 ["DataProtection:KeysPath"] = Path.Combine(Path.GetTempPath(), "shopflow-test-dataprotection"),
                 ["AllowedOrigins:0"] = "http://localhost",
                 ["StoreAccess:Mode"] = "PublicCatalogAndGuestCheckout",

@@ -7,9 +7,15 @@
 | `SHOPFLOW_ADMIN_EMAIL` | Sim (hml/prod) | E-mail do primeiro admin |
 | `SHOPFLOW_ADMIN_PASSWORD` | Sim (hml/prod) | Senha do primeiro admin (mín. 8 chars, 1 dígito, 1 minúscula) |
 | `SHOPFLOW_ADMIN_NAME` | Não | Nome exibido do admin (default: `Shopflow Admin`) |
+| `SHOPFLOW_DEMO_USERS_ENABLED` | Não | `true` cria admin+cliente demo em Development/TESTE. **Sempre ignorado em Production.** |
+| `SHOPFLOW_DEMO_ADMIN_EMAIL` / `SHOPFLOW_DEMO_ADMIN_PASSWORD` | Não | Defaults: `admin@teste.com.br` / `Admin123` |
+| `SHOPFLOW_DEMO_CUSTOMER_EMAIL` / `SHOPFLOW_DEMO_CUSTOMER_PASSWORD` | Não | Defaults: `teste@teste.com.br` / `Teste123` (cliente já **Approved**) |
+| `SHOPFLOW_DEMO_USERS_RESET_PASSWORD` | Não | `true` só para regravar senhas demo; depois `false` |
 | `DataProtection__KeysPath` | Recomendado (Docker) | Pasta para chaves ASP.NET Data Protection (default: `./dataprotection-keys`) |
 
 Em **Development**, o seed só roda se `SHOPFLOW_ADMIN_EMAIL` e `SHOPFLOW_ADMIN_PASSWORD` estiverem definidos.
+
+Usuários demo (`SHOPFLOW_DEMO_USERS_ENABLED=true`) são criados depois do admin principal: um Owner (`admin@teste.com.br`) e um cliente já Approved (`teste@teste.com.br`). Ligar só em local e TESTE. Em Production o seed recusa mesmo com a flag `true`.
 
 Em **hml/prod**, a API falha na inicialização se essas variáveis não existirem.
 

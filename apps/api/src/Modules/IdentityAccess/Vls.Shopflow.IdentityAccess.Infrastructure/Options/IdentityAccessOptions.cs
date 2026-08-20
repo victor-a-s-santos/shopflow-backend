@@ -32,6 +32,31 @@ public sealed class AdminSeedOptions
     public string? Name { get; set; }
 }
 
+/// <summary>
+/// Optional demo Owner + Approved customer for local Development and TESTE.
+/// Never applied in Production even if Enabled=true.
+/// </summary>
+public sealed class DemoUsersSeedOptions
+{
+    public const string SectionName = "DemoUsersSeed";
+
+    public bool Enabled { get; set; }
+
+    public bool ResetPasswords { get; set; }
+
+    public string AdminEmail { get; set; } = "admin@teste.com.br";
+
+    public string AdminPassword { get; set; } = "Admin123";
+
+    public string AdminName { get; set; } = "Admin Teste";
+
+    public string CustomerEmail { get; set; } = "teste@teste.com.br";
+
+    public string CustomerPassword { get; set; } = "Teste123";
+
+    public string CustomerName { get; set; } = "Cliente Teste";
+}
+
 public sealed class CustomerAuthOptions
 {
     public const string SectionName = "CustomerAuth";

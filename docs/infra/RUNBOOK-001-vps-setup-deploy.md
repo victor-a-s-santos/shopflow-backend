@@ -168,6 +168,10 @@ Em **Testing** e **Staging**, `SHOPFLOW_ADMIN_EMAIL` e `SHOPFLOW_ADMIN_PASSWORD`
 
 Requisitos da senha: mínimo 8 caracteres, 1 dígito, 1 minúscula.
 
+### Usuários demo (TESTE)
+
+Com `SHOPFLOW_DEMO_USERS_ENABLED=true` no `.env.test`, o startup também cria `admin@teste.com.br` / `Admin123` (Owner) e `teste@teste.com.br` / `Teste123` (cliente **Approved**). Não ligar em HML/PROD. `SHOPFLOW_DEMO_USERS_RESET_PASSWORD=false` no dia a dia.
+
 Após alterar `.env.test` ou `.env.hml`:
 
 ```bash

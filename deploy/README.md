@@ -90,6 +90,17 @@ Admin seed configuration is required in non-development environments.
 
 Em **Development** (docker-compose na raiz), as mesmas variáveis vêm do `.env` do monorepo via `SHOPFLOW_ADMIN_*` — o seed é opcional e só roda se configurado.
 
+### Usuários demo (local / TESTE)
+
+Com `SHOPFLOW_DEMO_USERS_ENABLED=true` (e **nunca** em Production), o startup cria:
+
+| Papel | Login | Senha (default) |
+|-------|-------|-----------------|
+| Admin (Owner) | `admin@teste.com.br` no `/admin/login` | `Admin123` |
+| Cliente Approved | `teste@teste.com.br` no `/login` da loja | `Teste123` |
+
+O cliente nasce **Approved** (loja Closed). `SHOPFLOW_DEMO_USERS_RESET_PASSWORD=false` no dia a dia; use `true` só para regravar essas senhas. Em HML/PROD deixe `SHOPFLOW_DEMO_USERS_ENABLED=false`.
+
 ### Separação de variáveis
 
 - **`env_file` por serviço** — `api-test` e `worker-test` carregam só `.env.test`; `api-hml` e `worker-hml` carregam só `.env.hml`.
