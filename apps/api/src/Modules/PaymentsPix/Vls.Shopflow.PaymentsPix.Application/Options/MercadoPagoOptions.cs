@@ -14,8 +14,16 @@ public sealed class MercadoPagoOptions
 
     public string BaseUrl { get; set; } = "https://api.mercadopago.com";
 
+    /// <summary>
+    /// Optional. MP application id for webhook diagnostic logs only (compare to body application_id).
+    /// Not required for Pix create or webhook accept/reject.
+    /// </summary>
     public string ApplicationId { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Optional. MP user/seller id for webhook diagnostic logs only (compare to body user_id).
+    /// Not required for Pix create or webhook accept/reject.
+    /// </summary>
     public string UserId { get; set; } = string.Empty;
 
     public string WebhookSecret { get; set; } = string.Empty;

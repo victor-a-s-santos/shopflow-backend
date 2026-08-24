@@ -113,6 +113,113 @@ public sealed class MercadoPagoPixPaymentProviderTests
     }
 
     [Fact]
+    public async Task CreatePixChargeAsync_WhenHttp402TransactionFailed_LogsStructuredDetailsAndThrows()
+    {
+        var orderId = Guid.Parse("2b8ca893-b155-450e-8550-0743fa469181");
+        const string responseJson = """
+            {
+              "errors": [
+                {
+                  "code": "failed",
+                  "message": "The following transactions failed",
+                  "details": [
+                    "PAY01MASKEDTXNID001: high_risk"
+                  ]
+                }
+              ],
+              "data": {
+                "id": "ORD01MASKEDORDERID001",
+                "status": "failed",
+                "status_detail": "failed",
+                "transactions": {
+                  "payments": [
+                    {
+                      "id": "PAY01MASKEDTXNID001",
+                      "amount": "1.00",
+                      "status": "failed",
+                      "status_detail": "high_risk"
+                    }
+                  ]
+                }
+              }
+            }
+            """;
+
+        var handler = new StubHttpMessageHandler((_, _) =>
+        {
+            var response = new HttpResponseMessage((HttpStatusCode)402)
+            {
+                Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+            };
+            response.Headers.TryAddWithoutValidation("x-request-id", "mp-req-masked-402-001");
+            return response;
+        });
+
+        var provider = CreateProvider(handler);
+
+        var act = () => provider.CreatePixChargeAsync(
+            new PixChargeRequest(orderId, 1.00m, "Cliente Teste", "cliente@example.com", DateTimeOffset.UtcNow.AddMinutes(30)),
+            CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<MercadoPagoPixChargeFailedException>();
+        ex.Which.OrderId.Should().Be(orderId);
+        ex.Which.StatusCode.Should().Be(402);
+        ex.Which.ProviderMessage.Should().Contain("The following transactions failed");
+        ex.Which.ProviderMessage.Should().Contain("high_risk");
+    }
+
+    [Fact]
+    public void TryParseCreateOrderFailure_Http402WithTransactionDetail_ExtractsSafeFields()
+    {
+        const string responseJson = """
+            {
+              "errors": [
+                {
+                  "code": "failed",
+                  "message": "The following transactions failed",
+                  "details": [ "PAY01MASKEDTXNID002: rejected_by_issuer" ]
+                }
+              ],
+              "data": {
+                "id": "ORD01MASKEDORDERID002",
+                "status": "failed",
+                "status_detail": "failed",
+                "transactions": {
+                  "payments": [
+                    {
+                      "id": "PAY01MASKEDTXNID002",
+                      "status": "failed",
+                      "status_detail": "rejected_by_issuer"
+                    }
+                  ]
+                }
+              }
+            }
+            """;
+
+        var details = MercadoPagoPixPaymentProvider.TryParseCreateOrderFailure(
+            402,
+            responseJson,
+            "mp-req-masked-402-002");
+
+        details.HttpStatusCode.Should().Be(402);
+        details.MercadoPagoRequestId.Should().Be("mp-req-masked-402-002");
+        details.ProviderOrderId.Should().Be("ORD01MASKEDORDERID002");
+        details.OrderStatus.Should().Be("failed");
+        details.OrderStatusDetail.Should().Be("failed");
+        details.TransactionId.Should().Be("PAY01MASKEDTXNID002");
+        details.TransactionStatus.Should().Be("failed");
+        details.TransactionStatusDetail.Should().Be("rejected_by_issuer");
+        details.ErrorCode.Should().Be("failed");
+        details.ErrorDetailsSummary.Should().Contain("rejected_by_issuer");
+        details.ProviderMessage.Should().Contain("The following transactions failed");
+        details.ProviderMessage.Should().Contain("rejected_by_issuer");
+        // Must not surface raw body / payer / QR as the message when structured fields exist.
+        details.ProviderMessage.Should().NotContain("qr_code");
+        details.ProviderMessage.Should().NotContain("email");
+    }
+
+    [Fact]
     public async Task CreatePixChargeAsync_WhenSendNotificationUrlFalse_OmitsNotificationUrl()
     {
         string? requestBody = null;

@@ -8,9 +8,10 @@ using Vls.Shopflow.PaymentsPix.Application.Options;
 namespace Vls.Shopflow.PaymentsPix.Infrastructure.MercadoPago;
 
 /// <summary>
-/// Manual HMAC validation (docs without SDK): alphanumerics lowercased in the manifest.
-/// The official C# SDK (since case-preserve fix) includes data.id as received — use SDK as primary.
-/// This class remains the diagnostic oracle for sdk_valid vs manual_valid divergence.
+/// Manual HMAC validation reproducing Mercado Pago's official "Without SDKs" algorithm:
+/// alphanumeric data.id is lowercased in the manifest.
+/// Used as source of truth by <see cref="CompositeMercadoPagoWebhookSignatureValidator"/>;
+/// the official C# SDK (case-preserve since 3.x) remains diagnostic only.
 /// </summary>
 public sealed class ManualMercadoPagoWebhookSignatureValidator(
     IOptions<MercadoPagoOptions> options)

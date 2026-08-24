@@ -8,8 +8,11 @@ using Vls.Shopflow.PaymentsPix.Application.Security;
 namespace Vls.Shopflow.PaymentsPix.Infrastructure.MercadoPago;
 
 /// <summary>
-/// Primary: official mercadopago-sdk WebhookSignatureValidator.
-/// Diagnostic: manual lowercase-manifest HMAC. Final decision prefers SDK.
+/// Primary: manual HMAC that reproduces Mercado Pago's official "Without SDKs" algorithm
+/// (alphanumeric <c>data.id</c> lowercased in the manifest).
+/// Diagnostic: mercadopago-sdk <c>WebhookSignatureValidator</c> (preserves data.id case since 3.x fix).
+/// Final decision prefers the official manual algorithm when it validates; SDK alone never overrides a
+/// manual rejection. SDK acceptance while manual rejects is logged as divergence (case-preserve bug path).
 /// </summary>
 public sealed class CompositeMercadoPagoWebhookSignatureValidator(
     IMercadoPagoOfficialWebhookSignatureClient sdkClient,
@@ -94,12 +97,12 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidator(
             }
             catch (Exception ex)
             {
-                // Unusual SDK failure — fall back to manual and document.
                 sdkValid = null;
                 sdkExceptionType = ex.GetType().Name;
                 sdkFailure = "sdk_unavailable";
                 logger.LogWarning(
-                    "Mercado Pago SDK webhook validator unavailable ({SdkExceptionType}); using manual fallback. " +
+                    "Mercado Pago SDK webhook validator unavailable ({SdkExceptionType}); " +
+                    "manual official algorithm remains source of truth. " +
                     "manual_valid={ManualValid} secret_configured={SecretConfigured} webhook_secret_fingerprint={Fingerprint}",
                     sdkExceptionType,
                     manualValid,
@@ -108,61 +111,76 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidator(
             }
         }
 
-        // Decision: SDK primary when available; manual only as fallback if SDK threw unexpected exception.
+        // Decision: official manual algorithm is source of truth (docs "Without SDKs" + vector tests).
+        // SDK is diagnostic / secondary agreement signal — never reject a valid official HMAC solely because SDK failed.
         bool isValid;
         string final;
         string failureCode;
         string? failureReason;
 
-        if (sdkValid == true)
+        if (manualValid)
         {
             isValid = true;
-            final = "Sdk";
+            final = "ManualOfficial";
             failureCode = "ok";
             failureReason = null;
-            if (manualValid == false)
+
+            if (sdkValid == false)
             {
                 logger.LogWarning(
-                    "Mercado Pago webhook signature: SDK accepted but manual lowercase-manifest rejected. " +
-                    "Preferring SDK (data.id case preserve). " +
-                    "sdk_signature_valid=true manual_signature_valid=false " +
-                    "manual_failure_reason={ManualFailure} query_data_id_masked={QueryMasked} " +
-                    "data_id_query_was_lowercased={Lowercased} webhook_secret_fingerprint={Fingerprint} " +
-                    "secret_length={SecretLength} secret_trimmed_changed={SecretTrimmedChanged}",
-                    manual.FailureReasonCode,
-                    Mask(queryTrimmed),
-                    dataIdWouldBeLowercased,
-                    fingerprint,
-                    secretLength,
-                    secretTrimmedChanged);
-            }
-        }
-        else if (sdkValid == false)
-        {
-            isValid = false;
-            final = "Rejected";
-            failureCode = MapSdkFailure(sdkFailure) ?? "signature_mismatch";
-            failureReason = sdkFailure ?? "SDK signature validation failed.";
-            if (manualValid)
-            {
-                logger.LogWarning(
-                    "Mercado Pago webhook signature: SDK rejected but manual accepted — rejecting (SDK primary). " +
+                    "Mercado Pago webhook signature: official manual accepted but SDK rejected — accepting (manual SoT). " +
+                    "Likely SDK case-preserve vs official lowercase data.id for ORD* ids. " +
                     "sdk_signature_valid=false manual_signature_valid=true " +
-                    "sdk_exception_type={SdkExceptionType} sdk_failure={SdkFailure} " +
-                    "query_data_id_masked={QueryMasked} webhook_secret_fingerprint={Fingerprint}",
+                    "received_v1_prefix={ReceivedV1} computed_official_prefix={ComputedOfficial} " +
+                    "data_id_query_was_lowercased={Lowercased} sdk_exception_type={SdkExceptionType} " +
+                    "sdk_failure={SdkFailure} query_data_id_masked={QueryMasked} " +
+                    "webhook_secret_fingerprint={Fingerprint}",
+                    manual.Diagnostics.ReceivedV1Prefix,
+                    manual.Diagnostics.ComputedOfficialPrefix,
+                    dataIdWouldBeLowercased,
                     sdkExceptionType,
                     sdkFailure,
                     Mask(queryTrimmed),
                     fingerprint);
             }
+            else if (sdkValid == true)
+            {
+                // Both agree — keep ManualOfficial as final authority label; log at debug only via structured fields.
+            }
+        }
+        else if (sdkValid == true)
+        {
+            // Manual rejected but SDK accepted — do NOT blindly trust SDK (case-preserve can accept forged casing).
+            // Accept only when divergence is the known inverse case: raw uppercase id signed without lowercase
+            // would make SDK pass and manual fail. That path is insecure relative to official docs; reject
+            // unless prefixes show we cannot verify manual (missing). Prefer reject + log for investigation.
+            isValid = false;
+            final = "Rejected";
+            failureCode = manual.FailureReasonCode;
+            failureReason =
+                "Official manual HMAC rejected while SDK accepted; rejecting per official lowercase algorithm.";
+            logger.LogWarning(
+                "Mercado Pago webhook signature: SDK accepted but official manual rejected — rejecting (manual SoT). " +
+                "sdk_signature_valid=true manual_signature_valid=false " +
+                "manual_failure_reason={ManualFailure} query_data_id_masked={QueryMasked} " +
+                "data_id_query_was_lowercased={Lowercased} received_v1_prefix={ReceivedV1} " +
+                "computed_official_prefix={ComputedOfficial} webhook_secret_fingerprint={Fingerprint} " +
+                "secret_length={SecretLength} secret_trimmed_changed={SecretTrimmedChanged}",
+                manual.FailureReasonCode,
+                Mask(queryTrimmed),
+                dataIdWouldBeLowercased,
+                manual.Diagnostics.ReceivedV1Prefix,
+                manual.Diagnostics.ComputedOfficialPrefix,
+                fingerprint,
+                secretLength,
+                secretTrimmedChanged);
         }
         else
         {
-            // SDK unavailable → manual fallback.
-            isValid = manualValid;
-            final = manualValid ? "ManualFallback" : "Rejected";
-            failureCode = manualValid ? "ok" : manual.FailureReasonCode;
-            failureReason = manual.FailureReason;
+            isValid = false;
+            final = "Rejected";
+            failureCode = manual.FailureReasonCode;
+            failureReason = manual.FailureReason ?? sdkFailure ?? "Signature validation failed.";
         }
 
         var baseDiag = manual.Diagnostics;
@@ -250,19 +268,6 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidator(
                 SecretLength: secretLength,
                 SecretTrimmedChanged: secretTrimmedChanged,
                 WebhookSecretFingerprint: fingerprint));
-
-    private static string? MapSdkFailure(string? sdkFailure)
-        => sdkFailure switch
-        {
-            nameof(SignatureFailureReason.MissingSignatureHeader) => "missing_signature",
-            nameof(SignatureFailureReason.MissingTimestamp) => "missing_ts",
-            nameof(SignatureFailureReason.MissingHash) => "missing_v1",
-            nameof(SignatureFailureReason.TimestampOutOfTolerance) => "timestamp_out_of_tolerance",
-            nameof(SignatureFailureReason.SignatureMismatch) => "signature_mismatch",
-            nameof(SignatureFailureReason.MalformedSignatureHeader) => "invalid_signature_format",
-            "missing_secret" => "missing_secret",
-            _ => sdkFailure is null ? null : "signature_mismatch"
-        };
 
     private static string? Mask(string? value)
     {
