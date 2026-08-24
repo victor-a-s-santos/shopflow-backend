@@ -62,12 +62,14 @@ Segundo a documentação Mercado Pago, **URLs enviadas na criação do pagamento
 
 `NotificationUrl` no env continua útil para checklist/startup mesmo quando não é enviada no payload.
 
+**Decisão (PROD / primeiro Pix real):** `configured=True` + `sent=False` **não é bug**. O contrato Orders API aceita `notification_url` opcional; Shopflow omite de propósito (`SendNotificationUrlInOrderCreate=false`) para que o secret/URL do **painel** permaneçam a fonte da notificação e da assinatura. Só ligar `true` se houver necessidade operacional explícita de override por pedido (e aí o secret da URL do create deve ser o mesmo usado na validação).
+
 **Teste de assinatura (painel):**
 
 1. Painel MP (modo teste): URL = endpoint Shopflow, evento **Order**, secret da tela Webhooks → `MercadoPago__WebhookSecret`.
 2. `MercadoPago__SendNotificationUrlInOrderCreate=false` + recriar API.
 3. Gerar Pix novo; log deve mostrar `notification_url sent: false`.
-4. Pagar no sandbox; validar `sdk_signature_valid=true` nos logs.
+4. Pagar no sandbox; validar `manual_signature_valid=true` e `signature_validator_final=ManualOfficial` nos logs (SDK pode divergir em `ORD*`).
 
 Se com `false` o SDK passar e com URL no create falhar, a causa provável é canal/secret diferente entre URL do create e secret do painel.
 
@@ -127,28 +129,28 @@ Status terminais para o mesmo `ProviderEventId`: `Processed`, `Ignored`, `Lookup
 
 Logs mascaram `ProviderOrderId` (prefixo/sufixo); **nunca** logar AccessToken, WebhookSecret ou `x-signature` completa.
 
-## Assinatura (SDK oficial + oráculo manual)
+## Assinatura (algoritmo oficial manual + SDK diagnóstico)
 
-Pacote NuGet: **`mercadopago-sdk` 3.3.0** (`MercadoPago.Webhook.WebhookSignatureValidator`).
+Pacote NuGet: **`mercadopago-sdk` 3.3.0** (`MercadoPago.Webhook.WebhookSignatureValidator`) — **somente diagnóstico**.
 
 | Camada | Comportamento |
 |--------|----------------|
-| **Primária** | `CompositeMercadoPagoWebhookSignatureValidator` → SDK `Validate(xSignature, xRequestId, queryDataId, secret, tolerance)` |
-| **Diagnóstico** | Manual HMAC (docs “without SDK”): data.id **lowercase** no manifest — útil para ver `sdk_valid` vs `manual_valid` |
-| **Fallback** | Só se o SDK lançar exceção inesperada (não `InvalidWebhookSignatureException`) |
+| **Fonte de verdade** | Manual HMAC conforme docs MP **“Without SDKs”**: `data.id` alfanumérico em **lowercase** no manifest |
+| **Diagnóstico** | SDK `Validate(...)` — desde o fix case-preserve o SDK **não** lowercases `data.id`, o que diverge da doc oficial e falha em `ORD*` reais assinados com lowercase |
+| **Decisão** | Manual aceita → webhook aceito (`signature_validator_final=ManualOfficial`), mesmo se SDK rejeitar. Manual rejeita → **401**, mesmo se SDK aceitar. Ambos rejeitam → 401 |
 
-**Entrada do SDK (nunca body):**
+**Por quê não “SDK primary”:** em produção real, `manual_signature_valid=true`, `sdk_signature_valid=false` e `received_v1_prefix == computed_official_prefix` — o HMAC oficial bate; o SDK rejeita por case. Preferir o algoritmo documentado (com testes vetoriais) evita 401 em webhooks legítimos.
+
+**Entrada (nunca body):**
 
 | Campo | Origem |
 |-------|--------|
-| `data.id` | `Request.Query["data.id"]` **como recebido** (SDK preserva case após fix no SDK; não fazer lowercase antes) |
+| `data.id` | `Request.Query["data.id"]` — HMAC oficial usa **lowercase**; GET `/v1/orders/{id}` usa o valor **original** |
 | `x-request-id` | header |
 | `x-signature` | header (`ts` em ms tipicamente; `v1`) |
 | `secret` | `MercadoPago__WebhookSecret` com `.Trim()` nas pontas |
 
-Decisão: SDK aceita → webhook aceito (mesmo se manual rejeitar por lowercase). SDK rejeita → **401** (mesmo se manual aceitar). Ambos rejeitam → 401.
-
-Logs: `sdk_signature_valid`, `manual_signature_valid`, `signature_validator_final` (`Sdk` / `ManualFallback` / `Rejected`), `secret_length`, `secret_trimmed_changed`, fingerprint — **nunca** secret/token/x-signature/v1 completos.
+Logs: `sdk_signature_valid`, `manual_signature_valid`, `signature_validator_final` (`ManualOfficial` / `Rejected`), `secret_length`, `secret_trimmed_changed`, fingerprint — **nunca** secret/token/x-signature/v1 completos.
 
 **.env:** sem aspas, sem espaço/quebra no fim do secret. Fingerprint local: `printf '%s' "$SECRET" | shasum -a 256 | cut -c1-8`.
 
@@ -179,8 +181,17 @@ Checklist operacional:
 2. URL modo teste vs produção no painel usa secrets distintos — escolher o par certo.
 3. Evento: **Order (Mercado Pago)** / tópico `orders`.
 4. Preencher `MercadoPago__ApplicationId` e `MercadoPago__UserId` nos `.env` ajuda a ver `*_matches_config=false` imediatamente.
+   Esses campos são **opcionais** (somente validação/diagnóstico de alinhamento app↔secret). **Não** bloqueiam webhook nem criação Pix se estiverem `(null)`/`(unset)`.
 
-## Reconciliação (fallback MVP — Worker)
+## Erros de criação (`POST /v1/orders`)
+
+Falhas (incl. **HTTP 402** “The following transactions failed”) são desserializadas de forma estruturada. Logs incluem:
+
+- HTTP status, `x-request-id` (MP), order id, order/transaction `status`/`status_detail`
+- `errors[].code` / `details` resumidos, `cause` code/description quando presentes
+- mensagem curta (`ProviderMessage`) — **sem** token, QR, e-mail completo ou body bruto sensível
+
+Causa típica do 402 Orders: transação Pix rejeitada no processamento (`status_detail` em `transactions.payments[]`, ex. `high_risk`, `rejected_by_issuer`, credenciais/conta). O body completo costuma vir em `errors` + `data`; versões antigas do provider só logavam `message` e descartavam o detalhe.
 
 Não substitui o webhook. Polling seguro de `PixPayment` **Pending** com `Provider=MercadoPago` e `ProviderOrderId` preenchido:
 

@@ -123,11 +123,38 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
 
         if (!response.IsSuccessStatusCode)
         {
-            var providerMessage = TryExtractErrorMessage(responseBody);
-            _logger.LogError(
-                "Mercado Pago Pix order failed for Shopflow order {OrderId}. Status={StatusCode} Message={Message}",
-                request.OrderId,
+            var mpRequestId = TryGetMercadoPagoRequestId(response);
+            var failure = TryParseCreateOrderFailure(
                 (int)response.StatusCode,
+                responseBody,
+                mpRequestId);
+            var providerMessage = failure.ProviderMessage
+                                  ?? (string.IsNullOrWhiteSpace(responseBody)
+                                      ? "Unknown Mercado Pago error."
+                                      : "Mercado Pago returned a non-success response.");
+
+            _logger.LogError(
+                "Mercado Pago Pix order failed for Shopflow order {OrderId}. " +
+                "HttpStatus={HttpStatus} MpRequestId={MpRequestId} MpOrderId={MpOrderId} " +
+                "OrderStatus={OrderStatus} OrderStatusDetail={OrderStatusDetail} " +
+                "TransactionId={TransactionId} TransactionStatus={TransactionStatus} " +
+                "TransactionStatusDetail={TransactionStatusDetail} " +
+                "Error={Error} ErrorCode={ErrorCode} CauseCode={CauseCode} " +
+                "CauseDescription={CauseDescription} ErrorDetails={ErrorDetails} Message={Message}",
+                request.OrderId,
+                failure.HttpStatusCode,
+                failure.MercadoPagoRequestId,
+                failure.ProviderOrderId,
+                failure.OrderStatus,
+                failure.OrderStatusDetail,
+                failure.TransactionId,
+                failure.TransactionStatus,
+                failure.TransactionStatusDetail,
+                failure.Error,
+                failure.ErrorCode,
+                failure.CauseCode,
+                failure.CauseDescription,
+                failure.ErrorDetailsSummary,
                 providerMessage);
 
             throw new MercadoPagoPixChargeFailedException(
@@ -242,34 +269,192 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
         return $"PT{(int)duration.TotalMinutes}M";
     }
 
-    private static string TryExtractErrorMessage(string responseBody)
+    internal static MercadoPagoCreateOrderFailureDetails TryParseCreateOrderFailure(
+        int httpStatusCode,
+        string responseBody,
+        string? mercadoPagoRequestId)
     {
         try
         {
             var error = JsonSerializer.Deserialize<MercadoPagoErrorResponse>(responseBody, JsonOptions);
-            var causeDescription = error?.Cause?.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.Description))?.Description;
-            var apiError = error?.Errors?.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.Message))?.Message;
-
-            if (causeDescription?.Contains("Unauthorized use of live credentials", StringComparison.OrdinalIgnoreCase) == true
-                || error?.Message?.Contains("Unauthorized use of live credentials", StringComparison.OrdinalIgnoreCase) == true)
+            if (error is null)
             {
-                return "Unauthorized use of live credentials. Use the Access Token from Mercado Pago *Credenciais de teste* (Checkout API /v1/orders).";
+                return new MercadoPagoCreateOrderFailureDetails(
+                    httpStatusCode,
+                    ProviderMessage: string.IsNullOrWhiteSpace(responseBody)
+                        ? "Unknown Mercado Pago error."
+                        : "Mercado Pago returned a non-success response.",
+                    Error: null,
+                    ProviderOrderId: null,
+                    OrderStatus: null,
+                    OrderStatusDetail: null,
+                    TransactionId: null,
+                    TransactionStatus: null,
+                    TransactionStatusDetail: null,
+                    ErrorCode: null,
+                    CauseCode: null,
+                    CauseDescription: null,
+                    ErrorDetailsSummary: null,
+                    MercadoPagoRequestId: mercadoPagoRequestId);
             }
 
-            if (!string.IsNullOrWhiteSpace(error?.Message))
-                return error.Message;
+            var firstCause = error.Cause?.FirstOrDefault(c =>
+                !string.IsNullOrWhiteSpace(c.Description) || !string.IsNullOrWhiteSpace(c.Code));
+            var firstApiError = error.Errors?.FirstOrDefault(e =>
+                !string.IsNullOrWhiteSpace(e.Message) || !string.IsNullOrWhiteSpace(e.Code));
 
-            if (apiError is not null)
-                return apiError;
+            var orderId = NullIfWhiteSpace(error.Data?.Id) ?? NullIfWhiteSpace(error.Id);
+            // Nested data.status, or flat string "status" on order-shaped bodies (int "status" is HTTP code).
+            var orderStatus = NullIfWhiteSpace(error.Data?.Status)
+                              ?? TryReadFlatOrderStatus(responseBody);
+            var orderStatusDetail = NullIfWhiteSpace(error.Data?.StatusDetail)
+                                    ?? NullIfWhiteSpace(error.StatusDetail);
 
-            if (causeDescription is not null)
-                return causeDescription;
+            var payment = error.Data?.Transactions?.Payments?.FirstOrDefault()
+                          ?? error.Transactions?.Payments?.FirstOrDefault();
 
-            return string.IsNullOrWhiteSpace(responseBody) ? "Unknown Mercado Pago error." : responseBody;
+            var detailsSummary = SummarizeErrorDetails(firstApiError?.Details);
+            var providerMessage = BuildProviderMessage(error, firstApiError, firstCause, payment);
+
+            return new MercadoPagoCreateOrderFailureDetails(
+                httpStatusCode,
+                ProviderMessage: providerMessage,
+                Error: NullIfWhiteSpace(error.Error),
+                ProviderOrderId: orderId,
+                OrderStatus: orderStatus,
+                OrderStatusDetail: orderStatusDetail,
+                TransactionId: NullIfWhiteSpace(payment?.Id),
+                TransactionStatus: NullIfWhiteSpace(payment?.Status),
+                TransactionStatusDetail: NullIfWhiteSpace(payment?.StatusDetail),
+                ErrorCode: NullIfWhiteSpace(firstApiError?.Code),
+                CauseCode: NullIfWhiteSpace(firstCause?.Code),
+                CauseDescription: NullIfWhiteSpace(firstCause?.Description),
+                ErrorDetailsSummary: detailsSummary,
+                MercadoPagoRequestId: mercadoPagoRequestId);
         }
         catch
         {
-            return string.IsNullOrWhiteSpace(responseBody) ? "Unknown Mercado Pago error." : responseBody;
+            return new MercadoPagoCreateOrderFailureDetails(
+                httpStatusCode,
+                ProviderMessage: string.IsNullOrWhiteSpace(responseBody)
+                    ? "Unknown Mercado Pago error."
+                    : "Mercado Pago returned a non-success response.",
+                Error: null,
+                ProviderOrderId: null,
+                OrderStatus: null,
+                OrderStatusDetail: null,
+                TransactionId: null,
+                TransactionStatus: null,
+                TransactionStatusDetail: null,
+                ErrorCode: null,
+                CauseCode: null,
+                CauseDescription: null,
+                ErrorDetailsSummary: null,
+                MercadoPagoRequestId: mercadoPagoRequestId);
         }
     }
+
+    private static string BuildProviderMessage(
+        MercadoPagoErrorResponse error,
+        MercadoPagoApiError? firstApiError,
+        MercadoPagoErrorCause? firstCause,
+        MercadoPagoOrderPaymentResponse? payment)
+    {
+        var causeDescription = firstCause?.Description;
+        var apiError = firstApiError?.Message;
+
+        if (causeDescription?.Contains("Unauthorized use of live credentials", StringComparison.OrdinalIgnoreCase) == true
+            || error.Message?.Contains("Unauthorized use of live credentials", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return "Unauthorized use of live credentials. Use the Access Token from Mercado Pago *Credenciais de teste* (Checkout API /v1/orders).";
+        }
+
+        if (!string.IsNullOrWhiteSpace(error.Message))
+            return AppendStatusDetailHint(error.Message, payment?.StatusDetail, firstApiError?.Details);
+
+        if (!string.IsNullOrWhiteSpace(apiError))
+            return AppendStatusDetailHint(apiError, payment?.StatusDetail, firstApiError?.Details);
+
+        if (!string.IsNullOrWhiteSpace(causeDescription))
+            return causeDescription;
+
+        if (!string.IsNullOrWhiteSpace(payment?.StatusDetail))
+            return $"Transaction failed: {payment.StatusDetail}";
+
+        return "Unknown Mercado Pago error.";
+    }
+
+    private static string AppendStatusDetailHint(
+        string message,
+        string? transactionStatusDetail,
+        string[]? details)
+    {
+        if (!string.IsNullOrWhiteSpace(transactionStatusDetail)
+            && !message.Contains(transactionStatusDetail, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{message} (status_detail={transactionStatusDetail})";
+        }
+
+        var detail = details?.FirstOrDefault(d => !string.IsNullOrWhiteSpace(d));
+        if (!string.IsNullOrWhiteSpace(detail) && !message.Contains(detail, StringComparison.OrdinalIgnoreCase))
+            return $"{message} ({detail})";
+
+        return message;
+    }
+
+    private static string? SummarizeErrorDetails(string[]? details)
+    {
+        if (details is null || details.Length == 0)
+            return null;
+
+        // Keep short, non-sensitive summaries (e.g. "pay_…: high_risk") — never log payer/docs/QR.
+        var parts = details
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Select(d => d.Trim())
+            .Take(3)
+            .ToArray();
+
+        return parts.Length == 0 ? null : string.Join("; ", parts);
+    }
+
+    private static string? TryReadFlatOrderStatus(string responseBody)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            if (doc.RootElement.TryGetProperty("status", out var statusEl)
+                && statusEl.ValueKind == JsonValueKind.String)
+            {
+                return NullIfWhiteSpace(statusEl.GetString());
+            }
+
+            if (doc.RootElement.TryGetProperty("data", out var data)
+                && data.ValueKind == JsonValueKind.Object
+                && data.TryGetProperty("status", out var nestedStatus)
+                && nestedStatus.ValueKind == JsonValueKind.String)
+            {
+                return NullIfWhiteSpace(nestedStatus.GetString());
+            }
+        }
+        catch (JsonException)
+        {
+            // ignore
+        }
+
+        return null;
+    }
+
+    private static string? TryGetMercadoPagoRequestId(HttpResponseMessage response)
+    {
+        if (response.Headers.TryGetValues("x-request-id", out var values))
+            return NullIfWhiteSpace(values.FirstOrDefault());
+
+        if (response.Headers.TryGetValues("X-Request-Id", out values))
+            return NullIfWhiteSpace(values.FirstOrDefault());
+
+        return null;
+    }
+
+    private static string? NullIfWhiteSpace(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

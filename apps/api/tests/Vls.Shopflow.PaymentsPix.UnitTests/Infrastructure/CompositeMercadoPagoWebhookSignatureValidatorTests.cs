@@ -12,10 +12,10 @@ namespace Vls.Shopflow.PaymentsPix.UnitTests.Infrastructure;
 public sealed class CompositeMercadoPagoWebhookSignatureValidatorTests
 {
     [Fact]
-    public void Validate_SdkAcceptsManualRejects_PrefersSdk()
+    public void Validate_SdkAcceptsManualRejects_RejectsPreferringOfficialManual()
     {
         var sdk = new Mock<IMercadoPagoOfficialWebhookSignatureClient>();
-        // SDK succeeds (no throw)
+        // SDK succeeds (no throw) — case-preserve path.
         sdk.Setup(x => x.Validate(
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
@@ -25,19 +25,17 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidatorTests
 
         var sut = CreateSut(sdk.Object, secret: "secret");
         var dataId = "ORDTST01UPPERCASEID";
-        // Sign with lowercase manifest for "manual" path (secret matches but SDK receives raw uppercase).
-        // Manual lowercases → HMAC for ordtst…; we compute signature for uppercase id as SDK would.
         var requestId = "req-1";
         var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+        // Signature computed with case-preserved id (SDK style) — official manual lowercases and rejects.
         var sdkManifest = $"id:{dataId};request-id:{requestId};ts:{ts};";
         var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex("secret", sdkManifest);
 
         var result = sut.Validate($"ts={ts},v1={v1}", requestId, dataId, "secret");
 
-        result.IsValid.Should().BeTrue();
-        result.Diagnostics.SignatureValidatorFinal.Should().Be("Sdk");
+        result.IsValid.Should().BeFalse();
+        result.Diagnostics.SignatureValidatorFinal.Should().Be("Rejected");
         result.Diagnostics.SdkSignatureValid.Should().BeTrue();
-        // Manual lowercases ORD* so its HMAC differs from the case-preserving signature.
         result.Diagnostics.ManualSignatureValid.Should().BeFalse();
         sdk.Verify(x => x.Validate(
             $"ts={ts},v1={v1}",
@@ -48,7 +46,7 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidatorTests
     }
 
     [Fact]
-    public void Validate_SdkRejectsManualAccepts_RejectsWith401Semantics()
+    public void Validate_SdkRejectsManualAccepts_AcceptsOfficialManualAsSourceOfTruth()
     {
         var sdk = new Mock<IMercadoPagoOfficialWebhookSignatureClient>();
         sdk.Setup(x => x.Validate(
@@ -63,19 +61,24 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidatorTests
                 "1700000000"));
 
         var sut = CreateSut(sdk.Object, secret: "secret");
-        var dataId = "ORD01ABC";
-        var requestId = "req-1";
-        var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        // Masked production-like fixture: ORD* id signed with official lowercase manifest.
+        var dataId = "ORD01ABCXYZMASKED";
+        var requestId = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
         var manualManifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
         var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex("secret", manualManifest);
 
         var result = sut.Validate($"ts={ts},v1={v1}", requestId, dataId, "secret");
 
-        result.IsValid.Should().BeFalse();
-        result.Diagnostics.SignatureValidatorFinal.Should().Be("Rejected");
+        result.IsValid.Should().BeTrue();
+        result.Diagnostics.SignatureValidatorFinal.Should().Be("ManualOfficial");
         result.Diagnostics.SdkSignatureValid.Should().BeFalse();
         result.Diagnostics.ManualSignatureValid.Should().BeTrue();
-        result.FailureReasonCode.Should().Be("signature_mismatch");
+        result.FailureReasonCode.Should().Be("ok");
+        // Prefixes match when manual HMAC is correct (prod symptom: received_v1 == computed_official).
+        result.Diagnostics.ReceivedV1Prefix.Should().Be(result.Diagnostics.ComputedOfficialPrefix);
+        result.Diagnostics.DataIdQueryWasLowercased.Should().BeTrue();
+        manualManifest.Should().StartWith("id:ord01abcxyzmasked;");
     }
 
     [Fact]
@@ -107,7 +110,33 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidatorTests
     }
 
     [Fact]
-    public void Validate_SdkUnavailable_FallsBackToManual()
+    public void Validate_BothAccept_ReturnsManualOfficial()
+    {
+        var sdk = new Mock<IMercadoPagoOfficialWebhookSignatureClient>();
+        sdk.Setup(x => x.Validate(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string>(),
+                It.IsAny<TimeSpan?>()));
+
+        var sut = CreateSut(sdk.Object, secret: "secret");
+        var dataId = "123456";
+        var requestId = "req-1";
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var manifest = ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(dataId, requestId, ts);
+        var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex("secret", manifest);
+
+        var result = sut.Validate($"ts={ts},v1={v1}", requestId, dataId, "secret");
+
+        result.IsValid.Should().BeTrue();
+        result.Diagnostics.SignatureValidatorFinal.Should().Be("ManualOfficial");
+        result.Diagnostics.SdkSignatureValid.Should().BeTrue();
+        result.Diagnostics.ManualSignatureValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_SdkUnavailable_FallsBackToManualOfficial()
     {
         var sdk = new Mock<IMercadoPagoOfficialWebhookSignatureClient>();
         sdk.Setup(x => x.Validate(
@@ -128,7 +157,7 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidatorTests
         var result = sut.Validate($"ts={ts},v1={v1}", requestId, dataId, "secret");
 
         result.IsValid.Should().BeTrue();
-        result.Diagnostics.SignatureValidatorFinal.Should().Be("ManualFallback");
+        result.Diagnostics.SignatureValidatorFinal.Should().Be("ManualOfficial");
         result.Diagnostics.SdkSignatureValid.Should().BeNull();
         result.Diagnostics.ManualSignatureValid.Should().BeTrue();
     }
@@ -181,12 +210,14 @@ public sealed class CompositeMercadoPagoWebhookSignatureValidatorTests
         var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
         var v1 = ManualMercadoPagoWebhookSignatureValidator.ComputeHmacHex(
             "secret",
-            $"id:{queryId};request-id:{requestId};ts:{ts};");
+            ManualMercadoPagoWebhookSignatureValidator.BuildManifestFromRaw(queryId, requestId, ts));
 
-        sut.Validate($"ts={ts},v1={v1}", requestId, queryId, "secret");
+        var result = sut.Validate($"ts={ts},v1={v1}", requestId, queryId, "secret");
 
         capturedDataId.Should().Be(queryId);
         capturedDataId.Should().NotBe("ORD01FROMBODY");
+        result.IsValid.Should().BeTrue();
+        result.Diagnostics.SignatureValidatorFinal.Should().Be("ManualOfficial");
     }
 
     private static CompositeMercadoPagoWebhookSignatureValidator CreateSut(

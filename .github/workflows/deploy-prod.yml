@@ -16,11 +16,14 @@ concurrency:
 env:
   REMOTE_APP_DIR: /opt/shopflow/app
   REMOTE_DEPLOY_DIR: /opt/shopflow/app/deploy
+  HEALTH_URL: https://api.vipassessoriadigital.com.br/health
 
 jobs:
   deploy-prod:
     name: Deploy produção (main)
     runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,6 +47,8 @@ jobs:
           VPS_PROD_USER: ${{ secrets.VPS_PROD_USER }}
         run: |
           set -euo pipefail
+          # --delete removes VPS files absent from the repo, but NEVER deletes destination
+          # paths listed in --exclude (deploy/.env, deploy/.env.prod stay untouched).
           rsync -az --delete \
             -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
             --exclude '.git' \
@@ -54,8 +59,6 @@ jobs:
             --exclude 'node_modules' \
             --exclude 'apps/web' \
             --exclude 'deploy/.env' \
-            --exclude 'deploy/.env.test' \
-            --exclude 'deploy/.env.hml' \
             --exclude 'deploy/.env.prod' \
             --exclude 'apps/api/wwwroot/uploads' \
             --exclude 'backups' \
@@ -66,7 +69,7 @@ jobs:
             --exclude 'uploads' \
             ./ "${VPS_PROD_USER}@${VPS_PROD_HOST}:${REMOTE_APP_DIR}/"
 
-      - name: Build and recreate api-prod / worker-prod
+      - name: Build and deploy api-prod / worker-prod
         env:
           VPS_PROD_HOST: ${{ secrets.VPS_PROD_HOST }}
           VPS_PROD_USER: ${{ secrets.VPS_PROD_USER }}
@@ -76,22 +79,86 @@ jobs:
             "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
           set -euo pipefail
           cd "$REMOTE_DEPLOY_DIR"
+          COMPOSE="docker compose -f docker-compose.prod.yml"
 
           if [[ ! -f .env || ! -f .env.prod ]]; then
             echo "Arquivos .env ou .env.prod ausentes na VPS PROD. Não sobrescrever via CI."
             exit 1
           fi
 
-          docker compose -f docker-compose.prod.yml config
-          docker compose -f docker-compose.prod.yml build --no-cache api-prod worker-prod
-          docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps api-prod worker-prod
-          # Caddyfile.prod is bind-mounted; recreate alone does not reload running Caddy.
-          docker compose -f docker-compose.prod.yml up -d caddy
-          docker compose -f docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile
-          docker compose -f docker-compose.prod.yml ps
+          show_failure_logs() {
+            echo "==> Logs recentes (api-prod / worker-prod / caddy)"
+            $COMPOSE logs --tail=100 api-prod worker-prod caddy 2>&1 \
+              | grep -Ev '\.(env|env\.prod)(\s|$)|POSTGRES_PASSWORD|MercadoPago__AccessToken|MercadoPago__WebhookSecret|Brevo__ApiKey|Storage__R2__SecretAccessKey|ConnectionStrings__|SHOPFLOW_ADMIN_PASSWORD|GuestOrderAccess__TokenHashSecret' \
+              || $COMPOSE logs --tail=100 api-prod worker-prod caddy || true
+          }
+
+          wait_postgres_ready() {
+            local pg_user i
+            pg_user="$(grep -E '^POSTGRES_USER=' .env | cut -d= -f2- | tr -d '\r')"
+            if [[ -z "$pg_user" ]]; then
+              echo "POSTGRES_USER ausente em .env"
+              return 1
+            fi
+            for i in $(seq 1 30); do
+              if $COMPOSE exec -T postgres pg_isready -U "$pg_user" -d postgres >/dev/null 2>&1; then
+                echo "Postgres pronto"
+                return 0
+              fi
+              echo "Aguardando Postgres... tentativa ${i}/30"
+              sleep 2
+            done
+            echo "Postgres não ficou pronto a tempo"
+            $COMPOSE logs --tail=50 postgres || true
+            return 1
+          }
+
+          # Readiness without wget/curl inside api-prod:
+          # 1) prefer Docker health status (healthcheck in docker-compose.prod.yml)
+          # 2) fallback: curl on VPS host → container IP:8080/health
+          wait_api_prod_ready() {
+            local i status body api_ip
+            for i in $(seq 1 36); do
+              status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' shopflow-api-prod 2>/dev/null || echo "missing")"
+              if [[ "$status" == "healthy" ]]; then
+                echo "api-prod Docker health: healthy"
+                return 0
+              fi
+
+              api_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' shopflow-api-prod 2>/dev/null || true)"
+              if [[ -n "$api_ip" ]]; then
+                body="$(curl -fsS --connect-timeout 3 --max-time 10 "http://${api_ip}:8080/health" 2>/dev/null || true)"
+                if echo "$body" | grep -q '"status":"ok"' \
+                  && echo "$body" | grep -q '"environment":"Production"'; then
+                  echo "api-prod respondeu /health via rede Docker (status=${status})"
+                  return 0
+                fi
+              fi
+
+              echo "Aguardando api-prod (migrations/startup)... tentativa ${i}/36 (docker health: ${status})"
+              sleep 5
+            done
+            echo "api-prod não ficou saudável a tempo"
+            return 1
+          }
+
+          $COMPOSE config
+          $COMPOSE up -d postgres
+          wait_postgres_ready
+
+          $COMPOSE build --no-cache api-prod worker-prod
+          $COMPOSE up -d --force-recreate --no-deps api-prod
+
+          if ! wait_api_prod_ready; then
+            show_failure_logs
+            exit 1
+          fi
+
+          $COMPOSE up -d --force-recreate --no-deps worker-prod
+          $COMPOSE ps
           EOF
 
-      - name: Health check api-prod
+      - name: Reload Caddy (PROD)
         env:
           VPS_PROD_HOST: ${{ secrets.VPS_PROD_HOST }}
           VPS_PROD_USER: ${{ secrets.VPS_PROD_USER }}
@@ -101,18 +168,62 @@ jobs:
             "REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
           set -euo pipefail
           cd "$REMOTE_DEPLOY_DIR"
+          COMPOSE="docker compose -f docker-compose.prod.yml"
 
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            if curl -fsS https://api.vipassessoriadigital.com.br/health; then
-              echo
-              echo "Health check OK (api-prod)"
+          show_failure_logs() {
+            echo "==> Logs recentes (api-prod / worker-prod / caddy)"
+            $COMPOSE logs --tail=100 api-prod worker-prod caddy 2>&1 \
+              | grep -Ev '\.(env|env\.prod)(\s|$)|POSTGRES_PASSWORD|MercadoPago__AccessToken|MercadoPago__WebhookSecret|Brevo__ApiKey|Storage__R2__SecretAccessKey|ConnectionStrings__|SHOPFLOW_ADMIN_PASSWORD|GuestOrderAccess__TokenHashSecret' \
+              || $COMPOSE logs --tail=100 api-prod worker-prod caddy || true
+          }
+
+          $COMPOSE up -d caddy
+          if ! $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile; then
+            echo "Caddy reload falhou"
+            show_failure_logs
+            exit 1
+          fi
+          echo "Caddy reload OK"
+          EOF
+
+      - name: Health check api-prod (public HTTPS)
+        env:
+          VPS_PROD_HOST: ${{ secrets.VPS_PROD_HOST }}
+          VPS_PROD_USER: ${{ secrets.VPS_PROD_USER }}
+          HEALTH_URL: ${{ env.HEALTH_URL }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes "${VPS_PROD_USER}@${VPS_PROD_HOST}" \
+            "HEALTH_URL='${HEALTH_URL}' REMOTE_DEPLOY_DIR='${REMOTE_DEPLOY_DIR}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$REMOTE_DEPLOY_DIR"
+          COMPOSE="docker compose -f docker-compose.prod.yml"
+
+          show_failure_logs() {
+            echo "==> Logs recentes (api-prod / worker-prod / caddy)"
+            $COMPOSE logs --tail=100 api-prod worker-prod caddy 2>&1 \
+              | grep -Ev '\.(env|env\.prod)(\s|$)|POSTGRES_PASSWORD|MercadoPago__AccessToken|MercadoPago__WebhookSecret|Brevo__ApiKey|Storage__R2__SecretAccessKey|ConnectionStrings__|SHOPFLOW_ADMIN_PASSWORD|GuestOrderAccess__TokenHashSecret' \
+              || $COMPOSE logs --tail=100 api-prod worker-prod caddy || true
+          }
+
+          health_body_ok() {
+            local body="$1"
+            echo "$body" | grep -q '"status":"ok"' \
+              && echo "$body" | grep -q '"environment":"Production"'
+          }
+
+          for i in $(seq 1 20); do
+            body="$(curl -fsS --connect-timeout 5 --max-time 15 "$HEALTH_URL" 2>/dev/null || true)"
+            if health_body_ok "$body"; then
+              echo "$body"
+              echo "Health check OK (api-prod / Production)"
               exit 0
             fi
-            echo "Aguardando API produção... tentativa ${i}/10"
+            echo "Aguardando health público... tentativa ${i}/20"
             sleep 6
           done
 
           echo "Health check falhou (api-prod)"
-          docker compose -f docker-compose.prod.yml logs --tail=100 api-prod worker-prod || true
+          show_failure_logs
           exit 1
           EOF
