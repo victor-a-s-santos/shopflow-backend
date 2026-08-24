@@ -28,4 +28,10 @@ public sealed record CustomerLoginResult(
     CustomerUserDto? Customer,
     string? ErrorMessage);
 
+public sealed record ResetCustomerPasswordResult(
+    bool Succeeded,
+    string? ErrorMessage,
+    string? Code = null,
+    IReadOnlyList<RegisterCustomerFieldError>? Errors = null);
+
 public sealed record GenericMessageResult(string Message);

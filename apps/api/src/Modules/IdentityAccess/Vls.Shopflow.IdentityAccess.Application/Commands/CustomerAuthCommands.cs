@@ -21,7 +21,7 @@ public sealed record ForgotCustomerPasswordCommand(string Email) : IRequest<Gene
 public sealed record ResetCustomerPasswordCommand(
     string Email,
     string Token,
-    string NewPassword) : IRequest<(bool Succeeded, string? ErrorMessage)>;
+    string NewPassword) : IRequest<ResetCustomerPasswordResult>;
 
 public sealed record ConfirmCustomerEmailCommand(
     string Email,

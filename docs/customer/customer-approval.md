@@ -8,6 +8,20 @@ Não usar `EmailConfirmed`, `IsStaff` ou role admin como aprovação comercial.
 
 ## Cadastro
 
+### Política de senha (backend)
+
+Cadastro público e reset password exigem senha forte (fonte da verdade: Identity + FluentValidation):
+
+- mínimo 8 caracteres;
+- 1 letra maiúscula;
+- 1 letra minúscula;
+- 1 número;
+- 1 caractere especial.
+
+Exemplo **somente** para dev/test: `Shopflow@123`. Produção usa secrets (`SHOPFLOW_*_PASSWORD`).
+
+Falha → **400** com `code=PASSWORD_TOO_WEAK` (Identity) ou ValidationProblemDetails no campo `password` / `newPassword`, mensagens em PT-BR. Sem stack trace.
+
 Loja `Closed` (ou `RequireApproval=true` / checkout que exige aprovado): cria `PendingApproval`, `AccessRequestedAt=now`, **não** emite cookie.
 
 ```json

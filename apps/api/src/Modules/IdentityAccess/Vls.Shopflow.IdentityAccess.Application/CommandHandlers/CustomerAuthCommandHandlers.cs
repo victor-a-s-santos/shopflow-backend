@@ -37,9 +37,9 @@ public sealed class ForgotCustomerPasswordCommandHandler(ICustomerPasswordServic
 }
 
 public sealed class ResetCustomerPasswordCommandHandler(ICustomerPasswordService service)
-    : IRequestHandler<ResetCustomerPasswordCommand, (bool Succeeded, string? ErrorMessage)>
+    : IRequestHandler<ResetCustomerPasswordCommand, ResetCustomerPasswordResult>
 {
-    public Task<(bool Succeeded, string? ErrorMessage)> Handle(
+    public Task<ResetCustomerPasswordResult> Handle(
         ResetCustomerPasswordCommand request,
         CancellationToken cancellationToken)
         => service.ResetPasswordAsync(request.Email, request.Token, request.NewPassword, cancellationToken);

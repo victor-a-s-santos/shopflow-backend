@@ -73,6 +73,8 @@ Loja `Closed` (ou `PublicCatalogApprovedCheckout`) força cadastro `Pending` mes
 
 Cadastro **não** emite cookie. Login com senha correta emite `CustomerCookie` mesmo se pendente/recusado/suspenso. Catálogo privado e checkout continuam bloqueados no backend.
 
+Senha forte obrigatória no register/reset (mín. 8, maiúscula, minúscula, dígito, especial). Ver `docs/customer/customer-auth.md`.
+
 `ICustomerAccessNotifier` enfileira e-mails de pendência/aprovação no outbox Brevo (`docs/customer/customer-approval-emails.md`). Falha de e-mail não quebra o cadastro.
 
 ### Codes (ProblemDetails `code`)

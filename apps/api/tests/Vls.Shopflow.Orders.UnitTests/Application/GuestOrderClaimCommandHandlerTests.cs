@@ -54,7 +54,7 @@ public sealed class GuestOrderClaimCommandHandlerTests
         accounts.Setup(x => x.EmailExistsAsync(order.CustomerEmail, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
         accounts.Setup(x => x.RegisterAsync(
-                order.CustomerEmail, "Password1", order.CustomerFullName, order.CustomerPhone,
+                order.CustomerEmail, "Shopflow@123", order.CustomerFullName, order.CustomerPhone,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CustomerAccountCreateResult(true, customerId, false, []));
         accounts.Setup(x => x.SignInAsync(customerId, It.IsAny<CancellationToken>()))
@@ -68,7 +68,7 @@ public sealed class GuestOrderClaimCommandHandlerTests
             NullLogger<CreateAccountFromGuestOrderCommandHandler>.Instance);
 
         var result = await handler.Handle(
-            new CreateAccountFromGuestOrderCommand(order.Id, "raw", "Password1", "Password1"),
+            new CreateAccountFromGuestOrderCommand(order.Id, "raw", "Shopflow@123", "Shopflow@123"),
             CancellationToken.None);
 
         result.Code.Should().Be("ACCOUNT_CREATED_AND_ORDER_LINKED");
@@ -99,7 +99,7 @@ public sealed class GuestOrderClaimCommandHandlerTests
             NullLogger<CreateAccountFromGuestOrderCommandHandler>.Instance);
 
         var act = () => handler.Handle(
-            new CreateAccountFromGuestOrderCommand(Guid.NewGuid(), "bad", "Password1", "Password1"),
+            new CreateAccountFromGuestOrderCommand(Guid.NewGuid(), "bad", "Shopflow@123", "Shopflow@123"),
             CancellationToken.None);
 
         await act.Should().ThrowAsync<GuestOrderAccessDeniedException>();
@@ -124,7 +124,7 @@ public sealed class GuestOrderClaimCommandHandlerTests
             NullLogger<CreateAccountFromGuestOrderCommandHandler>.Instance);
 
         var act = () => handler.Handle(
-            new CreateAccountFromGuestOrderCommand(order.Id, "raw", "Password1", "Password1"),
+            new CreateAccountFromGuestOrderCommand(order.Id, "raw", "Shopflow@123", "Shopflow@123"),
             CancellationToken.None);
 
         await act.Should().ThrowAsync<GuestOrderAccountAlreadyExistsException>();
@@ -173,7 +173,7 @@ public sealed class GuestOrderClaimCommandHandlerTests
         accounts.Setup(x => x.EmailExistsAsync(order.CustomerEmail, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
         accounts.Setup(x => x.RegisterAsync(
-                order.CustomerEmail, "Password1", order.CustomerFullName, order.CustomerPhone,
+                order.CustomerEmail, "Shopflow@123", order.CustomerFullName, order.CustomerPhone,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CustomerAccountCreateResult(
                 false,
@@ -186,7 +186,7 @@ public sealed class GuestOrderClaimCommandHandlerTests
             NullLogger<CreateAccountFromGuestOrderCommandHandler>.Instance);
 
         var act = () => handler.Handle(
-            new CreateAccountFromGuestOrderCommand(order.Id, "raw", "Password1", "Password1"),
+            new CreateAccountFromGuestOrderCommand(order.Id, "raw", "Shopflow@123", "Shopflow@123"),
             CancellationToken.None);
 
         var ex = await act.Should().ThrowAsync<PasswordRequirementsNotMetException>();
@@ -284,7 +284,7 @@ public sealed class GuestOrderClaimCommandHandlerTests
     public void CreateAccountValidator_PasswordMismatch_FailsOnConfirmPassword()
     {
         var result = new CreateAccountFromGuestOrderCommandValidator().Validate(
-            new CreateAccountFromGuestOrderCommand(Guid.NewGuid(), "tok", "Password1", "Other"));
+            new CreateAccountFromGuestOrderCommand(Guid.NewGuid(), "tok", "Shopflow@123", "OtherPass@1"));
 
         result.IsValid.Should().BeFalse();
         result.Errors.Select(e => e.PropertyName.ToLowerInvariant())

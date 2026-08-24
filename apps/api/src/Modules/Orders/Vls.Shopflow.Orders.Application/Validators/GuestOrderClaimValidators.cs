@@ -14,6 +14,7 @@ public sealed class CreateAccountFromGuestOrderCommandValidator
             .WithMessage("Guest access token is required.")
             .WithName("guestAccessToken");
 
+        // Keep in sync with IdentityAccess CustomerPasswordPolicy / IdentityOptions.
         RuleFor(x => x.Password)
             .NotEmpty()
             .WithMessage("A senha é obrigatória.")
@@ -23,6 +24,10 @@ public sealed class CreateAccountFromGuestOrderCommandValidator
             .WithMessage("Use pelo menos um número.")
             .Must(p => p.Any(char.IsLower))
             .WithMessage("Use pelo menos uma letra minúscula.")
+            .Must(p => p.Any(char.IsUpper))
+            .WithMessage("Use pelo menos uma letra maiúscula.")
+            .Must(p => p.Any(c => !char.IsLetterOrDigit(c)))
+            .WithMessage("Use pelo menos um caractere especial.")
             .WithName("password");
 
         RuleFor(x => x.ConfirmPassword)

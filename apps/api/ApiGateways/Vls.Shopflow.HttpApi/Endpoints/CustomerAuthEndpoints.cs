@@ -1,6 +1,7 @@
 using MediatR;
 using Vls.Shopflow.IdentityAccess.Application.Commands;
 using Vls.Shopflow.IdentityAccess.Application.Queries;
+using Vls.Shopflow.IdentityAccess.Application.Security;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Infrastructure;
 
@@ -45,8 +46,8 @@ public static class CustomerAuthEndpoints
                 return Results.Json(
                     new
                     {
-                        code = "PASSWORD_REQUIREMENTS_NOT_MET",
-                        message = result.ErrorMessage ?? "A senha não atende aos requisitos.",
+                        code = CustomerPasswordPolicy.TooWeakCode,
+                        message = result.ErrorMessage ?? CustomerPasswordPolicy.SummaryMessage,
                         errors
                     },
                     statusCode: StatusCodes.Status400BadRequest);
@@ -113,9 +114,29 @@ public static class CustomerAuthEndpoints
                 new ResetCustomerPasswordCommand(req.Email, req.Token, req.NewPassword), ct);
 
             if (!result.Succeeded)
+            {
+                if (result.Errors is { Count: > 0 })
+                {
+                    var errors = result.Errors
+                        .GroupBy(e => e.Field)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => g.Select(e => e.Message).Distinct().ToArray());
+
+                    return Results.Json(
+                        new
+                        {
+                            code = result.Code ?? CustomerPasswordPolicy.TooWeakCode,
+                            message = result.ErrorMessage ?? CustomerPasswordPolicy.SummaryMessage,
+                            errors
+                        },
+                        statusCode: StatusCodes.Status400BadRequest);
+                }
+
                 return Results.Json(
                     new { message = result.ErrorMessage ?? "Unable to complete the request." },
                     statusCode: StatusCodes.Status400BadRequest);
+            }
 
             return Results.NoContent();
         })

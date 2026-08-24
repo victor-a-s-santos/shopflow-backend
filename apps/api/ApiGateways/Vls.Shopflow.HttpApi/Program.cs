@@ -315,7 +315,20 @@ app.Use(async (ctx, next) =>
 
     {
 
-        var problem = HttpProblemDetails.Validation(ctx, ex);
+        var passwordOnly = ex.Errors.Any() && ex.Errors.All(e =>
+        {
+            var field = HttpProblemDetails.ToCamelCasePath(e.PropertyName);
+            return field is "password" or "newPassword" or "confirmPassword";
+        });
+
+        var problem = passwordOnly
+            ? HttpProblemDetails.Validation(
+                ctx,
+                ex.Errors,
+                detail: Vls.Shopflow.IdentityAccess.Application.Security.CustomerPasswordPolicy.SummaryMessage,
+                code: Vls.Shopflow.IdentityAccess.Application.Security.CustomerPasswordPolicy.TooWeakCode,
+                message: Vls.Shopflow.IdentityAccess.Application.Security.CustomerPasswordPolicy.SummaryMessage)
+            : HttpProblemDetails.Validation(ctx, ex);
 
         ctx.Response.StatusCode = problem.Status ?? StatusCodes.Status400BadRequest;
 

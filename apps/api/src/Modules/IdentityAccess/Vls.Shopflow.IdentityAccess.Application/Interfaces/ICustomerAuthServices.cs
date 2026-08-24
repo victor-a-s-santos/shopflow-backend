@@ -46,7 +46,7 @@ public interface ICustomerPasswordService
 {
     Task<GenericMessageResult> ForgotPasswordAsync(string email, CancellationToken cancellationToken = default);
 
-    Task<(bool Succeeded, string? ErrorMessage)> ResetPasswordAsync(
+    Task<ResetCustomerPasswordResult> ResetPasswordAsync(
         string email,
         string token,
         string newPassword,
