@@ -224,8 +224,11 @@ internal sealed record MercadoPagoCreateOrderFailureDetails(
     string? TransactionId,
     string? TransactionStatus,
     string? TransactionStatusDetail,
+    string? PaymentMethodId,
+    string? PaymentMethodType,
     string? ErrorCode,
     string? CauseCode,
     string? CauseDescription,
     string? ErrorDetailsSummary,
+    string? ErrorsSummary,
     string? MercadoPagoRequestId);

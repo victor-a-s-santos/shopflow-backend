@@ -139,8 +139,10 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
                 "OrderStatus={OrderStatus} OrderStatusDetail={OrderStatusDetail} " +
                 "TransactionId={TransactionId} TransactionStatus={TransactionStatus} " +
                 "TransactionStatusDetail={TransactionStatusDetail} " +
+                "PaymentMethodId={PaymentMethodId} PaymentMethodType={PaymentMethodType} " +
                 "Error={Error} ErrorCode={ErrorCode} CauseCode={CauseCode} " +
-                "CauseDescription={CauseDescription} ErrorDetails={ErrorDetails} Message={Message}",
+                "CauseDescription={CauseDescription} ErrorDetails={ErrorDetails} " +
+                "ErrorsSummary={ErrorsSummary} Message={Message}",
                 request.OrderId,
                 failure.HttpStatusCode,
                 failure.MercadoPagoRequestId,
@@ -150,11 +152,14 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
                 failure.TransactionId,
                 failure.TransactionStatus,
                 failure.TransactionStatusDetail,
+                failure.PaymentMethodId,
+                failure.PaymentMethodType,
                 failure.Error,
                 failure.ErrorCode,
                 failure.CauseCode,
                 failure.CauseDescription,
                 failure.ErrorDetailsSummary,
+                failure.ErrorsSummary,
                 providerMessage);
 
             throw new MercadoPagoPixChargeFailedException(
@@ -291,10 +296,13 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
                     TransactionId: null,
                     TransactionStatus: null,
                     TransactionStatusDetail: null,
+                    PaymentMethodId: null,
+                    PaymentMethodType: null,
                     ErrorCode: null,
                     CauseCode: null,
                     CauseDescription: null,
                     ErrorDetailsSummary: null,
+                    ErrorsSummary: null,
                     MercadoPagoRequestId: mercadoPagoRequestId);
             }
 
@@ -314,6 +322,7 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
                           ?? error.Transactions?.Payments?.FirstOrDefault();
 
             var detailsSummary = SummarizeErrorDetails(firstApiError?.Details);
+            var errorsSummary = SummarizeApiErrors(error.Errors);
             var providerMessage = BuildProviderMessage(error, firstApiError, firstCause, payment);
 
             return new MercadoPagoCreateOrderFailureDetails(
@@ -326,10 +335,13 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
                 TransactionId: NullIfWhiteSpace(payment?.Id),
                 TransactionStatus: NullIfWhiteSpace(payment?.Status),
                 TransactionStatusDetail: NullIfWhiteSpace(payment?.StatusDetail),
+                PaymentMethodId: NullIfWhiteSpace(payment?.PaymentMethod?.Id),
+                PaymentMethodType: NullIfWhiteSpace(payment?.PaymentMethod?.Type),
                 ErrorCode: NullIfWhiteSpace(firstApiError?.Code),
                 CauseCode: NullIfWhiteSpace(firstCause?.Code),
                 CauseDescription: NullIfWhiteSpace(firstCause?.Description),
                 ErrorDetailsSummary: detailsSummary,
+                ErrorsSummary: errorsSummary,
                 MercadoPagoRequestId: mercadoPagoRequestId);
         }
         catch
@@ -346,10 +358,13 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
                 TransactionId: null,
                 TransactionStatus: null,
                 TransactionStatusDetail: null,
+                PaymentMethodId: null,
+                PaymentMethodType: null,
                 ErrorCode: null,
                 CauseCode: null,
                 CauseDescription: null,
                 ErrorDetailsSummary: null,
+                ErrorsSummary: null,
                 MercadoPagoRequestId: mercadoPagoRequestId);
         }
     }
@@ -415,6 +430,31 @@ public sealed class MercadoPagoPixPaymentProvider : IPixPaymentProvider
             .ToArray();
 
         return parts.Length == 0 ? null : string.Join("; ", parts);
+    }
+
+    private static string? SummarizeApiErrors(MercadoPagoApiError[]? errors)
+    {
+        if (errors is null || errors.Length == 0)
+            return null;
+
+        var parts = errors
+            .Select(e =>
+            {
+                var code = NullIfWhiteSpace(e.Code);
+                var message = NullIfWhiteSpace(e.Message);
+                if (code is null && message is null)
+                    return null;
+                if (code is null)
+                    return message;
+                if (message is null)
+                    return code;
+                return $"{code}:{message}";
+            })
+            .Where(p => p is not null)
+            .Take(5)
+            .ToArray();
+
+        return parts.Length == 0 ? null : string.Join(" | ", parts!);
     }
 
     private static string? TryReadFlatOrderStatus(string responseBody)
