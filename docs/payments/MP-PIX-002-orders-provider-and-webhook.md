@@ -187,9 +187,15 @@ Checklist operacional:
 
 Falhas (incl. **HTTP 402** “The following transactions failed”) são desserializadas de forma estruturada. Logs incluem:
 
-- HTTP status, `x-request-id` (MP), order id, order/transaction `status`/`status_detail`
-- `errors[].code` / `details` resumidos, `cause` code/description quando presentes
+- `HttpStatus`, `MpRequestId` (`x-request-id`), `MpOrderId`
+- `OrderStatus` / `OrderStatusDetail`
+- `TransactionId` / `TransactionStatus` / `TransactionStatusDetail`
+- `PaymentMethodId` / `PaymentMethodType` (ex. `pix` / `bank_transfer`) — sem QR
+- `Error` / `ErrorCode` / `CauseCode` / `CauseDescription`
+- `ErrorDetails` / `ErrorsSummary` (resumo curto de `errors[]`)
 - mensagem curta (`ProviderMessage`) — **sem** token, QR, e-mail completo ou body bruto sensível
+
+**Não** loga AccessToken, WebhookSecret, documento, e-mail, QR ou body bruto.
 
 Causa típica do 402 Orders: transação Pix rejeitada no processamento (`status_detail` em `transactions.payments[]`, ex. `high_risk`, `rejected_by_issuer`, credenciais/conta). O body completo costuma vir em `errors` + `data`; versões antigas do provider só logavam `message` e descartavam o detalhe.
 

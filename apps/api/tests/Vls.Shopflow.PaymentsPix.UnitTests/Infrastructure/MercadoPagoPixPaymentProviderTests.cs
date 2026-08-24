@@ -137,7 +137,11 @@ public sealed class MercadoPagoPixPaymentProviderTests
                       "id": "PAY01MASKEDTXNID001",
                       "amount": "1.00",
                       "status": "failed",
-                      "status_detail": "high_risk"
+                      "status_detail": "high_risk",
+                      "payment_method": {
+                        "id": "pix",
+                        "type": "bank_transfer"
+                      }
                     }
                   ]
                 }
@@ -189,7 +193,11 @@ public sealed class MercadoPagoPixPaymentProviderTests
                     {
                       "id": "PAY01MASKEDTXNID002",
                       "status": "failed",
-                      "status_detail": "rejected_by_issuer"
+                      "status_detail": "rejected_by_issuer",
+                      "payment_method": {
+                        "id": "pix",
+                        "type": "bank_transfer"
+                      }
                     }
                   ]
                 }
@@ -210,8 +218,12 @@ public sealed class MercadoPagoPixPaymentProviderTests
         details.TransactionId.Should().Be("PAY01MASKEDTXNID002");
         details.TransactionStatus.Should().Be("failed");
         details.TransactionStatusDetail.Should().Be("rejected_by_issuer");
+        details.PaymentMethodId.Should().Be("pix");
+        details.PaymentMethodType.Should().Be("bank_transfer");
         details.ErrorCode.Should().Be("failed");
         details.ErrorDetailsSummary.Should().Contain("rejected_by_issuer");
+        details.ErrorsSummary.Should().Contain("failed");
+        details.ErrorsSummary.Should().Contain("The following transactions failed");
         details.ProviderMessage.Should().Contain("The following transactions failed");
         details.ProviderMessage.Should().Contain("rejected_by_issuer");
         // Must not surface raw body / payer / QR as the message when structured fields exist.
