@@ -5,7 +5,7 @@ namespace Vls.Shopflow.PaymentsPix.Infrastructure.MercadoPago;
 
 /// <summary>
 /// Adapter over <see cref="WebhookSignatureValidator"/> (mercadopago-sdk).
-/// Passes query data.id as received (SDK does not lowercase).
+/// Passes query data.id as received (SDK does not lowercase — diagnostic only vs official manual).
 /// </summary>
 public sealed class MercadoPagoOfficialWebhookSignatureClient : IMercadoPagoOfficialWebhookSignatureClient
 {

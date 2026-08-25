@@ -141,6 +141,10 @@ internal sealed class MercadoPagoOrderPaymentMethodResponse
     public string? TicketUrl { get; init; }
 }
 
+/// <summary>
+/// Error envelope for Mercado Pago Orders API failures (incl. HTTP 402 transaction failures).
+/// 402 often returns <c>errors[]</c> + nested <c>data</c> (order/transactions) rather than a flat message-only body.
+/// </summary>
 internal sealed class MercadoPagoErrorResponse
 {
     [JsonPropertyName("message")]
@@ -149,14 +153,40 @@ internal sealed class MercadoPagoErrorResponse
     [JsonPropertyName("error")]
     public string? Error { get; init; }
 
-    [JsonPropertyName("status")]
-    public int? Status { get; init; }
-
     [JsonPropertyName("cause")]
     public MercadoPagoErrorCause[]? Cause { get; init; }
 
     [JsonPropertyName("errors")]
     public MercadoPagoApiError[]? Errors { get; init; }
+
+    /// <summary>Nested order snapshot on some failure responses (e.g. HTTP 402).</summary>
+    [JsonPropertyName("data")]
+    public MercadoPagoErrorOrderData? Data { get; init; }
+
+    // Flat order fields when MP returns the order body with a non-2xx status.
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+
+    [JsonPropertyName("status_detail")]
+    public string? StatusDetail { get; init; }
+
+    [JsonPropertyName("transactions")]
+    public MercadoPagoOrderTransactionsResponse? Transactions { get; init; }
+}
+
+internal sealed class MercadoPagoErrorOrderData
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; init; }
+
+    [JsonPropertyName("status_detail")]
+    public string? StatusDetail { get; init; }
+
+    [JsonPropertyName("transactions")]
+    public MercadoPagoOrderTransactionsResponse? Transactions { get; init; }
 }
 
 internal sealed class MercadoPagoErrorCause
@@ -175,4 +205,30 @@ internal sealed class MercadoPagoApiError
 
     [JsonPropertyName("message")]
     public string? Message { get; init; }
+
+    [JsonPropertyName("details")]
+    public string[]? Details { get; init; }
 }
+
+/// <summary>
+/// Safe, structured snapshot of a Mercado Pago create-order failure for logging/diagnostics.
+/// Does not include payer PII, tokens, QR codes, or raw response bodies.
+/// </summary>
+internal sealed record MercadoPagoCreateOrderFailureDetails(
+    int HttpStatusCode,
+    string? ProviderMessage,
+    string? Error,
+    string? ProviderOrderId,
+    string? OrderStatus,
+    string? OrderStatusDetail,
+    string? TransactionId,
+    string? TransactionStatus,
+    string? TransactionStatusDetail,
+    string? PaymentMethodId,
+    string? PaymentMethodType,
+    string? ErrorCode,
+    string? CauseCode,
+    string? CauseDescription,
+    string? ErrorDetailsSummary,
+    string? ErrorsSummary,
+    string? MercadoPagoRequestId);

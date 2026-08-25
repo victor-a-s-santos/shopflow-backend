@@ -64,6 +64,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      # No wget/curl in the aspnet runtime image — raw HTTP over bash /dev/tcp.
+      test:
+        - CMD-SHELL
+        - >
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 &&
+          cat <&3 | tee /tmp/shopflow-health |
+          grep -q "\"status\":\"ok\"" &&
+          grep -q "\"environment\":\"Production\"" /tmp/shopflow-health'
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 120s
     networks:
       - shopflow
 
@@ -82,7 +96,7 @@ services:
       postgres:
         condition: service_healthy
       api-prod:
-        condition: service_started
+        condition: service_healthy
     networks:
       - shopflow
 
