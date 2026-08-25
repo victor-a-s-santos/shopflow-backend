@@ -185,11 +185,15 @@ R2ImageBackfill__Enabled=false
 ```bash
 cd /opt/shopflow/app/deploy
 docker compose -f docker-compose.prod.yml config
-docker compose -f docker-compose.prod.yml up -d --build
+# Preferível (mesmo contrato do CI): rebuild limpo + recreate
+./scripts/deploy-prod.sh
+# Alternativa bootstrap: docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml ps
 ```
 
 Containers esperados: `shopflow-caddy-prod`, `shopflow-postgres-prod`, `shopflow-api-prod`, `shopflow-worker-prod`.
+
+**Atenção:** `rsync`/`git pull` sozinho **não** atualiza a API. Sem `build` + recreate, o health pode responder 200 com imagem antiga.
 
 ### 2.5 Conferir banco e volumes
 
@@ -221,12 +225,17 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 
 ### 2.7 Deploys seguintes (manual)
 
+Preferir CI (`main` / `workflow_dispatch` em **Deploy PROD**). Em emergência:
+
 ```bash
 cd /opt/shopflow/app/deploy
 ./scripts/deploy-prod.sh
 # migrations = restart da API (automáticas no startup)
 ./scripts/migrate-prod.sh
+docker compose -f docker-compose.prod.yml images api-prod worker-prod
 ```
+
+`deploy-prod.sh` faz `build --no-cache` + `up -d --force-recreate --no-deps` em **api-prod e worker-prod** (igual ao workflow). Não use só `up -d` após sync.
 
 Não use `docker compose` **sem** `-f docker-compose.prod.yml` nesta VPS — o `docker-compose.yml` padrão é a stack TESTE/HML e não deve subir aqui.
 

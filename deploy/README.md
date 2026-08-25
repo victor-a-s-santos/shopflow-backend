@@ -187,6 +187,10 @@ Isso sobe: `postgres`, `caddy`, `api-test` e `api-hml`.
 
 ### 4. Deploys subsequentes por ambiente
 
+**`rsync` / `git pull` ≠ deploy.** O código em `/opt/shopflow/app` só entra em execução depois de **rebuild das imagens** e **recreate** dos containers `api-*` / `worker-*`. Health 200 com imagem antiga é um falso positivo.
+
+Scripts manuais alinham com o CI (`build --no-cache` + `up -d --force-recreate --no-deps`):
+
 ```bash
 # Apenas teste
 ./scripts/deploy-test.sh
@@ -194,6 +198,8 @@ Isso sobe: `postgres`, `caddy`, `api-test` e `api-hml`.
 # Apenas homologação
 ./scripts/deploy-hml.sh
 ```
+
+Prefira o GitHub Actions quando possível. Em emergência na VPS, use só esses scripts (ou o equivalente do workflow) — nunca `up -d` sem `build` após sync de código.
 
 ### 5. Migrations
 
@@ -266,9 +272,11 @@ PROD **não** entra no `docker-compose.yml` de TESTE/HML. Usa arquivo e VPS pró
 | Banco | `shopflow_prod` (`postgres/init-prod.sql`) |
 | Env | `.env` (Postgres) + `.env.prod` (API/worker) |
 | DataProtection | volume `shopflow_dataprotection_prod` |
-| Deploy | `./scripts/deploy-prod.sh` |
-| CI | [`.github/workflows/deploy-prod.yml`](../.github/workflows/deploy-prod.yml) — `main` → PROD |
+| Deploy | `./scripts/deploy-prod.sh` (`build --no-cache` + `--force-recreate` api/worker) |
+| CI | [`.github/workflows/deploy-prod.yml`](../.github/workflows/deploy-prod.yml) — `main` → PROD (mesmo contrato) |
 | Secrets CI | `VPS_PROD_HOST`, `VPS_PROD_USER`, `VPS_PROD_SSH_KEY_B64` (nunca os de TESTE/HML) |
+
+**Armadilha:** syncar código na VPS PROD sem rebuild deixa a API/worker com a DLL antiga. Confirme pós-deploy com `docker compose -f docker-compose.prod.yml images api-prod worker-prod` (Created recente) + `/health`.
 
 Validar o Compose **sem** subir containers:
 
