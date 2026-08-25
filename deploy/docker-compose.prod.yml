@@ -1,6 +1,9 @@
 # Stack exclusiva de PRODUÇÃO (VPS própria).
 # Não usar este arquivo na VPS de TESTE/HML.
-# Uso: docker compose -f docker-compose.prod.yml up -d --build
+#
+# Publicar código: ./scripts/deploy-prod.sh (ou CI deploy-prod.yml).
+# Nunca assumir que rsync/git pull sozinho atualiza a API — é preciso
+# build --no-cache + up --force-recreate de api-prod e worker-prod.
 #
 # ADR: docs/infra/ADR-005-production-infrastructure.md
 

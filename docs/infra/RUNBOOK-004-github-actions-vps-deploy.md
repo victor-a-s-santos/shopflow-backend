@@ -228,6 +228,28 @@ Não use `docker compose down`. Não remova volumes.
 
 ---
 
+## 14. `rsync` ≠ deploy (imagem Docker)
+
+A API e o worker **não** montam o código-fonte em runtime: rodam DLLs embutidas na imagem. Por isso:
+
+| Passo | Publica código novo? |
+|-------|----------------------|
+| Só `rsync` / `git pull` na VPS | **Não** |
+| `docker compose up -d` sem `build` | **Não** (reusa imagem antiga) |
+| `build --no-cache` + `up -d --force-recreate` api **e** worker | **Sim** |
+
+O CI já faz rebuild+recreate. Scripts manuais `deploy/scripts/deploy-{test,hml,prod}.sh` usam o **mesmo** contrato. Não faça sync avulso seguido de recreate sem build — foi a causa de PROD rodar DLL antiga com health OK.
+
+Smoke rápido pós-deploy:
+
+```bash
+cd /opt/shopflow/app/deploy
+docker compose images api-test worker-test   # ou api-hml / api-prod + -f docker-compose.prod.yml
+curl -fsS https://api-teste.vipassessoriadigital.com.br/health
+```
+
+---
+
 ## Checklist de configuração (uma vez)
 
 - [ ] `ssh-keygen … -f ~/.ssh/shopflow_actions_vps`

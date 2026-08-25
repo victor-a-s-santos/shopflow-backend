@@ -113,6 +113,7 @@ cd deploy
 ./scripts/deploy-test.sh   # ou deploy-hml.sh
 ```
 
+Os scripts fazem `build --no-cache` + `--force-recreate` (igual ao CI). Só sincronizar código na VPS **não** publica a API — ver [RUNBOOK-004 §14](./RUNBOOK-004-github-actions-vps-deploy.md).
 ### Teste manual de preflight (OPTIONS)
 
 Simula o que o navegador envia antes de um `fetch` cross-origin.
