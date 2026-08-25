@@ -65,7 +65,7 @@ public sealed class CustomerAccountPort(
 
     public async Task SignInAsync(Guid customerUserId, CancellationToken cancellationToken)
     {
-        var (succeeded, _) = await signInService.SignInAsync(customerUserId, cancellationToken);
+        var (succeeded, _) = await signInService.SignInAsync(customerUserId, rememberMe: false, cancellationToken);
         if (!succeeded)
         {
             // Account was created and order linked; session is best-effort.

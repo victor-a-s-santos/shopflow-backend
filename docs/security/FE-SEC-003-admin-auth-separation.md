@@ -150,7 +150,8 @@ Misturar customer e admin no frontend ou na sessão do navegador introduz falhas
 | Autenticado | Renderiza `<Outlet />` |
 
 **Fonte de verdade:** `AuthContext` → `GET /auth/customer/me` no mount.  
-**401 em `/auth/customer/me`:** trata como visitante; **sem** redirect global na vitrine (apenas nas rotas `/account/*`).
+**401 em `/auth/customer/me`:** trata como visitante; **sem** redirect global na vitrine (apenas nas rotas `/account/*`).  
+**401 em APIs customer protegidas:** limpa estado local + cache React Query e pede login de novo nas rotas `/account/*`. Guest order 401 **não** derruba a sessão customer.
 
 ### `AdminRouteGuard`
 

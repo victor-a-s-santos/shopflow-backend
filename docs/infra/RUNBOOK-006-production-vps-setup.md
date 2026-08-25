@@ -154,8 +154,21 @@ cp .env.example .env
 cp .env.prod.example .env.prod
 chmod 600 .env .env.prod
 nano .env          # POSTGRES_USER + POSTGRES_PASSWORD fortes e exclusivos
-nano .env.prod     # connection strings, R2, Brevo, MP, admin, CORS
+nano .env.prod     # connection strings, R2, Brevo, MP, admin, CORS, session timeouts
 ```
+
+Timeouts de sessão (não são secrets; defaults no código se omitidos):
+
+```
+AdminAuth__IdleMinutes=30
+AdminAuth__AbsoluteHours=8
+CustomerAuth__SessionHours=12
+CustomerAuth__AbsoluteDays=7
+CustomerAuth__RememberMeDays=14
+```
+
+Após o deploy desta política, sessões **já abertas** recebem um teto absoluto na primeira request (não permanecem infinitas). Admins e customers podem precisar entrar de novo. Guest order access **não** muda.
+
 
 A senha em `.env` **deve** ser a mesma das `ConnectionStrings__*` em `.env.prod`.
 

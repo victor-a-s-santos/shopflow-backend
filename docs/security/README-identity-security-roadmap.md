@@ -12,6 +12,11 @@
 | `SHOPFLOW_DEMO_CUSTOMER_EMAIL` / `SHOPFLOW_DEMO_CUSTOMER_PASSWORD` | Não | Defaults: `teste@teste.com.br` / `Shopflow@123` (cliente já **Approved**) |
 | `SHOPFLOW_DEMO_USERS_RESET_PASSWORD` | Não | `true` só para regravar senhas demo; depois `false` |
 | `DataProtection__KeysPath` | Recomendado (Docker) | Pasta para chaves ASP.NET Data Protection (default: `./dataprotection-keys`) |
+| `AdminAuth__IdleMinutes` | Não | Idle admin (default `30`) |
+| `AdminAuth__AbsoluteHours` | Não | Teto absoluto admin desde o login (default `8`) |
+| `CustomerAuth__SessionHours` | Não | Idle customer sem Remember Me (default `12`) |
+| `CustomerAuth__AbsoluteDays` | Não | Teto absoluto customer sem Remember Me (default `7`) |
+| `CustomerAuth__RememberMeDays` | Não | Remember Me customer, teto 14 (default `14`) |
 
 Em **Development**, o seed só roda se `SHOPFLOW_ADMIN_EMAIL` e `SHOPFLOW_ADMIN_PASSWORD` estiverem definidos.
 
@@ -26,7 +31,16 @@ Em **hml/prod**, a API falha na inicialização se essas variáveis não existir
 | Development | `shopflow_admin_dev` | SameAsRequest |
 | hml/prod | `__Host-shopflow_admin` | Always |
 
-Propriedades: HttpOnly, SameSite=Lax, Path=/, sem Domain.
+Propriedades: HttpOnly, SameSite=Lax, Path=/, sem Domain. Sem `Cookie.MaxAge` global — o ticket usa `ExpireTimeSpan` (idle) e Remember Me define `Expires` no cookie persistente.
+
+### Tempo de sessão
+
+| Papel | Idle (sliding) | Absolute (desde o login) | Remember Me | Persistente |
+|-------|----------------|--------------------------|-------------|-------------|
+| Admin | 30 min (`AdminAuth:IdleMinutes`) | 8 h (`AdminAuth:AbsoluteHours`) | Não | Não |
+| Customer | 12 h (`CustomerAuth:SessionHours`) | 7 d (`CustomerAuth:AbsoluteDays`) | Opcional, máx. 14 d | Só com Remember Me |
+
+Sliding renewal **não** pode ultrapassar o absolute timeout (`sf.session_started` no ticket). `AdminAuth:SessionHours` e `CustomerAuth:SessionDays` são fallback legado.
 
 ## Cookie customer
 

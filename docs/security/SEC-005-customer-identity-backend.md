@@ -43,6 +43,8 @@ Cria usuário com role `Customer`, `is_customer=true`, `is_staff=false`. **Não 
 
 Autentica via scheme `CustomerCookie`. Usuários `IsStaff` ou sem role `Customer` recebem 401 genérico. Login permitido **sem** e-mail confirmado (MVP documentado).
 
+Body opcional: `rememberMe` (default `false`). Sem Remember Me a sessão é de navegador (cookie de sessão) com idle 12h e teto absoluto de 7 dias. Com Remember Me o cookie é persistente, limitado a 14 dias.
+
 ### Logout (204)
 
 Sign-out apenas do scheme `CustomerCookie`. Não invalida sessão admin.
@@ -68,9 +70,11 @@ Retorna dados básicos do cliente autenticado pelo cookie customer. Cookie admin
 
 Propriedades: HttpOnly, Path=/, sem Domain (obrigatório com `__Host-`).
 
-Configuração: `appsettings` → `CustomerAuth` (`SessionDays`, nomes dev/prod).
+Configuração: `appsettings` / env → `CustomerAuth` (`SessionHours`, `AbsoluteDays`, `RememberMeDays`, nomes de cookie).
 
-Sessão: sliding expiration, default **30 dias**.
+`CustomerAuth:SessionDays` continua aceito só como fallback legado quando `SessionHours` não está definido.
+
+Sessão: **idle 12 horas** (sliding) + **absolute 7 dias** a partir do login. Remember Me opcional: cookie persistente, máximo **14 dias** (idle e absolute). Nunca infinita.
 
 ---
 
