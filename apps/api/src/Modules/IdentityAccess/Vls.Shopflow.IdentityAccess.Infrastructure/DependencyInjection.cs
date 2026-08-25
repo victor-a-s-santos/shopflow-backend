@@ -9,10 +9,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
 using Vls.Shopflow.IdentityAccess.Application.Options;
 using Vls.Shopflow.IdentityAccess.Application.Services;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
+using Vls.Shopflow.IdentityAccess.Infrastructure.Authentication;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Identity;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Middleware;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Options;
@@ -133,6 +135,10 @@ public static class DependencyInjection
 
         services.AddScoped<IUserClaimsPrincipalFactory<ShopflowUser>, ShopflowUserClaimsPrincipalFactory>();
 
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, CookieTimeProviderPostConfigure>();
+        services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, CookieSessionEventsPostConfigure>();
+
         var securePolicy = environment.IsDevelopment()
             ? CookieSecurePolicy.SameAsRequest
             : CookieSecurePolicy.Always;
@@ -145,7 +151,7 @@ public static class DependencyInjection
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.Cookie.SecurePolicy = securePolicy;
             options.SlidingExpiration = true;
-            options.ExpireTimeSpan = TimeSpan.FromHours(adminAuthOptions.SessionHours);
+            options.ExpireTimeSpan = adminAuthOptions.GetIdleLifetime();
             options.LoginPath = "/api/auth/admin/login";
             options.Events.OnRedirectToLogin = ctx =>
             {
@@ -174,7 +180,7 @@ public static class DependencyInjection
                 options.Cookie.SameSite = SameSiteMode.Lax;
                 options.Cookie.SecurePolicy = securePolicy;
                 options.SlidingExpiration = true;
-                options.ExpireTimeSpan = TimeSpan.FromDays(customerAuthOptions.SessionDays);
+                options.ExpireTimeSpan = customerAuthOptions.GetIdleLifetime();
                 options.LoginPath = "/api/auth/customer/login";
                 options.Events.OnRedirectToLogin = ctx =>
                 {

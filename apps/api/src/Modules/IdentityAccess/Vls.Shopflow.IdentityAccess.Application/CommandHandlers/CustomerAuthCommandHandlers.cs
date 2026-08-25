@@ -17,7 +17,12 @@ public sealed class LoginCustomerCommandHandler(ICustomerLoginService service)
     : IRequestHandler<LoginCustomerCommand, CustomerLoginResult>
 {
     public Task<CustomerLoginResult> Handle(LoginCustomerCommand request, CancellationToken cancellationToken)
-        => service.LoginAsync(request.Email, request.Password, request.IpAddress, cancellationToken);
+        => service.LoginAsync(
+            request.Email,
+            request.Password,
+            request.IpAddress,
+            request.RememberMe,
+            cancellationToken);
 }
 
 public sealed class CustomerLogoutCommandHandler(ICustomerSignInService signInService)

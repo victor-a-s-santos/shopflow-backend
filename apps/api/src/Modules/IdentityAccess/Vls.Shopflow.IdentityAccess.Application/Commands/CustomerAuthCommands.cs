@@ -12,7 +12,8 @@ public sealed record RegisterCustomerCommand(
 public sealed record LoginCustomerCommand(
     string Email,
     string Password,
-    string? IpAddress) : IRequest<CustomerLoginResult>;
+    string? IpAddress,
+    bool RememberMe = false) : IRequest<CustomerLoginResult>;
 
 public sealed record CustomerLogoutCommand : IRequest;
 

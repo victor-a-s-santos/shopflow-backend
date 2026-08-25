@@ -65,7 +65,8 @@ public static class CustomerAuthEndpoints
             CancellationToken ct) =>
         {
             var ip = ctx.Connection.RemoteIpAddress?.ToString();
-            var result = await sender.Send(new LoginCustomerCommand(req.Email, req.Password, ip), ct);
+            var result = await sender.Send(
+                new LoginCustomerCommand(req.Email, req.Password, ip, req.RememberMe), ct);
 
             if (!result.Succeeded || result.Customer is null)
                 return Results.Json(
@@ -170,7 +171,7 @@ public sealed record RegisterCustomerRequest(
     string FullName,
     string? Phone);
 
-public sealed record CustomerLoginRequest(string Email, string Password);
+public sealed record CustomerLoginRequest(string Email, string Password, bool RememberMe = false);
 
 public sealed record CustomerForgotPasswordRequest(string Email);
 

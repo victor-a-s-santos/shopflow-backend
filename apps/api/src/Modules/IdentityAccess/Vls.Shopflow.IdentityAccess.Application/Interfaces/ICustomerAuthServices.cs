@@ -25,6 +25,7 @@ public interface ICustomerLoginService
         string email,
         string password,
         string? ipAddress,
+        bool rememberMe = false,
         CancellationToken cancellationToken = default);
 }
 
@@ -32,6 +33,7 @@ public interface ICustomerSignInService
 {
     Task<(bool Succeeded, string? ErrorMessage)> SignInAsync(
         Guid userId,
+        bool rememberMe = false,
         CancellationToken cancellationToken = default);
 
     Task SignOutAsync(CancellationToken cancellationToken = default);

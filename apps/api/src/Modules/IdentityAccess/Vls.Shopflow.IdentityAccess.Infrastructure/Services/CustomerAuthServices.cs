@@ -3,13 +3,16 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.IdentityAccess.Application.DataTransferObjects;
 using Vls.Shopflow.IdentityAccess.Application.Interfaces;
 using Vls.Shopflow.IdentityAccess.Application.Security;
 using Vls.Shopflow.IdentityAccess.Application.Services;
 using Vls.Shopflow.IdentityAccess.Domain.Constants;
 using Vls.Shopflow.IdentityAccess.Domain.Enums;
+using Vls.Shopflow.IdentityAccess.Infrastructure.Authentication;
 using Vls.Shopflow.IdentityAccess.Infrastructure.Identity;
+using Vls.Shopflow.IdentityAccess.Infrastructure.Options;
 
 namespace Vls.Shopflow.IdentityAccess.Infrastructure.Services;
 
@@ -188,6 +191,7 @@ public sealed class CustomerLoginService(
         string email,
         string password,
         string? ipAddress,
+        bool rememberMe = false,
         CancellationToken cancellationToken = default)
     {
         var normalizedEmail = email.Trim();
@@ -232,7 +236,10 @@ public sealed class CustomerLoginService(
 
         await userManager.ResetAccessFailedCountAsync(user);
 
-        var (signInSucceeded, _) = await customerSignInService.SignInAsync(user.Id, cancellationToken);
+        var (signInSucceeded, _) = await customerSignInService.SignInAsync(
+            user.Id,
+            rememberMe,
+            cancellationToken);
         if (!signInSucceeded)
         {
             return new CustomerLoginResult(false, null, GenericError);
@@ -255,11 +262,15 @@ public sealed class CustomerLoginService(
 public sealed class CustomerSignInService(
     SignInManager<ShopflowUser> signInManager,
     UserManager<ShopflowUser> userManager,
-    IHttpContextAccessor httpContextAccessor)
+    IHttpContextAccessor httpContextAccessor,
+    TimeProvider timeProvider,
+    IOptions<CustomerAuthOptions> customerAuthOptions,
+    ILogger<CustomerSignInService> logger)
     : ICustomerSignInService
 {
     public async Task<(bool Succeeded, string? ErrorMessage)> SignInAsync(
         Guid userId,
+        bool rememberMe = false,
         CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());
@@ -272,15 +283,24 @@ public sealed class CustomerSignInService(
         var httpContext = httpContextAccessor.HttpContext
             ?? throw new InvalidOperationException("HttpContext is not available.");
 
+        var now = timeProvider.GetUtcNow();
+        var options = customerAuthOptions.Value;
+        var absolute = rememberMe ? options.GetRememberMeLifetime() : options.GetAbsoluteLifetime();
+        var properties = new AuthenticationProperties
+        {
+            IsPersistent = rememberMe,
+            AllowRefresh = true
+        };
+        if (rememberMe)
+            properties.ExpiresUtc = now.Add(options.GetRememberMeLifetime());
+
+        CookieSessionExpiration.Stamp(properties, now, absolute);
+
         var principal = await signInManager.CreateUserPrincipalAsync(user);
         await httpContext.SignInAsync(
             AuthSchemes.CustomerCookie,
             principal,
-            new AuthenticationProperties
-            {
-                IsPersistent = false,
-                AllowRefresh = true
-            });
+            properties);
 
         return (true, null);
     }
@@ -291,13 +311,16 @@ public sealed class CustomerSignInService(
         if (httpContext is null)
             return;
 
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
         await httpContext.SignOutAsync(AuthSchemes.CustomerCookie);
+        logger.LogInformation("Customer logout. UserId={UserId}", userId ?? "unknown");
     }
 }
 
 public sealed class CurrentCustomerAccessor(
     IHttpContextAccessor httpContextAccessor,
-    UserManager<ShopflowUser> userManager)
+    UserManager<ShopflowUser> userManager,
+    ILogger<CurrentCustomerAccessor> logger)
     : ICurrentCustomerAccessor
 {
     public async Task<CustomerUserDto?> GetCurrentCustomerAsync(CancellationToken cancellationToken = default)
@@ -308,7 +331,13 @@ public sealed class CurrentCustomerAccessor(
 
         var authResult = await httpContext.AuthenticateAsync(AuthSchemes.CustomerCookie);
         if (!authResult.Succeeded || authResult.Principal is null)
+        {
+            CookieSessionExpiration.LogIdleExpirationIfPresent(
+                authResult,
+                AuthSchemes.CustomerCookie,
+                logger);
             return null;
+        }
 
         var userIdClaim = authResult.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
