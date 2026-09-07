@@ -48,7 +48,8 @@ public sealed class CreateOrderFromCheckoutSessionCommandHandler(
                 i.SkuCode,
                 i.Quantity,
                 i.UnitPrice,
-                ToOrderItemSalesSnapshot(i)))
+                ToOrderItemSalesSnapshot(i),
+                i.ProductImageUrl))
             .ToList();
 
         var order = Order.CreatePendingPayment(

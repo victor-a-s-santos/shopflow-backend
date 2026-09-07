@@ -33,7 +33,8 @@ internal static class OrderMapper
                 i.Quantity,
                 i.UnitPrice,
                 i.Subtotal,
-                OrderItemSalesDisplayMapper.ToDto(i))).ToList(),
+                OrderItemSalesDisplayMapper.ToDto(i),
+                i.ProductImageUrl)).ToList(),
             order.Subtotal,
             order.ShippingAmount,
             order.Total,
@@ -68,7 +69,7 @@ internal static class OrderMapper
                 i.UnitPrice,
                 i.Subtotal,
                 Attributes: null,
-                ImageUrl: null,
+                ImageUrl: i.ProductImageUrl,
                 SalesDisplay: OrderItemSalesDisplayMapper.ToDto(i))).ToList(),
             new DataTransferObjects.GuestOrderTotalsDto(
                 order.Subtotal,

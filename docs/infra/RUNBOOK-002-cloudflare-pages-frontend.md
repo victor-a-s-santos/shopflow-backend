@@ -45,6 +45,8 @@ Referência local (não commitar `.env.test` / `.env.hml` com secrets):
 ```env
 VITE_API_BASE_URL=https://api-teste.vipassessoriadigital.com.br/api
 VITE_APP_ENV=test
+VITE_ORDER_TRACKING_PREPARING_LABEL=Em estoque
+VITE_ORDER_TRACKING_SHIPPED_LABEL=Separado
 ```
 
 ### Homologação
@@ -52,9 +54,22 @@ VITE_APP_ENV=test
 ```env
 VITE_API_BASE_URL=https://api-hml.vipassessoriadigital.com.br/api
 VITE_APP_ENV=hml
+VITE_ORDER_TRACKING_PREPARING_LABEL=Em estoque
+VITE_ORDER_TRACKING_SHIPPED_LABEL=Separado
+```
+
+### Produção (Pages)
+
+```env
+VITE_API_BASE_URL=https://api.vipassessoriadigital.com.br/api
+VITE_APP_ENV=prod
+VITE_ORDER_TRACKING_PREPARING_LABEL=Em estoque
+VITE_ORDER_TRACKING_SHIPPED_LABEL=Separado
 ```
 
 `VITE_APP_ENV` é informativa (build-time); a URL da API é definida por `VITE_API_BASE_URL`.
+
+**Labels de acompanhamento (repo-controlled):** `apps/web/.env.production` é versionado e o Vite carrega no `npm run build` (mode=production) de **TESTE, HML e PROD**. Não precisa de secret. Variáveis homônimas no dashboard do Pages, se existirem, têm prioridade.
 
 ---
 
@@ -98,8 +113,10 @@ Em **Environment variables** (escopo **Production**):
 | `NODE_VERSION` | `20` |
 | `VITE_SUPPORT_WHATSAPP_ENABLED` | `true` |
 | `VITE_SUPPORT_WHATSAPP_PHONE` | número real só dígitos (ex. `5511…`) — **nunca** `55DDDNUMERO` / `5511999999999` |
+| `VITE_ORDER_TRACKING_PREPARING_LABEL` | `Em estoque` (VIP Assessoria) |
+| `VITE_ORDER_TRACKING_SHIPPED_LABEL` | `Separado` (VIP Assessoria) |
 
-`VITE_*` entra no **build**. Qualquer mudança de telefone exige **Retry deployment** / novo build.
+`VITE_*` entra no **build**. Qualquer mudança de telefone ou label de acompanhamento exige **Retry deployment** / novo build.
 
 Salve e dispare o primeiro deploy (push em `develop` ou **Retry deployment**).
 
@@ -147,6 +164,8 @@ Variáveis (**Production**):
 | `NODE_VERSION` | `20` |
 | `VITE_SUPPORT_WHATSAPP_ENABLED` | `true` |
 | `VITE_SUPPORT_WHATSAPP_PHONE` | número real só dígitos — não usar placeholder |
+| `VITE_ORDER_TRACKING_PREPARING_LABEL` | `Em estoque` (VIP Assessoria) |
+| `VITE_ORDER_TRACKING_SHIPPED_LABEL` | `Separado` (VIP Assessoria) |
 
 Domínio customizado: `hml.vipassessoriadigital.com.br`.
 
@@ -232,8 +251,23 @@ Não é necessário GitHub Actions para o frontend nesta fase (integração nati
 
 ---
 
+## Produção (frontend Pages)
+
+Projeto Pages da loja (`vipassessoriadigital.com.br` / `www`). Branch de produção: `main` (ou a branch configurada no projeto).
+
+Variáveis **Production** do Pages (além das labels já baked em `.env.production`):
+
+| Nome | Valor |
+|------|--------|
+| `VITE_API_BASE_URL` | `https://api.vipassessoriadigital.com.br/api` |
+| `VITE_APP_ENV` | `prod` |
+| `NODE_VERSION` | `20` |
+| `VITE_SUPPORT_WHATSAPP_ENABLED` | `true` |
+| `VITE_SUPPORT_WHATSAPP_PHONE` | número real só dígitos |
+| `VITE_ORDER_TRACKING_PREPARING_LABEL` | `Em estoque` |
+| `VITE_ORDER_TRACKING_SHIPPED_LABEL` | `Separado` |
+
 ## Escopo fora deste runbook
 
-- Ambiente de **produção** (domínio final da loja).
 - Alterações no backend ou banco.
 - Pipelines GitHub Actions para o frontend.

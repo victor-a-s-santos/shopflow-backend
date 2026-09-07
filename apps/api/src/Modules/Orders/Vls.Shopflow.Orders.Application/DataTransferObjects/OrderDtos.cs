@@ -18,7 +18,8 @@ public sealed record OrderItemDto(
     int Quantity,
     decimal UnitPrice,
     decimal Subtotal,
-    OrderItemSalesDisplayDto? SalesDisplay = null);
+    OrderItemSalesDisplayDto? SalesDisplay = null,
+    string? ImageUrl = null);
 
 public sealed record OrderDto(
     Guid OrderId,

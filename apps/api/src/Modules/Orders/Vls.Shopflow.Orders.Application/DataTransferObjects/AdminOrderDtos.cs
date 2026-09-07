@@ -77,7 +77,8 @@ public sealed record AdminOrderItemDto(
     int Quantity,
     decimal UnitPrice,
     decimal Subtotal,
-    OrderItemSalesDisplayDto? SalesDisplay = null);
+    OrderItemSalesDisplayDto? SalesDisplay = null,
+    string? ImageUrl = null);
 
 public sealed record AdminOrderDetailDto(
     Guid Id,

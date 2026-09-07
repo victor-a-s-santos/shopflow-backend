@@ -411,6 +411,10 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                     b.Property<int?>("PackageSize")
                         .HasColumnType("integer");
 
+                    b.Property<string>("ProductImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ProductName")
                         .IsRequired()
                         .HasMaxLength(200)

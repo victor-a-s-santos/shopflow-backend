@@ -69,7 +69,8 @@ public sealed class CreateCheckoutSessionCommandHandler(
                     line.Quantity,
                     pricing.UnitPrice,
                     reservationId,
-                    salesSnapshot));
+                    salesSnapshot,
+                    pricing.ProductImageUrl));
             }
 
             DeliveryMethod? preferredMethod = null;

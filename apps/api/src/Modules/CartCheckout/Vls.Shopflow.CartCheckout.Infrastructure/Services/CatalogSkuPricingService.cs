@@ -30,6 +30,7 @@ public sealed class CatalogSkuPricingService(CartCheckoutDbContext db) : ICatalo
         public string? PackageDescription { get; init; }
         public string? QuantityUnitLabel { get; init; }
         public bool ShowTotalPieces { get; init; }
+        public string? ProductImageUrl { get; init; }
     }
 
     public async Task<SkuPricingSnapshot?> GetBySkuIdAsync(Guid skuId, CancellationToken cancellationToken)
@@ -55,7 +56,14 @@ public sealed class CatalogSkuPricingService(CartCheckoutDbContext db) : ICatalo
                     s.package_label AS "PackageLabel",
                     s.package_description AS "PackageDescription",
                     s.quantity_unit_label AS "QuantityUnitLabel",
-                    COALESCE(s.show_total_pieces, FALSE) AS "ShowTotalPieces"
+                    COALESCE(s.show_total_pieces, FALSE) AS "ShowTotalPieces",
+                    (
+                        SELECT img."Url"
+                        FROM catalog.product_images img
+                        WHERE img."ProductId" = p."Id"
+                        ORDER BY img."IsPrimary" DESC, img."SortOrder" ASC
+                        LIMIT 1
+                    ) AS "ProductImageUrl"
                 FROM catalog.product_skus s
                 INNER JOIN catalog.products p ON p."Id" = s."ProductId"
                 WHERE s."Id" = {skuId}
@@ -100,6 +108,7 @@ public sealed class CatalogSkuPricingService(CartCheckoutDbContext db) : ICatalo
                 row.PackageLabel,
                 row.PackageDescription,
                 row.QuantityUnitLabel,
-                row.ShowTotalPieces));
+                row.ShowTotalPieces),
+            string.IsNullOrWhiteSpace(row.ProductImageUrl) ? null : row.ProductImageUrl);
     }
 }

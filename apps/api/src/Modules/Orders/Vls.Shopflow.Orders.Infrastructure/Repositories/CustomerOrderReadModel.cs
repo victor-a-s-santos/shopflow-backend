@@ -53,7 +53,11 @@ public sealed class CustomerOrderReadModel(OrdersDbContext db) : ICustomerOrderR
                 o.PreferredDeliveryMethod,
                 o.PreferredDeliveryDate,
                 o.ShippedAt,
-                o.DeliveredAt))
+                o.DeliveredAt,
+                o.Items
+                    .OrderBy(i => i.ProductName)
+                    .Select(i => i.ProductImageUrl)
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         return new CustomerOrderListPage(pageItems, totalItems);

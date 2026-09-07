@@ -20,7 +20,8 @@ public sealed record SkuPricingSnapshot(
     decimal UnitPrice,
     bool SkuIsActive,
     bool ProductIsActive,
-    SkuSalesRuleSnapshot SalesRule);
+    SkuSalesRuleSnapshot SalesRule,
+    string? ProductImageUrl = null);
 
 public interface ICatalogSkuPricingService
 {

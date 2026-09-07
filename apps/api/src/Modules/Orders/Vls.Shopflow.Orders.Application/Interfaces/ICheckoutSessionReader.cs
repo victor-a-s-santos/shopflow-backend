@@ -15,7 +15,8 @@ public sealed record CheckoutSessionItemSnapshot(
     bool? ShowTotalPieces,
     int? TotalPieces,
     decimal? EquivalentUnitPrice,
-    string? SalesDisplaySummary);
+    string? SalesDisplaySummary,
+    string? ProductImageUrl = null);
 
 public sealed record CheckoutSessionSnapshot(
     Guid Id,

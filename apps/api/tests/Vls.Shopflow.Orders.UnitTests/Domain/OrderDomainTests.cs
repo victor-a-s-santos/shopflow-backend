@@ -119,4 +119,20 @@ public sealed class OrderDomainTests
 
         order.Status.Should().Be(OrderStatus.PendingPayment);
     }
+
+    [Fact]
+    public void Create_StoresPublicProductImageUrl_AndAllowsNullForLegacy()
+    {
+        var withImage = OrderItem.Create(
+            Guid.NewGuid(),
+            "Camiseta",
+            "SKU-1",
+            1,
+            50m,
+            productImageUrl: "https://cdn.example.test/shirt.jpg");
+        withImage.ProductImageUrl.Should().Be("https://cdn.example.test/shirt.jpg");
+
+        var legacy = OrderItem.Create(Guid.NewGuid(), "Jaqueta", "SKU-2", 1, 80m);
+        legacy.ProductImageUrl.Should().BeNull();
+    }
 }

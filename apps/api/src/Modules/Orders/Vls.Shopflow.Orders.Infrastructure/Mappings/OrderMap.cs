@@ -114,6 +114,7 @@ internal sealed class OrderItemMap : IEntityTypeConfiguration<OrderItem>
         map.Property(x => x.TotalPieces);
         map.Property(x => x.EquivalentUnitPrice).HasColumnType("numeric(12,2)");
         map.Property(x => x.SalesDisplaySummary).HasMaxLength(200);
+        map.Property(x => x.ProductImageUrl).HasMaxLength(500);
 
         map.HasIndex(x => x.OrderId);
         map.HasIndex(x => x.SkuId);

@@ -34,6 +34,7 @@ public sealed class OrderItem
     public int? TotalPieces { get; private set; }
     public decimal? EquivalentUnitPrice { get; private set; }
     public string? SalesDisplaySummary { get; private set; }
+    public string? ProductImageUrl { get; private set; }
 
     private OrderItem() { }
 
@@ -43,7 +44,8 @@ public sealed class OrderItem
         string skuCode,
         int quantity,
         decimal unitPrice,
-        OrderItemSalesSnapshot? salesSnapshot = null)
+        OrderItemSalesSnapshot? salesSnapshot = null,
+        string? productImageUrl = null)
     {
         if (quantity <= 0)
             throw new ArgumentOutOfRangeException(nameof(quantity), "Order item quantity must be greater than zero.");
@@ -72,7 +74,8 @@ public sealed class OrderItem
             ShowTotalPieces = salesSnapshot?.ShowTotalPieces,
             TotalPieces = salesSnapshot?.TotalPieces,
             EquivalentUnitPrice = salesSnapshot?.EquivalentUnitPrice,
-            SalesDisplaySummary = salesSnapshot?.SalesDisplaySummary
+            SalesDisplaySummary = salesSnapshot?.SalesDisplaySummary,
+            ProductImageUrl = string.IsNullOrWhiteSpace(productImageUrl) ? null : productImageUrl.Trim()
         };
     }
 

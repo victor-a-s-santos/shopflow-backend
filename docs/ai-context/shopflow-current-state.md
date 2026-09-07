@@ -1,7 +1,9 @@
 # Shopflow — Estado atual do projeto
 
-> Última atualização: julho/2026. Baseado no código em `apps/api`, `apps/web` e `docs/`.
+> Última atualização: setembro/2026. Baseado no código em `apps/api`, `apps/web` e `docs/`.
 > Se este arquivo divergir do código, **o código prevalece**.
+
+**UX storefront (set/2026):** banner home local; olho de senha; `imageUrl` nos itens de pedido (snapshot); endereços do customer com default no checkout (`docs/customer/customer-addresses.md`). Sem mudança em Pix, Brevo, StoreAccess, R2, Delivery ou Remessas.
 
 ## Visão geral
 

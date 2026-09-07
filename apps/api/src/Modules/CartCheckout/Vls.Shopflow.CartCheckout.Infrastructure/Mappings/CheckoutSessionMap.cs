@@ -82,6 +82,7 @@ internal sealed class CheckoutSessionItemMap : IEntityTypeConfiguration<Checkout
         map.Property(x => x.TotalPieces);
         map.Property(x => x.EquivalentUnitPrice).HasColumnType("numeric(12,2)");
         map.Property(x => x.SalesDisplaySummary).HasMaxLength(200);
+        map.Property(x => x.ProductImageUrl).HasMaxLength(500);
 
         map.HasIndex(x => x.CheckoutSessionId);
         map.HasIndex(x => x.SkuId);

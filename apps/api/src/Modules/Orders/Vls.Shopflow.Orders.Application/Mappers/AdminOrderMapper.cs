@@ -38,7 +38,8 @@ internal static class AdminOrderMapper
                     i.Quantity,
                     i.UnitPrice,
                     i.Subtotal,
-                    OrderItemSalesDisplayMapper.ToDto(i)))
+                    OrderItemSalesDisplayMapper.ToDto(i),
+                    i.ProductImageUrl))
                 .ToList(),
             payment,
             order.PreferredDeliveryMethod?.ToString(),
