@@ -137,6 +137,27 @@ public sealed class DeliveryBatchDomainTests
     }
 
     [Fact]
+    public void EnsureEligible_WhenRequireStockConfirmationAndMissing_Throws()
+    {
+        var order = PaidOrder(Guid.NewGuid());
+        var act = () => DeliveryBatchGroupingRules.EnsureEligibleForBatch(
+            order,
+            alreadyInBatch: false,
+            requireStockConfirmation: true);
+        act.Should().Throw<DeliveryBatchException>()
+            .Which.Code.Should().Be(DeliveryBatchErrorCodes.StockConfirmationRequired);
+    }
+
+    [Fact]
+    public void IsEligibleCandidate_WhenRequireStockConfirmationAndConfirmed_IsTrue()
+    {
+        var order = PaidOrder(Guid.NewGuid());
+        order.ConfirmStock(Guid.NewGuid());
+        DeliveryBatchGroupingRules.IsEligibleCandidate(order, false, requireStockConfirmation: true)
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public void Create_RequiresMinTwoOrders()
     {
         var act = () => DeliveryBatch.CreateAwaitingShipment(

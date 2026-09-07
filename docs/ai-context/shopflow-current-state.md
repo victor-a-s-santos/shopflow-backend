@@ -3,7 +3,9 @@
 > Última atualização: setembro/2026. Baseado no código em `apps/api`, `apps/web` e `docs/`.
 > Se este arquivo divergir do código, **o código prevalece**.
 
-**UX storefront (set/2026):** banner home local; olho de senha; `imageUrl` nos itens de pedido (snapshot); endereços do customer com default no checkout (`docs/customer/customer-addresses.md`). Sem mudança em Pix, Brevo, StoreAccess, R2, Delivery ou Remessas.
+**UX storefront (set/2026):** banner home local; olho de senha; `imageUrl` nos itens de pedido (snapshot); endereços do customer com default no checkout (`docs/customer/customer-addresses.md`).
+
+**Fulfillment (set/2026):** confirmação física de estoque (`StockConfirmedAt` + `POST /api/admin/orders/{id}/fulfillment/confirm-stock`). `Fulfillment__RequireStockConfirmation=true` neste cliente. “Em estoque” deixa de ser só label de `AwaitingShipment`. Sem mudança em Pix, checkout, StoreAccess ou R2.
 
 ## Visão geral
 
@@ -95,12 +97,12 @@ Upload de imagens: **Cloudflare R2** (S3-compatible) quando `Storage__Provider=C
 | Módulo | Estado | Pendente |
 |--------|--------|----------|
 | **Shipping** | Scaffold + **postal code lookup** (`GET /api/integrations/postal-code/br/{cep}`, ViaCEP no backend) | Frete calculado |
-| **Orders / Fulfillment** | Fase 2+3: preferência + `FulfillmentStatus` + admin ship/deliver + **DeliveryBatch** (`docs/orders/delivery-batch-phase-3.md`) | FE admin/checkout |
+| **Orders / Fulfillment** | Fase 2+3 + confirmação de estoque físico (`StockConfirmedAt`, `confirm-stock`, bloqueio de Separado). DeliveryBatch respeita a config. | FE admin: botão “Confirmar em estoque”; timeline cliente |
 
 
 ### Pendente
 
-- Delivery/Fulfillment frontend (checkout + admin remessa)
+- Delivery/Fulfillment frontend (checkout + admin remessa + **confirm-stock / etapa Em estoque**)
 - Shipping / frete calculado
 - Frontend integração customer auth (backend pronto) — parcialmente wired
 - Storage externo de imagens (R2) — **feito** (`docs/integrations/cloudflare-r2-product-images.md`); backfill TEST manual documentado (`docs/qa/R2-TEST-PRODUCT-IMAGES-BACKFILL-REPORT.md`)

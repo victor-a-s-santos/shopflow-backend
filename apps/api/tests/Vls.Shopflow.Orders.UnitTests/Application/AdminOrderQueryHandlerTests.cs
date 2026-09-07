@@ -1,9 +1,11 @@
 using System.Text.Json;
 using FluentAssertions;
 using FluentValidation.TestHelper;
+using Microsoft.Extensions.Options;
 using Moq;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Queries;
 using Vls.Shopflow.Orders.Application.QueryHandlers;
 using Vls.Shopflow.Orders.Application.Repositories;
@@ -103,7 +105,11 @@ public sealed class AdminOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AdminOrderPaymentSummaryDto?)null);
 
-        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, paymentReader.Object, MockBatchRepo());
+        var sut = new GetAdminOrderByIdQueryHandler(
+            repo.Object,
+            paymentReader.Object,
+            MockBatchRepo(),
+            Options.Create(new FulfillmentOptions { RequireStockConfirmation = true }));
         var result = await sut.Handle(new GetAdminOrderByIdQuery(order.Id), CancellationToken.None);
 
         result.InternalOrderNote.Should().Be("Segurar até sexta");
@@ -111,6 +117,9 @@ public sealed class AdminOrderQueryHandlerTests
         result.FulfillmentStatus.Should().Be("Shipped");
         result.TrackingCode.Should().Be("BR123");
         result.PreferredDeliveryMethod.Should().Be("Correios");
+        result.StockConfirmedAt.Should().BeNull();
+        result.CanConfirmStock.Should().BeTrue();
+        result.CanMarkAsSeparated.Should().BeFalse();
     }
 
     [Fact]
@@ -221,7 +230,11 @@ public sealed class AdminOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);
 
-        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, paymentReader.Object, MockBatchRepo());
+        var sut = new GetAdminOrderByIdQueryHandler(
+            repo.Object,
+            paymentReader.Object,
+            MockBatchRepo(),
+            Options.Create(new FulfillmentOptions()));
         var result = await sut.Handle(new GetAdminOrderByIdQuery(order.Id), CancellationToken.None);
 
         result.Id.Should().Be(order.Id);
@@ -239,7 +252,11 @@ public sealed class AdminOrderQueryHandlerTests
         repo.Setup(x => x.GetByIdWithItemsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Order?)null);
 
-        var sut = new GetAdminOrderByIdQueryHandler(repo.Object, Mock.Of<IAdminOrderPixPaymentReader>(), MockBatchRepo());
+        var sut = new GetAdminOrderByIdQueryHandler(
+            repo.Object,
+            Mock.Of<IAdminOrderPixPaymentReader>(),
+            MockBatchRepo(),
+            Options.Create(new FulfillmentOptions()));
         var act = () => sut.Handle(new GetAdminOrderByIdQuery(Guid.NewGuid()), CancellationToken.None);
 
         await act.Should().ThrowAsync<OrderNotFoundException>();

@@ -57,7 +57,8 @@ public sealed class CustomerOrderReadModel(OrdersDbContext db) : ICustomerOrderR
                 o.Items
                     .OrderBy(i => i.ProductName)
                     .Select(i => i.ProductImageUrl)
-                    .FirstOrDefault()))
+                    .FirstOrDefault(),
+                o.StockConfirmedAt))
             .ToListAsync(cancellationToken);
 
         return new CustomerOrderListPage(pageItems, totalItems);

@@ -29,6 +29,7 @@ Nome canônico: **DeliveryBatch** (não ShipmentBatch).
 - `OrderStatus = Paid`
 - `FulfillmentStatus = AwaitingShipment`
 - não está em outra batch
+- se `Fulfillment:RequireStockConfirmation=true`: `StockConfirmedAt` preenchido (candidates, create e ship da remessa)
 
 ## Mesmo cliente
 
@@ -52,7 +53,7 @@ Detectados por fingerprint do endereço. Sem `confirmDifferentAddresses=true` �
 | PUT | `/api/admin/delivery-batches/{id}/internal-note` |
 
 Create: mínimo 2 pedidos; status inicial `AwaitingShipment`.  
-Ship: atualiza batch + `Order.MarkAsShipped(...)` **sem** sobrescrever `InternalOrderNote` do pedido.  
+Ship: atualiza batch + `Order.MarkAsShipped(...)` **sem** sobrescrever `InternalOrderNote` do pedido. Com `RequireStockConfirmation=true`, todos os pedidos da remessa precisam ter estoque confirmado (409 `DELIVERY_BATCH_STOCK_CONFIRMATION_REQUIRED`: “Todos os pedidos da remessa precisam ter estoque confirmado antes de marcar como separado.”).  
 Deliver: exige batch/pedidos shipped; idem `MarkAsDelivered` sem sobrescrever nota do pedido.
 
 ## Admin Orders

@@ -30,6 +30,10 @@ public interface IEmailNotificationService
         OrderEmailNotificationRequest request,
         CancellationToken cancellationToken = default);
 
+    Task EnqueueOrderStockConfirmedAsync(
+        OrderEmailNotificationRequest request,
+        CancellationToken cancellationToken = default);
+
     Task EnqueueCustomerApprovalRequestAdminAsync(
         CustomerApprovalEmailRequest request,
         CancellationToken cancellationToken = default);

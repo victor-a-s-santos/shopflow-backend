@@ -5,5 +5,6 @@ public enum OrderEmailIntentType
     OrderCreated = 1,
     PaymentConfirmed = 2,
     OrderShipped = 3,
-    OrderDelivered = 4
+    OrderDelivered = 4,
+    OrderStockConfirmed = 5
 }

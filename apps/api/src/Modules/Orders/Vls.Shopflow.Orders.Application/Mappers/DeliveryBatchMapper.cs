@@ -31,7 +31,8 @@ internal static class DeliveryBatchMapper
                 o.PreferredDeliveryMethod?.ToString(),
                 o.PreferredDeliveryDate,
                 o.CustomerOrderNote,
-                CustomerContactNormalizer.AddressSummary(o.ShippingCity, o.ShippingState, o.ShippingZipCode)))
+                CustomerContactNormalizer.AddressSummary(o.ShippingCity, o.ShippingState, o.ShippingZipCode),
+                o.StockConfirmedAt))
             .ToList();
 
         return new DeliveryBatchDetailDto(

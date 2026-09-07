@@ -26,6 +26,7 @@ public sealed class OrderEmailIntent : Entity<Guid>
             OrderEmailIntentType.PaymentConfirmed => $"order:{orderId:D}:paid",
             OrderEmailIntentType.OrderShipped => $"order:{orderId:D}:shipped",
             OrderEmailIntentType.OrderDelivered => $"order:{orderId:D}:delivered",
+            OrderEmailIntentType.OrderStockConfirmed => $"order:{orderId:D}:stock-confirmed",
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown order email intent type.")
         };
 

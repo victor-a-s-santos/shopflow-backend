@@ -17,7 +17,8 @@ public sealed record DeliveryBatchOrderSummaryDto(
     string? PreferredDeliveryMethod,
     DateOnly? PreferredDeliveryDate,
     string? CustomerOrderNote,
-    string AddressSummary);
+    string AddressSummary,
+    DateTimeOffset? StockConfirmedAt = null);
 
 public sealed record DeliveryBatchCandidateOrderDto(
     Guid OrderId,
@@ -27,7 +28,8 @@ public sealed record DeliveryBatchCandidateOrderDto(
     string FulfillmentStatus,
     string? PreferredDeliveryMethod,
     DateOnly? PreferredDeliveryDate,
-    string AddressSummary);
+    string AddressSummary,
+    DateTimeOffset? StockConfirmedAt = null);
 
 public sealed record DeliveryBatchCandidatesDto(
     Guid BaseOrderId,

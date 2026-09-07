@@ -41,7 +41,8 @@ public sealed record AdminOrderListItemDto(
     DateTimeOffset? DeliveredAt = null,
     string? TrackingCode = null,
     Guid? DeliveryBatchId = null,
-    string? DeliveryBatchNumber = null);
+    string? DeliveryBatchNumber = null,
+    DateTimeOffset? StockConfirmedAt = null);
 
 public sealed record PagedAdminOrdersDto(
     IReadOnlyList<AdminOrderListItemDto> Items,
@@ -104,7 +105,12 @@ public sealed record AdminOrderDetailDto(
     DateTimeOffset? FulfillmentUpdatedAt = null,
     Guid? FulfillmentUpdatedByAdminId = null,
     Guid? DeliveryBatchId = null,
-    string? DeliveryBatchNumber = null);
+    string? DeliveryBatchNumber = null,
+    DateTimeOffset? StockConfirmedAt = null,
+    Guid? StockConfirmedByAdminUserId = null,
+    string? StockConfirmationNote = null,
+    bool CanConfirmStock = false,
+    bool CanMarkAsSeparated = false);
 
 /// <summary>Safe delivery/fulfillment projection (no internal notes or admin ids).</summary>
 public sealed record OrderDeliveryInfoDto(
@@ -115,4 +121,5 @@ public sealed record OrderDeliveryInfoDto(
     string? FinalDeliveryMethod,
     string? TrackingCode,
     DateTimeOffset? ShippedAt,
-    DateTimeOffset? DeliveredAt);
+    DateTimeOffset? DeliveredAt,
+    DateTimeOffset? StockConfirmedAt = null);

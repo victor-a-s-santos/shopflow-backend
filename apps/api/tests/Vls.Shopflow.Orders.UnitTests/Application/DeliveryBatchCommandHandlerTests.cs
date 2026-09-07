@@ -1,10 +1,12 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Vls.Shopflow.Orders.Application.CommandHandlers;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Constants;
 using Vls.Shopflow.Orders.Domain.Entities;
@@ -107,7 +109,12 @@ public sealed class DeliveryBatchCommandHandlerTests
 
         var uow = new Mock<IOrdersUnitOfWork>();
         var sut = new ShipDeliveryBatchCommandHandler(
-            batchRepo.Object, orderRepo.Object, paymentReader.Object, uow.Object, Mock.Of<IOrderEmailIntentRepository>());
+            batchRepo.Object,
+            orderRepo.Object,
+            paymentReader.Object,
+            uow.Object,
+            Mock.Of<IOrderEmailIntentRepository>(),
+            Options.Create(new FulfillmentOptions()));
 
         var result = await sut.Handle(
             new ShipDeliveryBatchCommand(batch.Id, Guid.NewGuid(), "Correios", "BR1", "Nota remessa"),
@@ -190,6 +197,41 @@ public sealed class DeliveryBatchCommandHandlerTests
         b.FulfillmentStatus.Should().Be(FulfillmentStatus.Delivered);
     }
 
+    [Fact]
+    public async Task Ship_WhenRequireStockConfirmationAndOrderMissingConfirmation_Throws()
+    {
+        var userId = Guid.NewGuid();
+        var a = PaidOrder(userId, orderNumber: 1);
+        var b = PaidOrder(userId, orderNumber: 2);
+        a.ConfirmStock(Guid.NewGuid());
+        var batch = DeliveryBatch.CreateAwaitingShipment(
+            [a.Id, b.Id], userId, "Loja", "loja@test.com", "11999999999", false, Guid.NewGuid());
+        batch.AssignBatchNumber(30053);
+
+        var batchRepo = new Mock<IDeliveryBatchRepository>();
+        batchRepo.Setup(x => x.GetByIdWithOrdersAsync(batch.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(batch);
+        var orderRepo = new Mock<IOrderRepository>();
+        orderRepo.Setup(x => x.GetByIdsWithItemsAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([a, b]);
+
+        var sut = new ShipDeliveryBatchCommandHandler(
+            batchRepo.Object,
+            orderRepo.Object,
+            Mock.Of<IAdminOrderPixPaymentReader>(),
+            Mock.Of<IOrdersUnitOfWork>(),
+            Mock.Of<IOrderEmailIntentRepository>(),
+            Options.Create(new FulfillmentOptions { RequireStockConfirmation = true }));
+
+        var act = () => sut.Handle(
+            new ShipDeliveryBatchCommand(batch.Id, Guid.NewGuid()),
+            CancellationToken.None);
+
+        var ex = await act.Should().ThrowAsync<DeliveryBatchException>();
+        ex.Which.Code.Should().Be(DeliveryBatchErrorCodes.StockConfirmationRequired);
+        ex.Which.Message.Should().Contain("estoque confirmado");
+    }
+
     private static CreateDeliveryBatchCommandHandler CreateCreateHandler(IReadOnlyList<Order> orders)
     {
         var orderRepo = new Mock<IOrderRepository>();
@@ -215,6 +257,7 @@ public sealed class DeliveryBatchCommandHandlerTests
             numbers.Object,
             paymentReader.Object,
             Mock.Of<IOrdersUnitOfWork>(),
-            NullLogger<CreateDeliveryBatchCommandHandler>.Instance);
+            NullLogger<CreateDeliveryBatchCommandHandler>.Instance,
+            Options.Create(new FulfillmentOptions()));
     }
 }

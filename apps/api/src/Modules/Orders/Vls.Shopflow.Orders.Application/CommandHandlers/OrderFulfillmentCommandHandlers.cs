@@ -1,9 +1,12 @@
 using MediatR;
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Domain.Enums;
 using Vls.Shopflow.Orders.Domain.Exceptions;
 
@@ -14,7 +17,8 @@ public sealed class ShipOrderFulfillmentCommandHandler(
     IAdminOrderPixPaymentReader pixPaymentReader,
     IDeliveryBatchRepository batchRepository,
     IOrdersUnitOfWork unitOfWork,
-    IOrderEmailIntentRepository emailIntents)
+    IOrderEmailIntentRepository emailIntents,
+    IOptions<FulfillmentOptions> fulfillmentOptions)
     : IRequestHandler<ShipOrderFulfillmentCommand, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -23,6 +27,10 @@ public sealed class ShipOrderFulfillmentCommandHandler(
     {
         var order = await orderRepository.GetByIdWithItemsAsync(command.OrderId, cancellationToken)
                     ?? throw new OrderNotFoundException(command.OrderId);
+
+        OrderStockConfirmationRules.EnsureConfirmedForShipment(
+            order,
+            fulfillmentOptions.Value.RequireStockConfirmation);
 
         DeliveryMethod? finalMethod = null;
         if (!string.IsNullOrWhiteSpace(command.FinalDeliveryMethod)
@@ -49,7 +57,8 @@ public sealed class ShipOrderFulfillmentCommandHandler(
             order,
             payment,
             membership?.DeliveryBatchId,
-            membership is null ? null : membership.BatchNumber.ToString());
+            membership is null ? null : membership.BatchNumber.ToString(),
+            fulfillmentOptions.Value.RequireStockConfirmation);
     }
 }
 
@@ -58,7 +67,8 @@ public sealed class DeliverOrderFulfillmentCommandHandler(
     IAdminOrderPixPaymentReader pixPaymentReader,
     IDeliveryBatchRepository batchRepository,
     IOrdersUnitOfWork unitOfWork,
-    IOrderEmailIntentRepository emailIntents)
+    IOrderEmailIntentRepository emailIntents,
+    IOptions<FulfillmentOptions> fulfillmentOptions)
     : IRequestHandler<DeliverOrderFulfillmentCommand, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -82,7 +92,46 @@ public sealed class DeliverOrderFulfillmentCommandHandler(
             order,
             payment,
             membership?.DeliveryBatchId,
-            membership is null ? null : membership.BatchNumber.ToString());
+            membership is null ? null : membership.BatchNumber.ToString(),
+            fulfillmentOptions.Value.RequireStockConfirmation);
+    }
+}
+
+public sealed class ConfirmOrderStockCommandHandler(
+    IOrderRepository orderRepository,
+    IAdminOrderPixPaymentReader pixPaymentReader,
+    IDeliveryBatchRepository batchRepository,
+    IOrdersUnitOfWork unitOfWork,
+    IOrderEmailIntentRepository emailIntents,
+    IOptions<FulfillmentOptions> fulfillmentOptions)
+    : IRequestHandler<ConfirmOrderStockCommand, AdminOrderDetailDto>
+{
+    public async Task<AdminOrderDetailDto> Handle(
+        ConfirmOrderStockCommand command,
+        CancellationToken cancellationToken)
+    {
+        var order = await orderRepository.GetByIdWithItemsAsync(command.OrderId, cancellationToken)
+                    ?? throw new OrderNotFoundException(command.OrderId);
+
+        var newlyConfirmed = order.ConfirmStock(command.AdminId, command.Note);
+
+        if (newlyConfirmed)
+        {
+            await emailIntents.EnsurePendingAsync(
+                OrderEmailIntentFactory.PendingFromOrder(order, OrderEmailIntentType.OrderStockConfirmed),
+                cancellationToken);
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
+        var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);
+        return AdminOrderMapper.ToDetailDto(
+            order,
+            payment,
+            membership?.DeliveryBatchId,
+            membership is null ? null : membership.BatchNumber.ToString(),
+            fulfillmentOptions.Value.RequireStockConfirmation);
     }
 }
 
@@ -90,7 +139,8 @@ public sealed class UpdateOrderInternalNoteCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
     IDeliveryBatchRepository batchRepository,
-    IOrdersUnitOfWork unitOfWork)
+    IOrdersUnitOfWork unitOfWork,
+    IOptions<FulfillmentOptions> fulfillmentOptions)
     : IRequestHandler<UpdateOrderInternalNoteCommand, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -110,6 +160,7 @@ public sealed class UpdateOrderInternalNoteCommandHandler(
             order,
             payment,
             membership?.DeliveryBatchId,
-            membership is null ? null : membership.BatchNumber.ToString());
+            membership is null ? null : membership.BatchNumber.ToString(),
+            fulfillmentOptions.Value.RequireStockConfirmation);
     }
 }

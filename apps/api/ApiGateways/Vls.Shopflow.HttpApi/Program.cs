@@ -649,6 +649,7 @@ app.Use(async (ctx, next) =>
             or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.CannotBeDelivered
             or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.MustBeShippedBeforeDelivered
             or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.AlreadyDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.DeliveryBatchErrorCodes.StockConfirmationRequired
             ? StatusCodes.Status409Conflict
             : StatusCodes.Status400BadRequest;
 
@@ -744,6 +745,9 @@ app.Use(async (ctx, next) =>
             or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderNotPaidForShipment
             or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderCannotBeShipped
             or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderCannotBeDelivered
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderStockConfirmationRequired
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderMustBePaidBeforeStockConfirmation
+            or Vls.Shopflow.Orders.Domain.Constants.OrderFulfillmentErrorCodes.OrderCannotConfirmStockAfterDelivered
             ? StatusCodes.Status409Conflict
             : StatusCodes.Status400BadRequest;
 

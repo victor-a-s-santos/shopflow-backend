@@ -76,7 +76,8 @@ public sealed class OrderEmailIntentCommandHandlerTests
             Mock.Of<IAdminOrderPixPaymentReader>(),
             MockBatchRepo(),
             uow.Object,
-            intents.Object);
+            intents.Object,
+            Options.Create(new FulfillmentOptions()));
 
         await sut.Handle(new ShipOrderFulfillmentCommand(order.Id, Guid.NewGuid(), "Carrier", "T1"), CancellationToken.None);
 
@@ -98,13 +99,57 @@ public sealed class OrderEmailIntentCommandHandlerTests
             Mock.Of<IAdminOrderPixPaymentReader>(),
             MockBatchRepo(),
             Mock.Of<IOrdersUnitOfWork>(),
-            intents.Object);
+            intents.Object,
+            Options.Create(new FulfillmentOptions()));
 
         await sut.Handle(new DeliverOrderFulfillmentCommand(order.Id, Guid.NewGuid()), CancellationToken.None);
 
         captured.Should().NotBeNull();
         captured!.Type.Should().Be(OrderEmailIntentType.OrderDelivered);
         captured.IdempotencyKey.Should().Be($"order:{order.Id:D}:delivered");
+    }
+
+    [Fact]
+    public async Task ConfirmStock_CreatesExactlyOneStockConfirmedIntent()
+    {
+        var order = PaidOrder();
+        OrderEmailIntent? captured = null;
+        var intents = Capture(intent => captured = intent);
+        var sut = new ConfirmOrderStockCommandHandler(
+            MockOrderRepo(order),
+            Mock.Of<IAdminOrderPixPaymentReader>(),
+            MockBatchRepo(),
+            Mock.Of<IOrdersUnitOfWork>(),
+            intents.Object,
+            Options.Create(new FulfillmentOptions { RequireStockConfirmation = true }));
+
+        await sut.Handle(new ConfirmOrderStockCommand(order.Id, Guid.NewGuid()), CancellationToken.None);
+
+        captured.Should().NotBeNull();
+        captured!.Type.Should().Be(OrderEmailIntentType.OrderStockConfirmed);
+        captured.IdempotencyKey.Should().Be($"order:{order.Id:D}:stock-confirmed");
+        captured.PayloadJson.Should().NotContain("note");
+        captured.PayloadJson.Should().NotContain("admin");
+    }
+
+    [Fact]
+    public async Task ConfirmStock_WhenRepeated_DoesNotEnqueueSecondIntent()
+    {
+        var order = PaidOrder();
+        order.ConfirmStock(Guid.NewGuid());
+        var captured = new List<OrderEmailIntent>();
+        var intents = Capture(intent => captured.Add(intent));
+        var sut = new ConfirmOrderStockCommandHandler(
+            MockOrderRepo(order),
+            Mock.Of<IAdminOrderPixPaymentReader>(),
+            MockBatchRepo(),
+            Mock.Of<IOrdersUnitOfWork>(),
+            intents.Object,
+            Options.Create(new FulfillmentOptions { RequireStockConfirmation = true }));
+
+        await sut.Handle(new ConfirmOrderStockCommand(order.Id, Guid.NewGuid()), CancellationToken.None);
+
+        captured.Should().BeEmpty();
     }
 
     [Fact]
@@ -134,7 +179,8 @@ public sealed class OrderEmailIntentCommandHandlerTests
             orderRepo.Object,
             paymentReader.Object,
             Mock.Of<IOrdersUnitOfWork>(),
-            intents.Object);
+            intents.Object,
+            Options.Create(new FulfillmentOptions()));
 
         await sut.Handle(new ShipDeliveryBatchCommand(batch.Id, Guid.NewGuid(), "Correios", "BR1"), CancellationToken.None);
 

@@ -122,6 +122,22 @@ public sealed class EmailNotificationService(
             cancellationToken);
     }
 
+    public Task EnqueueOrderStockConfirmedAsync(
+        OrderEmailNotificationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var (subject, html, text) = TransactionalEmailTemplates.OrderStockConfirmed(publicAppOptions.Value, request);
+        return EnqueueAsync(
+            EmailNotificationType.OrderStockConfirmed,
+            request.CustomerEmail,
+            request.CustomerName,
+            subject,
+            html,
+            text,
+            $"order:{request.OrderId:D}:stock-confirmed",
+            cancellationToken);
+    }
+
     public Task EnqueueCustomerApprovalRequestAdminAsync(
         CustomerApprovalEmailRequest request,
         CancellationToken cancellationToken = default)

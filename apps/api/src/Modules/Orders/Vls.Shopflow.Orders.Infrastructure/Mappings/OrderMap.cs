@@ -62,6 +62,10 @@ internal sealed class OrderMap : IEntityTypeConfiguration<Order>
         map.Property(x => x.DeliveredAt);
         map.Property(x => x.FulfillmentUpdatedAt);
         map.Property(x => x.FulfillmentUpdatedByAdminId);
+        map.Property(x => x.StockConfirmedAt);
+        map.Property(x => x.StockConfirmedByAdminUserId);
+        map.Property(x => x.StockConfirmationUpdatedAt);
+        map.Property(x => x.StockConfirmationNote).HasMaxLength(1000);
 
         map.Property(x => x.CreatedAt).IsRequired();
         map.Property(x => x.UpdatedAt);

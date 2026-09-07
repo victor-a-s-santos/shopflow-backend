@@ -1,9 +1,11 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.Orders.Application.Commands;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Domain.Constants;
@@ -19,7 +21,8 @@ public sealed class CreateDeliveryBatchCommandHandler(
     IDeliveryBatchNumberGenerator batchNumberGenerator,
     IAdminOrderPixPaymentReader pixPaymentReader,
     IOrdersUnitOfWork unitOfWork,
-    ILogger<CreateDeliveryBatchCommandHandler> logger)
+    ILogger<CreateDeliveryBatchCommandHandler> logger,
+    IOptions<FulfillmentOptions> fulfillmentOptions)
     : IRequestHandler<CreateDeliveryBatchCommand, DeliveryBatchDetailDto>
 {
     public async Task<DeliveryBatchDetailDto> Handle(
@@ -36,8 +39,12 @@ public sealed class CreateDeliveryBatchCommandHandler(
         }
 
         var alreadyInBatch = await batchRepository.GetOrderIdsInAnyBatchAsync(orderIds, cancellationToken);
+        var requireStockConfirmation = fulfillmentOptions.Value.RequireStockConfirmation;
         foreach (var order in orders)
-            DeliveryBatchGroupingRules.EnsureEligibleForBatch(order, alreadyInBatch.Contains(order.Id));
+            DeliveryBatchGroupingRules.EnsureEligibleForBatch(
+                order,
+                alreadyInBatch.Contains(order.Id),
+                requireStockConfirmation);
 
         var identity = DeliveryBatchGroupingRules.ResolveIdentity(orders);
         var addresses = DeliveryBatchGroupingRules.BuildAddressInfos(orders);
@@ -106,7 +113,8 @@ public sealed class ShipDeliveryBatchCommandHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
     IOrdersUnitOfWork unitOfWork,
-    IOrderEmailIntentRepository emailIntents)
+    IOrderEmailIntentRepository emailIntents,
+    IOptions<FulfillmentOptions> fulfillmentOptions)
     : IRequestHandler<ShipDeliveryBatchCommand, DeliveryBatchDetailDto>
 {
     public async Task<DeliveryBatchDetailDto> Handle(
@@ -125,6 +133,7 @@ public sealed class ShipDeliveryBatchCommandHandler(
                 "Um ou mais pedidos da remessa não foram encontrados.");
         }
 
+        var requireStockConfirmation = fulfillmentOptions.Value.RequireStockConfirmation;
         foreach (var order in orders)
         {
             if (order.Status != OrderStatus.Paid)
@@ -139,6 +148,13 @@ public sealed class ShipDeliveryBatchCommandHandler(
                 throw new DeliveryBatchException(
                     DeliveryBatchErrorCodes.CannotBeShipped,
                     "Esta entrega agrupada não pode ser marcada como enviada.");
+            }
+
+            if (requireStockConfirmation && order.StockConfirmedAt is null)
+            {
+                throw new DeliveryBatchException(
+                    DeliveryBatchErrorCodes.StockConfirmationRequired,
+                    "Todos os pedidos da remessa precisam ter estoque confirmado antes de marcar como separado.");
             }
         }
 

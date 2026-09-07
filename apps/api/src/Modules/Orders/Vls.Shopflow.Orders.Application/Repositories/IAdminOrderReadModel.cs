@@ -34,7 +34,8 @@ public sealed record AdminOrderListRow(
     DateOnly? PreferredDeliveryDate,
     DateTimeOffset? ShippedAt,
     DateTimeOffset? DeliveredAt,
-    string? TrackingCode);
+    string? TrackingCode,
+    DateTimeOffset? StockConfirmedAt = null);
 
 public sealed record AdminOrderListPage(
     IReadOnlyList<AdminOrderListRow> Items,

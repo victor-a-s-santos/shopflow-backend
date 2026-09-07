@@ -15,4 +15,7 @@ public sealed class NullOrderEmailNotifier : IOrderEmailNotifier
 
     public Task NotifyOrderDeliveredAsync(OrderEmailNotifyRequest request, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
+
+    public Task NotifyOrderStockConfirmedAsync(OrderEmailNotifyRequest request, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
 }

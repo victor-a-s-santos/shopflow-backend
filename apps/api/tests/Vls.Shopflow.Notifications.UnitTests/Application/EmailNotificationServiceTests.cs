@@ -43,6 +43,36 @@ public sealed class EmailNotificationServiceTests
     }
 
     [Fact]
+    public async Task EnqueueOrderStockConfirmed_UsesStockConfirmedIdempotencyKey()
+    {
+        EmailOutboxMessage? saved = null;
+        var outbox = new Mock<IEmailOutboxRepository>();
+        outbox.Setup(x => x.ExistsByIdempotencyKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        outbox.Setup(x => x.TryAddNewAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()))
+            .Callback<EmailOutboxMessage, CancellationToken>((m, _) => saved = m)
+            .ReturnsAsync(true);
+
+        var sut = new EmailNotificationService(
+            outbox.Object,
+            Options.Create(new PublicAppOptions { BaseUrl = "https://loja.test" }),
+            Options.Create(new AdminNotificationsOptions()),
+            NullLogger<EmailNotificationService>.Instance);
+
+        var orderId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        await sut.EnqueueOrderStockConfirmedAsync(
+            new OrderEmailNotificationRequest(orderId, 10582, "a@b.com", "A", 10m),
+            CancellationToken.None);
+
+        saved.Should().NotBeNull();
+        saved!.IdempotencyKey.Should().Be($"order:{orderId:D}:stock-confirmed");
+        saved.Type.Should().Be(EmailNotificationType.OrderStockConfirmed);
+        saved.Subject.Should().Be("Pedido #10582 confirmado em estoque");
+        saved.HtmlBody.Should().NotContain("admin");
+        saved.HtmlBody.Should().NotContain("Internal");
+    }
+
+    [Fact]
     public async Task Enqueue_SkipsWhenIdempotencyKeyExists()
     {
         var outbox = new Mock<IEmailOutboxRepository>();

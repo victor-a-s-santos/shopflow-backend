@@ -11,4 +11,9 @@ public static class OrderFulfillmentErrorCodes
     public const string InternalNoteTooLong = "INTERNAL_NOTE_TOO_LONG";
     public const string CustomerOrderNoteTooLong = "CUSTOMER_ORDER_NOTE_TOO_LONG";
     public const string TrackingCodeTooLong = "TRACKING_CODE_TOO_LONG";
+    public const string OrderStockAlreadyConfirmed = "ORDER_STOCK_ALREADY_CONFIRMED";
+    public const string OrderStockConfirmationRequired = "ORDER_STOCK_CONFIRMATION_REQUIRED";
+    public const string OrderMustBePaidBeforeStockConfirmation = "ORDER_MUST_BE_PAID_BEFORE_STOCK_CONFIRMATION";
+    public const string OrderCannotConfirmStockAfterDelivered = "ORDER_CANNOT_CONFIRM_STOCK_AFTER_DELIVERED";
+    public const string StockConfirmationNoteTooLong = "STOCK_CONFIRMATION_NOTE_TOO_LONG";
 }

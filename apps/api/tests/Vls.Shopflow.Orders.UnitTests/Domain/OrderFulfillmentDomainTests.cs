@@ -145,6 +145,86 @@ public sealed class OrderFulfillmentDomainTests
     }
 
     [Fact]
+    public void ConfirmStock_WhenPaidAwaitingShipment_SetsFields()
+    {
+        var order = CreatePaidOrder();
+        var adminId = Guid.NewGuid();
+
+        var newlyConfirmed = order.ConfirmStock(adminId, "Retirada OK");
+
+        newlyConfirmed.Should().BeTrue();
+        order.StockConfirmedAt.Should().NotBeNull();
+        order.StockConfirmedByAdminUserId.Should().Be(adminId);
+        order.StockConfirmationNote.Should().Be("Retirada OK");
+        order.StockConfirmationUpdatedAt.Should().Be(order.StockConfirmedAt);
+        order.FulfillmentStatus.Should().Be(FulfillmentStatus.AwaitingShipment);
+    }
+
+    [Fact]
+    public void ConfirmStock_WhenAlreadyConfirmed_IsIdempotent()
+    {
+        var order = CreatePaidOrder();
+        var firstAdmin = Guid.NewGuid();
+        order.ConfirmStock(firstAdmin, "Primeira");
+        var confirmedAt = order.StockConfirmedAt;
+
+        var newlyConfirmed = order.ConfirmStock(Guid.NewGuid(), "Segunda");
+
+        newlyConfirmed.Should().BeFalse();
+        order.StockConfirmedAt.Should().Be(confirmedAt);
+        order.StockConfirmedByAdminUserId.Should().Be(firstAdmin);
+        order.StockConfirmationNote.Should().Be("Primeira");
+    }
+
+    [Fact]
+    public void ConfirmStock_WhenPendingPayment_Throws()
+    {
+        var order = CreatePendingOrder();
+        var act = () => order.ConfirmStock(Guid.NewGuid());
+        act.Should().Throw<OrderMustBePaidBeforeStockConfirmationException>();
+    }
+
+    [Fact]
+    public void ConfirmStock_WhenShippedWithoutConfirmation_FillsForCompatibility()
+    {
+        var order = CreatePaidOrder();
+        order.MarkAsShipped(Guid.NewGuid());
+
+        var newlyConfirmed = order.ConfirmStock(Guid.NewGuid(), "Compat");
+
+        newlyConfirmed.Should().BeTrue();
+        order.StockConfirmedAt.Should().NotBeNull();
+        order.FulfillmentStatus.Should().Be(FulfillmentStatus.Shipped);
+    }
+
+    [Fact]
+    public void ConfirmStock_WhenDeliveredWithoutConfirmation_Throws()
+    {
+        var order = CreatePaidOrder();
+        order.MarkAsShipped(Guid.NewGuid());
+        order.MarkAsDelivered(Guid.NewGuid());
+
+        var act = () => order.ConfirmStock(Guid.NewGuid());
+        act.Should().Throw<OrderCannotConfirmStockAfterDeliveredException>();
+    }
+
+    [Fact]
+    public void ConfirmStock_WhenDeliveredAlreadyConfirmed_IsIdempotent()
+    {
+        var order = CreatePaidOrder();
+        order.ConfirmStock(Guid.NewGuid());
+        order.MarkAsShipped(Guid.NewGuid());
+        order.MarkAsDelivered(Guid.NewGuid());
+        var confirmedAt = order.StockConfirmedAt;
+
+        var newlyConfirmed = order.ConfirmStock(Guid.NewGuid());
+
+        newlyConfirmed.Should().BeFalse();
+        order.StockConfirmedAt.Should().Be(confirmedAt);
+        order.FulfillmentStatus.Should().Be(FulfillmentStatus.Delivered);
+    }
+
+    [Fact]
     public void SetCustomerOrderNote_RejectsTooLong()
     {
         var order = CreatePendingOrder();

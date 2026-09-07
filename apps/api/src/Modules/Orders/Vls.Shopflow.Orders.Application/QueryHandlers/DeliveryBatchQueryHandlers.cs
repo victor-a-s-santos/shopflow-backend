@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.BuildingBlocks.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Queries;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Application.Services;
@@ -13,7 +15,8 @@ namespace Vls.Shopflow.Orders.Application.QueryHandlers;
 
 public sealed class GetDeliveryBatchCandidatesQueryHandler(
     IOrderRepository orderRepository,
-    IDeliveryBatchRepository batchRepository)
+    IDeliveryBatchRepository batchRepository,
+    IOptions<FulfillmentOptions> fulfillmentOptions)
     : IQueryHandler<GetDeliveryBatchCandidatesQuery, DeliveryBatchCandidatesDto>
 {
     public async Task<DeliveryBatchCandidatesDto> Handle(
@@ -34,15 +37,20 @@ public sealed class GetDeliveryBatchCandidatesQueryHandler(
         var candidateIds = candidates.Select(c => c.Id).ToList();
         var inBatch = await batchRepository.GetOrderIdsInAnyBatchAsync(candidateIds, cancellationToken);
 
+        var requireStockConfirmation = fulfillmentOptions.Value.RequireStockConfirmation;
         var eligible = candidates
-            .Where(o => DeliveryBatchGroupingRules.IsEligibleCandidate(o, inBatch.Contains(o.Id)))
+            .Where(o => DeliveryBatchGroupingRules.IsEligibleCandidate(
+                o,
+                inBatch.Contains(o.Id),
+                requireStockConfirmation))
             .OrderBy(o => o.CreatedAt)
             .ToList();
 
         // Include base if eligible but missing from query result (shouldn't happen).
         if (DeliveryBatchGroupingRules.IsEligibleCandidate(
                 baseOrder,
-                await batchRepository.IsOrderInAnyBatchAsync(baseOrder.Id, cancellationToken))
+                await batchRepository.IsOrderInAnyBatchAsync(baseOrder.Id, cancellationToken),
+                requireStockConfirmation)
             && eligible.All(o => o.Id != baseOrder.Id))
         {
             eligible.Insert(0, baseOrder);
@@ -66,7 +74,8 @@ public sealed class GetDeliveryBatchCandidatesQueryHandler(
                 CustomerContactNormalizer.AddressSummary(
                     o.ShippingCity,
                     o.ShippingState,
-                    o.ShippingZipCode))).ToList());
+                    o.ShippingZipCode),
+                o.StockConfirmedAt)).ToList());
     }
 }
 

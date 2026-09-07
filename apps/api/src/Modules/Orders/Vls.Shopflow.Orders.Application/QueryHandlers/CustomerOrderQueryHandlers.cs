@@ -78,7 +78,8 @@ public sealed class GetCustomerOrdersQueryHandler(
                 row.PreferredDeliveryMethod?.ToString(),
                 row.PreferredDeliveryDate,
                 row.ShippedAt,
-                row.DeliveredAt);
+                row.DeliveredAt,
+                row.StockConfirmedAt);
         }).ToList();
 
         var totalPages = page.TotalItems == 0

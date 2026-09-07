@@ -69,3 +69,36 @@ public sealed class TrackingCodeTooLongException : OrderFulfillmentException
     {
     }
 }
+
+public sealed class OrderMustBePaidBeforeStockConfirmationException : OrderFulfillmentException
+{
+    public Guid OrderId { get; }
+
+    public OrderMustBePaidBeforeStockConfirmationException(Guid orderId)
+        : base(
+            OrderFulfillmentErrorCodes.OrderMustBePaidBeforeStockConfirmation,
+            "O pagamento precisa estar aprovado antes de confirmar o estoque.")
+        => OrderId = orderId;
+}
+
+public sealed class OrderStockConfirmationRequiredException : OrderFulfillmentException
+{
+    public Guid OrderId { get; }
+
+    public OrderStockConfirmationRequiredException(Guid orderId)
+        : base(
+            OrderFulfillmentErrorCodes.OrderStockConfirmationRequired,
+            "Confirme o estoque antes de marcar o pedido como separado.")
+        => OrderId = orderId;
+}
+
+public sealed class OrderCannotConfirmStockAfterDeliveredException : OrderFulfillmentException
+{
+    public Guid OrderId { get; }
+
+    public OrderCannotConfirmStockAfterDeliveredException(Guid orderId)
+        : base(
+            OrderFulfillmentErrorCodes.OrderCannotConfirmStockAfterDelivered,
+            "Este pedido já foi entregue e não pode ter o estoque confirmado.")
+        => OrderId = orderId;
+}

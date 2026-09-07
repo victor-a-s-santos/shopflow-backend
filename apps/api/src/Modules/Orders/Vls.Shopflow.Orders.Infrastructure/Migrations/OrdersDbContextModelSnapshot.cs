@@ -351,6 +351,19 @@ namespace Vls.Shopflow.Orders.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<DateTimeOffset?>("StockConfirmationUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StockConfirmationNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("StockConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("StockConfirmedByAdminUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("Subtotal")
                         .HasColumnType("numeric(12,2)");
 

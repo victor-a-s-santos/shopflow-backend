@@ -39,8 +39,8 @@ Não há transação compartilhada entre `OrdersDbContext` e `NotificationsDbCon
 |--------|--------|
 | `Id` | PK |
 | `OrderId` | Pedido |
-| `Type` | `OrderCreated` / `PaymentConfirmed` / `OrderShipped` / `OrderDelivered` |
-| `IdempotencyKey` | UNIQUE: `order:{OrderId:D}:created\|paid\|shipped\|delivered` |
+| `Type` | `OrderCreated` / `PaymentConfirmed` / `OrderStockConfirmed` / `OrderShipped` / `OrderDelivered` |
+| `IdempotencyKey` | UNIQUE: `order:{OrderId:D}:created\|paid\|stock-confirmed\|shipped\|delivered` |
 | `PayloadJson` | Dados mínimos para o template (não HTML) |
 | `Status` | `Pending` / `Dispatched` |
 | `CreatedAt` / `DispatchedAt` | Auditoria |
