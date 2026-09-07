@@ -123,7 +123,7 @@ public sealed class CustomerOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync((CustomerOrderPaymentSummaryDto?)null);
 
-        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, paymentReader.Object);
+        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, paymentReader.Object, NullCatalogProductImageLookup.Instance);
         var result = await sut.Handle(new GetCustomerOrderByIdQuery(customerId, order.Id), CancellationToken.None);
 
         result.Delivery.Should().NotBeNull();
@@ -151,7 +151,7 @@ public sealed class CustomerOrderQueryHandlerTests
         var repo = new Mock<IOrderRepository>();
         repo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>())).ReturnsAsync(order);
 
-        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, Mock.Of<ICustomerOrderPixPaymentReader>());
+        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, Mock.Of<ICustomerOrderPixPaymentReader>(), NullCatalogProductImageLookup.Instance);
         var result = await sut.Handle(new GetCustomerOrderByIdQuery(customerId, order.Id), CancellationToken.None);
 
         result.Delivery.Should().NotBeNull();
@@ -182,7 +182,7 @@ public sealed class CustomerOrderQueryHandlerTests
         paymentReader.Setup(x => x.GetLatestByOrderIdAsync(order.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);
 
-        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, paymentReader.Object);
+        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, paymentReader.Object, NullCatalogProductImageLookup.Instance);
         var result = await sut.Handle(new GetCustomerOrderByIdQuery(customerId, order.Id), CancellationToken.None);
 
         result.Id.Should().Be(order.Id);
@@ -193,13 +193,40 @@ public sealed class CustomerOrderQueryHandlerTests
     }
 
     [Fact]
+    public async Task GetCustomerOrderById_WhenSnapshotImageMissing_FillsFromCatalog()
+    {
+        var customerId = Guid.NewGuid();
+        var order = CreateBoundOrder(customerId);
+        var skuId = order.Items.Single().SkuId;
+        var catalogUrl = "https://assets.example.test/tomara.jpg";
+
+        var repo = new Mock<IOrderRepository>();
+        repo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>())).ReturnsAsync(order);
+
+        var lookup = new Mock<ICatalogProductImageLookup>();
+        lookup.Setup(x => x.GetPrimaryImageUrlsBySkuIdsAsync(
+                It.Is<IReadOnlyCollection<Guid>>(ids => ids.Single() == skuId),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, string> { [skuId] = catalogUrl });
+
+        var sut = new GetCustomerOrderByIdQueryHandler(
+            repo.Object,
+            Mock.Of<ICustomerOrderPixPaymentReader>(),
+            lookup.Object);
+        var result = await sut.Handle(new GetCustomerOrderByIdQuery(customerId, order.Id), CancellationToken.None);
+
+        result.Items.Should().ContainSingle();
+        result.Items[0].ImageUrl.Should().Be(catalogUrl);
+    }
+
+    [Fact]
     public async Task GetCustomerOrderById_OtherCustomer_ThrowsNotFound()
     {
         var order = CreateBoundOrder(Guid.NewGuid());
         var repo = new Mock<IOrderRepository>();
         repo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>())).ReturnsAsync(order);
 
-        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, Mock.Of<ICustomerOrderPixPaymentReader>());
+        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, Mock.Of<ICustomerOrderPixPaymentReader>(), NullCatalogProductImageLookup.Instance);
         var act = () => sut.Handle(new GetCustomerOrderByIdQuery(Guid.NewGuid(), order.Id), CancellationToken.None);
 
         await act.Should().ThrowAsync<OrderNotFoundException>();
@@ -212,7 +239,7 @@ public sealed class CustomerOrderQueryHandlerTests
         var repo = new Mock<IOrderRepository>();
         repo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>())).ReturnsAsync(order);
 
-        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, Mock.Of<ICustomerOrderPixPaymentReader>());
+        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, Mock.Of<ICustomerOrderPixPaymentReader>(), NullCatalogProductImageLookup.Instance);
         var act = () => sut.Handle(new GetCustomerOrderByIdQuery(Guid.NewGuid(), order.Id), CancellationToken.None);
 
         await act.Should().ThrowAsync<OrderNotFoundException>();

@@ -5,6 +5,7 @@ using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Domain.Constants;
 using Vls.Shopflow.Orders.Domain.Entities;
 using Vls.Shopflow.Orders.Domain.Enums;
@@ -20,6 +21,7 @@ internal static class GuestOrderStatusResponseBuilder
         IOrderPixPaymentStatusReader paymentStatusReader,
         ICustomerAccountPort customerAccountPort,
         IOrdersUnitOfWork unitOfWork,
+        ICatalogProductImageLookup catalogProductImageLookup,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -51,12 +53,18 @@ internal static class GuestOrderStatusResponseBuilder
         var accountExistsForEmail = canCreateAccount
             && await customerAccountPort.EmailExistsAsync(order.CustomerEmail, cancellationToken);
 
+        var catalogImages = await OrderItemImageUrl.LookupMissingAsync(
+            catalogProductImageLookup,
+            order.Items,
+            cancellationToken);
+
         return OrderMapper.ToGuestStatusDto(
             order,
             payment,
             accessToken,
             canCreateAccount,
-            accountExistsForEmail);
+            accountExistsForEmail,
+            catalogImages);
     }
 }
 
@@ -65,6 +73,7 @@ public sealed class GetGuestOrderStatusQueryHandler(
     IOrderPixPaymentStatusReader paymentStatusReader,
     ICustomerAccountPort customerAccountPort,
     IOrdersUnitOfWork unitOfWork,
+    ICatalogProductImageLookup catalogProductImageLookup,
     ILogger<GetGuestOrderStatusQueryHandler> logger)
     : IRequestHandler<GetGuestOrderStatusQuery, GuestOrderStatusDto>
 {
@@ -83,6 +92,7 @@ public sealed class GetGuestOrderStatusQueryHandler(
             paymentStatusReader,
             customerAccountPort,
             unitOfWork,
+            catalogProductImageLookup,
             logger,
             cancellationToken);
     }
@@ -93,6 +103,7 @@ public sealed class GetPublicOrderStatusQueryHandler(
     IOrderPixPaymentStatusReader paymentStatusReader,
     ICustomerAccountPort customerAccountPort,
     IOrdersUnitOfWork unitOfWork,
+    ICatalogProductImageLookup catalogProductImageLookup,
     ILogger<GetPublicOrderStatusQueryHandler> logger)
     : IRequestHandler<GetPublicOrderStatusQuery, GuestOrderStatusDto>
 {
@@ -114,6 +125,7 @@ public sealed class GetPublicOrderStatusQueryHandler(
             paymentStatusReader,
             customerAccountPort,
             unitOfWork,
+            catalogProductImageLookup,
             logger,
             cancellationToken);
     }

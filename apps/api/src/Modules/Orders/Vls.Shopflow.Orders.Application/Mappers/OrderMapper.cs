@@ -47,7 +47,8 @@ internal static class OrderMapper
         Interfaces.OrderPixPaymentStatusSnapshot? payment,
         GuestOrderAccessToken accessToken,
         bool canCreateAccount,
-        bool accountExistsForEmail)
+        bool accountExistsForEmail,
+        IReadOnlyDictionary<Guid, string>? catalogImages = null)
         => new(
             order.Id,
             order.FormatOrderNumber(),
@@ -69,7 +70,7 @@ internal static class OrderMapper
                 i.UnitPrice,
                 i.Subtotal,
                 Attributes: null,
-                ImageUrl: i.ProductImageUrl,
+                ImageUrl: OrderItemImageUrl.Coalesce(i.ProductImageUrl, i.SkuId, catalogImages),
                 SalesDisplay: OrderItemSalesDisplayMapper.ToDto(i))).ToList(),
             new DataTransferObjects.GuestOrderTotalsDto(
                 order.Subtotal,

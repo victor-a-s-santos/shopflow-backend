@@ -6,6 +6,7 @@ using Vls.Shopflow.Orders.Application.Mappers;
 using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Queries;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Domain.Enums;
 using Vls.Shopflow.Orders.Domain.Exceptions;
 
@@ -129,7 +130,8 @@ public sealed class GetAdminOrderByIdQueryHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
     IDeliveryBatchRepository batchRepository,
-    IOptions<FulfillmentOptions> fulfillmentOptions)
+    IOptions<FulfillmentOptions> fulfillmentOptions,
+    ICatalogProductImageLookup catalogProductImageLookup)
     : IQueryHandler<GetAdminOrderByIdQuery, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -141,12 +143,17 @@ public sealed class GetAdminOrderByIdQueryHandler(
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
         var membership = await batchRepository.FindMembershipByOrderIdAsync(order.Id, cancellationToken);
+        var catalogImages = await OrderItemImageUrl.LookupMissingAsync(
+            catalogProductImageLookup,
+            order.Items,
+            cancellationToken);
 
         return AdminOrderMapper.ToDetailDto(
             order,
             payment,
             membership?.DeliveryBatchId,
             membership is null ? null : membership.BatchNumber.ToString(),
-            fulfillmentOptions.Value.RequireStockConfirmation);
+            fulfillmentOptions.Value.RequireStockConfirmation,
+            catalogImages);
     }
 }

@@ -55,6 +55,7 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
             accountPort,
             uow ?? Mock.Of<IOrdersUnitOfWork>(x =>
                 x.SaveChangesAsync(It.IsAny<CancellationToken>()) == Task.FromResult(1)),
+            NullCatalogProductImageLookup.Instance,
             NullLogger<GetGuestOrderStatusQueryHandler>.Instance);
     }
 
@@ -73,6 +74,7 @@ public sealed class GetGuestOrderStatusQueryHandlerTests
             accountPort,
             uow ?? Mock.Of<IOrdersUnitOfWork>(x =>
                 x.SaveChangesAsync(It.IsAny<CancellationToken>()) == Task.FromResult(1)),
+            NullCatalogProductImageLookup.Instance,
             NullLogger<GetPublicOrderStatusQueryHandler>.Instance);
     }
 

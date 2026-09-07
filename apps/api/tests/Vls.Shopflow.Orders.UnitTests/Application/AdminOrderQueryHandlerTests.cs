@@ -9,6 +9,7 @@ using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Queries;
 using Vls.Shopflow.Orders.Application.QueryHandlers;
 using Vls.Shopflow.Orders.Application.Repositories;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Application.Validators;
 using Vls.Shopflow.Orders.Domain.Entities;
 using Vls.Shopflow.Orders.Domain.Enums;
@@ -109,7 +110,8 @@ public sealed class AdminOrderQueryHandlerTests
             repo.Object,
             paymentReader.Object,
             MockBatchRepo(),
-            Options.Create(new FulfillmentOptions { RequireStockConfirmation = true }));
+            Options.Create(new FulfillmentOptions { RequireStockConfirmation = true }),
+            NullCatalogProductImageLookup.Instance);
         var result = await sut.Handle(new GetAdminOrderByIdQuery(order.Id), CancellationToken.None);
 
         result.InternalOrderNote.Should().Be("Segurar até sexta");
@@ -234,7 +236,8 @@ public sealed class AdminOrderQueryHandlerTests
             repo.Object,
             paymentReader.Object,
             MockBatchRepo(),
-            Options.Create(new FulfillmentOptions()));
+            Options.Create(new FulfillmentOptions()),
+            NullCatalogProductImageLookup.Instance);
         var result = await sut.Handle(new GetAdminOrderByIdQuery(order.Id), CancellationToken.None);
 
         result.Id.Should().Be(order.Id);
@@ -256,7 +259,8 @@ public sealed class AdminOrderQueryHandlerTests
             repo.Object,
             Mock.Of<IAdminOrderPixPaymentReader>(),
             MockBatchRepo(),
-            Options.Create(new FulfillmentOptions()));
+            Options.Create(new FulfillmentOptions()),
+            NullCatalogProductImageLookup.Instance);
         var act = () => sut.Handle(new GetAdminOrderByIdQuery(Guid.NewGuid()), CancellationToken.None);
 
         await act.Should().ThrowAsync<OrderNotFoundException>();
