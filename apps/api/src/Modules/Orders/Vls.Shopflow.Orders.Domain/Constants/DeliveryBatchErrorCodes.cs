@@ -18,4 +18,5 @@ public static class DeliveryBatchErrorCodes
     public const string MustBeShippedBeforeDelivered = "DELIVERY_BATCH_MUST_BE_SHIPPED_BEFORE_DELIVERED";
     public const string AlreadyDelivered = "DELIVERY_BATCH_ALREADY_DELIVERED";
     public const string NotFound = "DELIVERY_BATCH_NOT_FOUND";
+    public const string StockConfirmationRequired = "DELIVERY_BATCH_STOCK_CONFIRMATION_REQUIRED";
 }

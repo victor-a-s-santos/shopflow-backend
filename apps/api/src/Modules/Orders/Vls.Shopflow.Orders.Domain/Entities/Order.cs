@@ -10,6 +10,7 @@ public sealed class Order : Entity<Guid>
     public const int CustomerOrderNoteMaxLength = 1000;
     public const int InternalOrderNoteMaxLength = 2000;
     public const int TrackingCodeMaxLength = 120;
+    public const int StockConfirmationNoteMaxLength = 1000;
 
     private readonly List<OrderItem> _items = new();
 
@@ -52,6 +53,15 @@ public sealed class Order : Entity<Guid>
     public DateTimeOffset? DeliveredAt { get; private set; }
     public DateTimeOffset? FulfillmentUpdatedAt { get; private set; }
     public Guid? FulfillmentUpdatedByAdminId { get; private set; }
+
+    /// <summary>
+    /// Physical supplier-stock confirmation. Distinct from site availability.
+    /// Null while paid + AwaitingShipment means "aguardando confirmação de estoque".
+    /// </summary>
+    public DateTimeOffset? StockConfirmedAt { get; private set; }
+    public Guid? StockConfirmedByAdminUserId { get; private set; }
+    public DateTimeOffset? StockConfirmationUpdatedAt { get; private set; }
+    public string? StockConfirmationNote { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
@@ -180,6 +190,48 @@ public sealed class Order : Entity<Guid>
             "internalOrderNote",
             "A observação interna deve ter no máximo 2000 caracteres.");
         UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Confirms physical supplier stock. Requires <see cref="OrderStatus.Paid"/>.
+    /// Idempotent when already confirmed — keeps the first confirmation timestamp/admin.
+    /// Shipped orders without confirmation are filled for compatibility.
+    /// </summary>
+    /// <returns>True when this call newly confirmed stock (caller may enqueue email).</returns>
+    public bool ConfirmStock(Guid? adminId, string? note = null)
+    {
+        if (Status != OrderStatus.Paid)
+            throw new OrderMustBePaidBeforeStockConfirmationException(Id);
+
+        if (FulfillmentStatus == FulfillmentStatus.Delivered)
+        {
+            if (StockConfirmedAt is not null)
+                return false;
+
+            throw new OrderCannotConfirmStockAfterDeliveredException(Id);
+        }
+
+        var normalizedNote = note is null
+            ? null
+            : NormalizeOptionalText(
+                note,
+                StockConfirmationNoteMaxLength,
+                OrderFulfillmentErrorCodes.StockConfirmationNoteTooLong,
+                "note",
+                "A observação da confirmação de estoque deve ter no máximo 1000 caracteres.");
+
+        if (StockConfirmedAt is not null)
+            return false;
+
+        var now = DateTimeOffset.UtcNow;
+        StockConfirmedAt = now;
+        StockConfirmationUpdatedAt = now;
+        if (adminId is not null && adminId != Guid.Empty)
+            StockConfirmedByAdminUserId = adminId;
+        if (normalizedNote is not null)
+            StockConfirmationNote = normalizedNote;
+        UpdatedAt = now;
+        return true;
     }
 
     /// <summary>

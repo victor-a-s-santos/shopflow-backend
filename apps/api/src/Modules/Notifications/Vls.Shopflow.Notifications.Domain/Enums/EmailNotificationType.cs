@@ -12,5 +12,6 @@ public enum EmailNotificationType
     CustomerRegistrationReceived = 8,
     CustomerApproved = 9,
     CustomerRejected = 10,
-    CustomerSuspended = 11
+    CustomerSuspended = 11,
+    OrderStockConfirmed = 12
 }

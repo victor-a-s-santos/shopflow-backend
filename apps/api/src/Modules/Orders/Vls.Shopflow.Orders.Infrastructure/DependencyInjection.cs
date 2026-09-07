@@ -31,9 +31,15 @@ public static class DependencyInjection
         });
 
         if (configuration is not null)
+        {
             services.Configure<GuestOrderAccessOptions>(configuration.GetSection(GuestOrderAccessOptions.SectionName));
+            services.Configure<FulfillmentOptions>(configuration.GetSection(FulfillmentOptions.SectionName));
+        }
         else
+        {
             services.Configure<GuestOrderAccessOptions>(_ => { });
+            services.Configure<FulfillmentOptions>(_ => { });
+        }
 
         RegisterServices(services);
         return services;

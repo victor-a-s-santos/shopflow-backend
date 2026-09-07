@@ -25,7 +25,10 @@ public sealed record DeliveryBatchAddressInfo(
 /// </summary>
 public static class DeliveryBatchGroupingRules
 {
-    public static void EnsureEligibleForBatch(Order order, bool alreadyInBatch)
+    public static void EnsureEligibleForBatch(
+        Order order,
+        bool alreadyInBatch,
+        bool requireStockConfirmation = false)
     {
         if (alreadyInBatch)
         {
@@ -75,12 +78,23 @@ public static class DeliveryBatchGroupingRules
                 DeliveryBatchErrorCodes.OrderNotEligible,
                 "Todos os pedidos precisam estar pagos e aguardando envio.");
         }
+
+        if (requireStockConfirmation && order.StockConfirmedAt is null)
+        {
+            throw new DeliveryBatchException(
+                DeliveryBatchErrorCodes.StockConfirmationRequired,
+                "Todos os pedidos da remessa precisam ter estoque confirmado antes de marcar como separado.");
+        }
     }
 
-    public static bool IsEligibleCandidate(Order order, bool alreadyInBatch)
+    public static bool IsEligibleCandidate(
+        Order order,
+        bool alreadyInBatch,
+        bool requireStockConfirmation = false)
         => !alreadyInBatch
            && order.Status == OrderStatus.Paid
-           && order.FulfillmentStatus == FulfillmentStatus.AwaitingShipment;
+           && order.FulfillmentStatus == FulfillmentStatus.AwaitingShipment
+           && (!requireStockConfirmation || order.StockConfirmedAt is not null);
 
     public static DeliveryBatchCustomerIdentity ResolveIdentity(IReadOnlyList<Order> orders)
     {

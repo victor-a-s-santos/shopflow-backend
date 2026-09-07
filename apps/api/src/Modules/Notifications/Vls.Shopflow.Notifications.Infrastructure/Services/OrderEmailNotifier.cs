@@ -20,6 +20,9 @@ public sealed class OrderEmailNotifier(
     public Task NotifyOrderDeliveredAsync(OrderEmailNotifyRequest request, CancellationToken cancellationToken = default)
         => SafeEnqueue(() => notifications.EnqueueOrderDeliveredAsync(Map(request), cancellationToken), "OrderDelivered", request.OrderId);
 
+    public Task NotifyOrderStockConfirmedAsync(OrderEmailNotifyRequest request, CancellationToken cancellationToken = default)
+        => SafeEnqueue(() => notifications.EnqueueOrderStockConfirmedAsync(Map(request), cancellationToken), "OrderStockConfirmed", request.OrderId);
+
     private async Task SafeEnqueue(Func<Task> action, string kind, Guid orderId)
     {
         try

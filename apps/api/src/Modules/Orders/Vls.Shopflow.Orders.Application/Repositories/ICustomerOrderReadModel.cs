@@ -28,7 +28,8 @@ public sealed record CustomerOrderListRow(
     DateOnly? PreferredDeliveryDate,
     DateTimeOffset? ShippedAt,
     DateTimeOffset? DeliveredAt,
-    string? FirstItemImageUrl = null);
+    string? FirstItemImageUrl = null,
+    DateTimeOffset? StockConfirmedAt = null);
 
 public sealed record CustomerOrderListPage(
     IReadOnlyList<CustomerOrderListRow> Items,

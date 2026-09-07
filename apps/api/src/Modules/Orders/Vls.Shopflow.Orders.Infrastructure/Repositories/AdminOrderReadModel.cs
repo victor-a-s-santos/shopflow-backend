@@ -73,7 +73,8 @@ public sealed class AdminOrderReadModel(OrdersDbContext db) : IAdminOrderReadMod
                 o.PreferredDeliveryDate,
                 o.ShippedAt,
                 o.DeliveredAt,
-                o.TrackingCode))
+                o.TrackingCode,
+                o.StockConfirmedAt))
             .ToListAsync(cancellationToken);
 
         return new AdminOrderListPage(pageItems, totalItems);

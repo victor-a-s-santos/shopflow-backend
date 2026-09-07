@@ -29,7 +29,8 @@ public sealed record CustomerOrderListItemDto(
     string? PreferredDeliveryMethod = null,
     DateOnly? PreferredDeliveryDate = null,
     DateTimeOffset? ShippedAt = null,
-    DateTimeOffset? DeliveredAt = null);
+    DateTimeOffset? DeliveredAt = null,
+    DateTimeOffset? StockConfirmedAt = null);
 
 public sealed record PagedCustomerOrdersDto(
     IReadOnlyList<CustomerOrderListItemDto> Items,

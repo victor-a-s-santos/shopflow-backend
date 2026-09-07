@@ -75,6 +75,20 @@ public sealed class TransactionalEmailTemplatesTests
     }
 
     [Fact]
+    public void OrderStockConfirmed_DoesNotExposeAdminOrInternalNote()
+    {
+        var (subject, html, text) = TransactionalEmailTemplates.OrderStockConfirmed(App, SampleOrder());
+
+        subject.Should().Be("Pedido #10582 confirmado em estoque");
+        html.Should().Contain("confirmado em estoque");
+        html.Should().Contain("separação");
+        text.Should().Contain("separação");
+        html.Should().NotContain("admin");
+        html.Should().NotContain("InternalOrderNote");
+        html.Should().NotContain("StockConfirmationNote");
+    }
+
+    [Fact]
     public void OrderDelivered_Renders()
     {
         var (subject, html, _) = TransactionalEmailTemplates.OrderDelivered(App, SampleOrder());

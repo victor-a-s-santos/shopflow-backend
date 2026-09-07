@@ -63,6 +63,24 @@ public static class AdminOrdersEndpoints
             return Results.Ok(result);
         });
 
+        adminOrders.MapPost("/{orderId:guid}/fulfillment/confirm-stock", async (
+            ISender sender,
+            ICurrentAdminAccessor currentAdmin,
+            Guid orderId,
+            ConfirmOrderStockRequest? req,
+            CancellationToken ct) =>
+        {
+            var admin = await currentAdmin.GetCurrentAdminAsync(ct);
+            if (admin is null)
+                return Results.Unauthorized();
+
+            var result = await sender.Send(
+                new ConfirmOrderStockCommand(orderId, admin.Id, req?.Note),
+                ct);
+
+            return Results.Ok(result);
+        });
+
         adminOrders.MapPost("/{orderId:guid}/fulfillment/ship", async (
             ISender sender,
             ICurrentAdminAccessor currentAdmin,
@@ -123,6 +141,8 @@ public static class AdminOrdersEndpoints
         return group;
     }
 }
+
+public sealed record ConfirmOrderStockRequest(string? Note = null);
 
 public sealed record ShipOrderFulfillmentRequest(
     string? FinalDeliveryMethod = null,

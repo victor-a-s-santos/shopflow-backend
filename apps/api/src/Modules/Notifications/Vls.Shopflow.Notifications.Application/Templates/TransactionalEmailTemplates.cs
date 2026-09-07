@@ -153,6 +153,26 @@ public static class TransactionalEmailTemplates
         return (subject, html, text);
     }
 
+    public static (string Subject, string Html, string Text) OrderStockConfirmed(
+        PublicAppOptions app,
+        OrderEmailNotificationRequest order)
+    {
+        var subject = $"Pedido #{order.OrderNumber} confirmado em estoque";
+        var link = BuildOrderLink(app, order);
+        var greeting = Greeting(order.CustomerName);
+        var html = Layout(
+            app.StoreName,
+            subject,
+            $"""
+            <p>{greeting}</p>
+            <p>Seu pedido <strong>#{order.OrderNumber}</strong> foi confirmado em estoque e agora seguirá para separação.</p>
+            {Cta(link, "Acompanhar pedido")}
+            {LinkFallback(link)}
+            """);
+        var text = $"{greeting}\n\nPedido #{order.OrderNumber} confirmado em estoque e agora seguirá para separação.\n{link}\n";
+        return (subject, html, text);
+    }
+
     public static (string Subject, string Html, string Text) CustomerApprovalRequestAdmin(
         PublicAppOptions app,
         CustomerApprovalEmailRequest customer)

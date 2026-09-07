@@ -86,6 +86,7 @@ services:
       MercadoPago__WebhookRawCaptureEnabled: ${MercadoPago__WebhookRawCaptureEnabled:-false}
       MercadoPago__WebhookRawCaptureOrderId: ${MercadoPago__WebhookRawCaptureOrderId:-}
       MercadoPago__WebhookRawCaptureMaxEvents: ${MercadoPago__WebhookRawCaptureMaxEvents:-5}
+      Fulfillment__RequireStockConfirmation: ${Fulfillment__RequireStockConfirmation:-true}
       GuestOrderAccess__Enabled: ${GuestOrderAccess__Enabled:-true}
       GuestOrderAccess__TokenTtlDays: ${GuestOrderAccess__TokenTtlDays:-30}
       GuestOrderAccess__TokenHashSecret: ${GuestOrderAccess__TokenHashSecret:-dev-only-guest-order-access-secret-change-me}

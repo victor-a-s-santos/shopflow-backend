@@ -89,6 +89,12 @@ public sealed class OrderEmailIntentRepository(OrdersDbContext db) : IOrderEmail
             batchSize - repaired,
             cancellationToken);
 
+        if (repaired >= batchSize)
+            return repaired;
+
+        // Only paid + awaiting shipment with a real confirmation — never backfilled Shipped/Delivered.
+        repaired += await RepairMissingStockConfirmedAsync(batchSize - repaired, cancellationToken);
+
         return repaired;
     }
 
@@ -117,6 +123,29 @@ public sealed class OrderEmailIntentRepository(OrdersDbContext db) : IOrderEmail
 
         foreach (var order in missing)
             await EnsurePendingAsync(OrderEmailIntentFactory.PendingFromOrder(order, type), cancellationToken);
+
+        return missing.Count;
+    }
+
+    private async Task<int> RepairMissingStockConfirmedAsync(int remaining, CancellationToken cancellationToken)
+    {
+        if (remaining <= 0)
+            return 0;
+
+        var type = OrderEmailIntentType.OrderStockConfirmed;
+        var missing = await db.Orders
+            .Where(o => o.Status == OrderStatus.Paid
+                        && o.FulfillmentStatus == FulfillmentStatus.AwaitingShipment
+                        && o.StockConfirmedAt != null
+                        && !db.EmailIntents.Any(i => i.OrderId == o.Id && i.Type == type))
+            .OrderBy(o => o.CreatedAt)
+            .Take(remaining)
+            .ToListAsync(cancellationToken);
+
+        foreach (var order in missing)
+            await EnsurePendingAsync(
+                OrderEmailIntentFactory.PendingFromOrder(order, type),
+                cancellationToken);
 
         return missing.Count;
     }

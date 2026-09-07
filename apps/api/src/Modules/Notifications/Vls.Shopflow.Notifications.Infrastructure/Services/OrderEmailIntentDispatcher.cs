@@ -72,6 +72,9 @@ public sealed class OrderEmailIntentDispatcher(
                 case OrderEmailIntentType.OrderDelivered:
                     await emails.EnqueueOrderDeliveredAsync(request, cancellationToken);
                     break;
+                case OrderEmailIntentType.OrderStockConfirmed:
+                    await emails.EnqueueOrderStockConfirmedAsync(request, cancellationToken);
+                    break;
                 default:
                     logger.LogError(
                         "Unknown order email intent Type={EmailType} IntentId={IntentId} OrderId={OrderId}",

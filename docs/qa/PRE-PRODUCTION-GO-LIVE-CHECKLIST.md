@@ -126,7 +126,8 @@ VITE_SUPPORT_WHATSAPP_PHONE=55DDDNUMERO
 # 3. Migrations / containers / infra
 
 - [ ] Migrations Catalog / Inventory / CartCheckout / Orders / PaymentsPix / Identity aplicadas.
-- [ ] Migrations DeliveryBatch + OrderDeliveryFulfillment + CheckoutDeliveryPreference aplicadas.
+- [ ] Migrations DeliveryBatch + OrderDeliveryFulfillment + CheckoutDeliveryPreference + AddOrderStockConfirmation aplicadas.
+- [ ] `Fulfillment__RequireStockConfirmation=true` em TESTE/HML/PROD.
 - [ ] `shopflow-api-*` / `worker-*` / `postgres` / `caddy` Up.
 - [ ] DNS + SSL (Caddy) OK.
 - [ ] Health público 200.
@@ -161,8 +162,8 @@ VITE_SUPPORT_WHATSAPP_PHONE=55DDDNUMERO
 # 6. Delivery / Fulfillment / Remessas
 
 - [ ] Admin orders list/detail.
-- [ ] Fulfillment individual (ship/deliver).
-- [ ] Delivery batches list/detail.
+- [ ] Fulfillment individual (confirm-stock → ship/deliver). Com `Fulfillment__RequireStockConfirmation=true`, separado só após estoque confirmado.
+- [ ] Delivery batches list/detail. Remessa não marca separado se algum pedido estiver sem `StockConfirmedAt`.
 - [ ] Create batch from order(s).
 - [ ] Ship/deliver remessa.
 - [ ] Guest/public não vazam dados internos de remessa.

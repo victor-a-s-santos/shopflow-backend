@@ -19,3 +19,8 @@ public sealed record DeliverOrderFulfillmentCommand(
 public sealed record UpdateOrderInternalNoteCommand(
     Guid OrderId,
     string? InternalNote) : ICommand<AdminOrderDetailDto>;
+
+public sealed record ConfirmOrderStockCommand(
+    Guid OrderId,
+    Guid? AdminId,
+    string? Note = null) : ICommand<AdminOrderDetailDto>;

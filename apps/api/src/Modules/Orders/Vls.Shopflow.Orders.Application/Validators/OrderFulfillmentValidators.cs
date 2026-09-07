@@ -45,6 +45,20 @@ public sealed class DeliverOrderFulfillmentCommandValidator : AbstractValidator<
     }
 }
 
+public sealed class ConfirmOrderStockCommandValidator : AbstractValidator<ConfirmOrderStockCommand>
+{
+    public ConfirmOrderStockCommandValidator()
+    {
+        RuleFor(x => x.OrderId).NotEmpty();
+
+        RuleFor(x => x.Note)
+            .MaximumLength(Order.StockConfirmationNoteMaxLength)
+            .When(x => !string.IsNullOrWhiteSpace(x.Note))
+            .WithErrorCode("STOCK_CONFIRMATION_NOTE_TOO_LONG")
+            .WithMessage("A observação da confirmação de estoque deve ter no máximo 1000 caracteres.");
+    }
+}
+
 public sealed class UpdateOrderInternalNoteCommandValidator : AbstractValidator<UpdateOrderInternalNoteCommand>
 {
     public UpdateOrderInternalNoteCommandValidator()

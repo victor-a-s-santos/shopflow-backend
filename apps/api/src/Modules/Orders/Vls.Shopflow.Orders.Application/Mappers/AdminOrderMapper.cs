@@ -1,4 +1,5 @@
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
+using Vls.Shopflow.Orders.Application.Services;
 using Vls.Shopflow.Orders.Domain.Entities;
 
 namespace Vls.Shopflow.Orders.Application.Mappers;
@@ -9,7 +10,8 @@ internal static class AdminOrderMapper
         Order order,
         AdminOrderPaymentSummaryDto? payment,
         Guid? deliveryBatchId = null,
-        string? deliveryBatchNumber = null)
+        string? deliveryBatchNumber = null,
+        bool requireStockConfirmation = false)
         => new(
             order.Id,
             order.FormatOrderNumber(),
@@ -54,7 +56,12 @@ internal static class AdminOrderMapper
             order.FulfillmentUpdatedAt,
             order.FulfillmentUpdatedByAdminId,
             deliveryBatchId,
-            deliveryBatchNumber);
+            deliveryBatchNumber,
+            order.StockConfirmedAt,
+            order.StockConfirmedByAdminUserId,
+            order.StockConfirmationNote,
+            OrderStockConfirmationRules.CanConfirmStock(order),
+            OrderStockConfirmationRules.CanMarkAsSeparated(order, requireStockConfirmation));
 
     public static OrderDeliveryInfoDto ToSafeDeliveryDto(Order order)
         => new(
@@ -65,5 +72,6 @@ internal static class AdminOrderMapper
             order.FinalDeliveryMethod?.ToString(),
             order.TrackingCode,
             order.ShippedAt,
-            order.DeliveredAt);
+            order.DeliveredAt,
+            order.StockConfirmedAt);
 }

@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Options;
 using Vls.Shopflow.BuildingBlocks.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.DataTransferObjects;
 using Vls.Shopflow.Orders.Application.Interfaces;
 using Vls.Shopflow.Orders.Application.Mappers;
+using Vls.Shopflow.Orders.Application.Options;
 using Vls.Shopflow.Orders.Application.Queries;
 using Vls.Shopflow.Orders.Application.Repositories;
 using Vls.Shopflow.Orders.Domain.Enums;
@@ -111,7 +113,8 @@ public sealed class GetAdminOrdersQueryHandler(
                 row.DeliveredAt,
                 row.TrackingCode,
                 membership?.DeliveryBatchId,
-                membership is null ? null : membership.BatchNumber.ToString());
+                membership is null ? null : membership.BatchNumber.ToString(),
+                row.StockConfirmedAt);
         }).ToList();
 
         var totalPages = page.TotalItems == 0
@@ -125,7 +128,8 @@ public sealed class GetAdminOrdersQueryHandler(
 public sealed class GetAdminOrderByIdQueryHandler(
     IOrderRepository orderRepository,
     IAdminOrderPixPaymentReader pixPaymentReader,
-    IDeliveryBatchRepository batchRepository)
+    IDeliveryBatchRepository batchRepository,
+    IOptions<FulfillmentOptions> fulfillmentOptions)
     : IQueryHandler<GetAdminOrderByIdQuery, AdminOrderDetailDto>
 {
     public async Task<AdminOrderDetailDto> Handle(
@@ -142,6 +146,7 @@ public sealed class GetAdminOrderByIdQueryHandler(
             order,
             payment,
             membership?.DeliveryBatchId,
-            membership is null ? null : membership.BatchNumber.ToString());
+            membership is null ? null : membership.BatchNumber.ToString(),
+            fulfillmentOptions.Value.RequireStockConfirmation);
     }
 }

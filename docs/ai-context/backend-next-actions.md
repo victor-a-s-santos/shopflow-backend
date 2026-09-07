@@ -11,6 +11,10 @@ Store access / customer approval no backend: config Open/Closed + 4 modos intern
 - CRUD `/api/customer/addresses` + default; checkout aceita `customerAddressId` / `saveAddress` / `setAsDefault`.
 - Snapshot `ProductImageUrl` em checkout item → order item; DTOs expõem `imageUrl` pública (null em legado). Sem ObjectKey/StoragePath.
 
+## Concluído — confirmação de estoque físico
+
+Milestone real no pedido (`StockConfirmedAt` + endpoint `confirm-stock`). Config `Fulfillment__RequireStockConfirmation` (true neste cliente). Ship/remessa bloqueados sem confirmação. E-mail `OrderStockConfirmed` (`order:{id}:stock-confirmed`). Ver `docs/orders/delivery-fulfillment-phase-2.md`.
+
 ## Pendente (não é backend desta fase)
 
 - **Fase 2 frontend:** guards de catálogo/checkout, tela “cadastro em análise”, fila `/admin/customers/approvals`, badge de pendentes, login visual unificado. **Não** fundir cookies/policies. **Não** remover `/admin/login` no backend.

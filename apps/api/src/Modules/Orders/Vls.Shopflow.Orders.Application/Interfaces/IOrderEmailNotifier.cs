@@ -12,6 +12,8 @@ public interface IOrderEmailNotifier
     Task NotifyOrderShippedAsync(OrderEmailNotifyRequest request, CancellationToken cancellationToken = default);
 
     Task NotifyOrderDeliveredAsync(OrderEmailNotifyRequest request, CancellationToken cancellationToken = default);
+
+    Task NotifyOrderStockConfirmedAsync(OrderEmailNotifyRequest request, CancellationToken cancellationToken = default);
 }
 
 public sealed record OrderEmailNotifyRequest(

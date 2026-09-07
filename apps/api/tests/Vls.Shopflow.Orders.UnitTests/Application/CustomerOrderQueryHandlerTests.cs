@@ -130,11 +130,38 @@ public sealed class CustomerOrderQueryHandlerTests
         result.Delivery!.FulfillmentStatus.Should().Be("Shipped");
         result.Delivery.CustomerOrderNote.Should().Be("Junto com pedido anterior");
         result.Delivery.TrackingCode.Should().Be("ABC123");
+        result.Delivery.StockConfirmedAt.Should().BeNull();
 
         var json = JsonSerializer.Serialize(result);
         json.Should().NotContain("InternalOrderNote");
         json.Should().NotContain("Não mostrar ao cliente");
         json.Should().NotContain("FulfillmentUpdatedByAdminId");
+        json.Should().NotContain("StockConfirmedByAdminUserId");
+        json.Should().NotContain("StockConfirmationNote");
+    }
+
+    [Fact]
+    public async Task GetCustomerOrderById_OwnOrder_ExposesStockConfirmedAtWithoutAdminId()
+    {
+        var customerId = Guid.NewGuid();
+        var order = CreateBoundOrder(customerId);
+        order.MarkAsPaid();
+        order.ConfirmStock(Guid.NewGuid(), "Nota interna do admin");
+
+        var repo = new Mock<IOrderRepository>();
+        repo.Setup(x => x.GetByIdWithItemsAsync(order.Id, It.IsAny<CancellationToken>())).ReturnsAsync(order);
+
+        var sut = new GetCustomerOrderByIdQueryHandler(repo.Object, Mock.Of<ICustomerOrderPixPaymentReader>());
+        var result = await sut.Handle(new GetCustomerOrderByIdQuery(customerId, order.Id), CancellationToken.None);
+
+        result.Delivery.Should().NotBeNull();
+        result.Delivery!.StockConfirmedAt.Should().Be(order.StockConfirmedAt);
+
+        var json = JsonSerializer.Serialize(result);
+        json.Should().Contain("StockConfirmedAt");
+        json.Should().NotContain("StockConfirmedByAdminUserId");
+        json.Should().NotContain("StockConfirmationNote");
+        json.Should().NotContain("Nota interna do admin");
     }
 
     [Fact]
