@@ -70,6 +70,7 @@ public static class DependencyInjection
         services.AddScoped<IGuestOrderAccessTokenRepository, GuestOrderAccessTokenRepository>();
         services.AddScoped<IGuestOrderAccessGate, GuestOrderAccessGate>();
         services.AddScoped<ICheckoutSessionReader, CheckoutSessionReader>();
+        services.AddScoped<ICatalogProductImageLookup, CatalogProductImageLookup>();
         services.AddScoped<IOrderPixPaymentStatusReader, NullOrderPixPaymentStatusReader>();
         services.AddScoped<IAdminOrderPixPaymentReader, NullAdminOrderPixPaymentReader>();
         services.AddScoped<ICustomerOrderPixPaymentReader, NullCustomerOrderPixPaymentReader>();

@@ -133,6 +133,7 @@ public sealed class CreateOrderFromCheckoutSessionIntegrationTests
                 new NullOrderPixPaymentStatusReader(),
                 new StubCustomerAccountPort(),
                 unitOfWork,
+                Vls.Shopflow.Orders.Application.Services.NullCatalogProductImageLookup.Instance,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<GetGuestOrderStatusQueryHandler>.Instance),
             hasher);
     }

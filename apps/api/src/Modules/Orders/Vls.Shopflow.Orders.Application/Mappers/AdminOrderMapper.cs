@@ -11,7 +11,8 @@ internal static class AdminOrderMapper
         AdminOrderPaymentSummaryDto? payment,
         Guid? deliveryBatchId = null,
         string? deliveryBatchNumber = null,
-        bool requireStockConfirmation = false)
+        bool requireStockConfirmation = false,
+        IReadOnlyDictionary<Guid, string>? catalogImages = null)
         => new(
             order.Id,
             order.FormatOrderNumber(),
@@ -41,7 +42,7 @@ internal static class AdminOrderMapper
                     i.UnitPrice,
                     i.Subtotal,
                     OrderItemSalesDisplayMapper.ToDto(i),
-                    i.ProductImageUrl))
+                    OrderItemImageUrl.Coalesce(i.ProductImageUrl, i.SkuId, catalogImages)))
                 .ToList(),
             payment,
             order.PreferredDeliveryMethod?.ToString(),

@@ -92,7 +92,8 @@ public sealed class GetCustomerOrdersQueryHandler(
 
 public sealed class GetCustomerOrderByIdQueryHandler(
     IOrderRepository orderRepository,
-    ICustomerOrderPixPaymentReader pixPaymentReader)
+    ICustomerOrderPixPaymentReader pixPaymentReader,
+    ICatalogProductImageLookup catalogProductImageLookup)
     : IQueryHandler<GetCustomerOrderByIdQuery, CustomerOrderDetailDto>
 {
     public async Task<CustomerOrderDetailDto> Handle(
@@ -106,6 +107,10 @@ public sealed class GetCustomerOrderByIdQueryHandler(
             throw new OrderNotFoundException(query.OrderId);
 
         var payment = await pixPaymentReader.GetLatestByOrderIdAsync(order.Id, cancellationToken);
+        var catalogImages = await OrderItemImageUrl.LookupMissingAsync(
+            catalogProductImageLookup,
+            order.Items,
+            cancellationToken);
 
         return new CustomerOrderDetailDto(
             order.Id,
@@ -137,7 +142,7 @@ public sealed class GetCustomerOrderByIdQueryHandler(
                     i.UnitPrice,
                     i.Subtotal,
                     OrderItemSalesDisplayMapper.ToDto(i),
-                    i.ProductImageUrl))
+                    OrderItemImageUrl.Coalesce(i.ProductImageUrl, i.SkuId, catalogImages)))
                 .ToList(),
             payment,
             AdminOrderMapper.ToSafeDeliveryDto(order));
