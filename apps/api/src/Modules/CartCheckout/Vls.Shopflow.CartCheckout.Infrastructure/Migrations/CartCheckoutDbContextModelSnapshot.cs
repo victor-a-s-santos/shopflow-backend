@@ -147,6 +147,10 @@ namespace Vls.Shopflow.CartCheckout.Infrastructure.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ProductImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ProductName")
                         .IsRequired()
                         .HasMaxLength(200)

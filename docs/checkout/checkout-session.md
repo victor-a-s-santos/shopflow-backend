@@ -17,4 +17,16 @@ Fonte da verdade: `IStoreAccessPolicy` (`StoreAccessPolicy`). Frontend não é b
 
 `GET /api/checkout/sessions/{id}` e cancelamento não mudam nesta fase.
 
-Ver também `docs/cart-checkout.md` e `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`.
+## Endereço salvo
+
+`POST /api/checkout/sessions` aceita:
+
+- `customerAddressId` — copia o endereço do customer autenticado para o snapshot da sessão
+- `address` — endereço manual (contrato legado)
+- `saveAddress` / `setAsDefault` — persiste em `CustomerAddress` após criar a sessão, só se o customer estiver logado e o endereço for manual
+
+Se `customerAddressId` for de outro customer: `400 ADDRESS_NOT_FOUND`. Guest continua enviando `address` quando o modo permitir.
+
+O pedido (`POST /api/orders/from-checkout-session`) continua copiando o snapshot da sessão. Itens da sessão/pedido agora também podem carregar `productImageUrl` pública (null em pedidos antigos).
+
+Ver também `docs/cart-checkout.md`, `docs/customer/customer-addresses.md` e `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`.

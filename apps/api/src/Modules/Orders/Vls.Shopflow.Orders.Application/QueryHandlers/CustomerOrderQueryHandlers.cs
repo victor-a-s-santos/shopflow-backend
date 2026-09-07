@@ -72,7 +72,7 @@ public sealed class GetCustomerOrdersQueryHandler(
                 DefaultCurrency,
                 row.ItemsCount,
                 row.FirstItemName,
-                PreviewImageUrl: null,
+                row.FirstItemImageUrl,
                 payment,
                 row.FulfillmentStatus.ToString(),
                 row.PreferredDeliveryMethod?.ToString(),
@@ -135,7 +135,8 @@ public sealed class GetCustomerOrderByIdQueryHandler(
                     i.Quantity,
                     i.UnitPrice,
                     i.Subtotal,
-                    OrderItemSalesDisplayMapper.ToDto(i)))
+                    OrderItemSalesDisplayMapper.ToDto(i),
+                    i.ProductImageUrl))
                 .ToList(),
             payment,
             AdminOrderMapper.ToSafeDeliveryDto(order));

@@ -104,6 +104,7 @@ Notas:
 - [ ] `VITE_API_BASE_URL` do ambiente.
 - [ ] `VITE_APP_ENV` informativo.
 - [ ] Rebuild após qualquer alteração `VITE_*`.
+- [ ] VIP Assessoria: labels em `apps/web/.env.production` (`Em estoque` / `Separado`) + iguais no Pages TESTE/PROD se quiser override explícito; rebuild após merge.
 
 ## WhatsApp
 
@@ -262,3 +263,4 @@ Documentar: passou / falhou / not run / flake.
 - [ ] FE: `/confirm-email`, `/reset-password`, `/account/pending-approval`, tracking `/pedido/:n?t=` hidrata token.
 - [ ] Frete real (fora do escopo e-mail).
 - [ ] Alinhar docs stale (`shopflow-current-state`, FE context).
+- [ ] Smoke storefront UX: banner home, olho de senha, miniatura nos itens, endereço padrão no checkout (`apps/web/docs/qa/storefront-ux-addresses-thumbnails-smoke.md`).

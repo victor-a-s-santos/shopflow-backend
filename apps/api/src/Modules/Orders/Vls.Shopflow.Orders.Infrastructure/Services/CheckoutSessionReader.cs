@@ -49,7 +49,8 @@ public sealed class CheckoutSessionReader(CartCheckoutDbContext cartCheckoutDb) 
                 i.ShowTotalPieces,
                 i.TotalPieces,
                 i.EquivalentUnitPrice,
-                i.SalesDisplaySummary)).ToList(),
+                i.SalesDisplaySummary,
+                i.ProductImageUrl)).ToList(),
             session.PreferredDeliveryMethod?.ToString(),
             session.PreferredDeliveryDate,
             session.CustomerOrderNote);

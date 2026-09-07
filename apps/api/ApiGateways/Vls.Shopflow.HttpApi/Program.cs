@@ -1166,6 +1166,8 @@ app.MapGroup("/api").MapAdminDeliveryBatchesEndpoints();
 
 app.MapGroup("/api").MapCustomerOrdersEndpoints();
 
+app.MapGroup("/api").MapCustomerAddressEndpoints();
+
 app.MapGroup("/api").MapPaymentsPixEndpoints();
 
 app.MapGroup("/api").MapIntegrationsEndpoints();

@@ -6,6 +6,11 @@ Documento de ponte. A lista viva continua em `docs/ai-context/next-actions.md`.
 
 Store access / customer approval no backend: config Open/Closed + 4 modos internos, cadastro Pending, gates de catálogo/checkout, admin `/approvals`, codes ProblemDetails. Ver `docs/features/STORE-ACCESS-CUSTOMER-APPROVAL.md`.
 
+## Concluído — Customer addresses + order item image
+
+- CRUD `/api/customer/addresses` + default; checkout aceita `customerAddressId` / `saveAddress` / `setAsDefault`.
+- Snapshot `ProductImageUrl` em checkout item → order item; DTOs expõem `imageUrl` pública (null em legado). Sem ObjectKey/StoragePath.
+
 ## Pendente (não é backend desta fase)
 
 - **Fase 2 frontend:** guards de catálogo/checkout, tela “cadastro em análise”, fila `/admin/customers/approvals`, badge de pendentes, login visual unificado. **Não** fundir cookies/policies. **Não** remover `/admin/login` no backend.

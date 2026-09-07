@@ -37,6 +37,7 @@ public sealed class CheckoutSessionItem
     public int? TotalPieces { get; private set; }
     public decimal? EquivalentUnitPrice { get; private set; }
     public string? SalesDisplaySummary { get; private set; }
+    public string? ProductImageUrl { get; private set; }
 
     private CheckoutSessionItem() { }
 
@@ -49,7 +50,8 @@ public sealed class CheckoutSessionItem
         int quantity,
         decimal unitPrice,
         Guid inventoryReservationId,
-        CheckoutItemSalesSnapshot? salesSnapshot = null)
+        CheckoutItemSalesSnapshot? salesSnapshot = null,
+        string? productImageUrl = null)
     {
         if (quantity <= 0)
             throw new ArgumentOutOfRangeException(nameof(quantity));
@@ -76,7 +78,8 @@ public sealed class CheckoutSessionItem
             ShowTotalPieces = salesSnapshot?.ShowTotalPieces,
             TotalPieces = salesSnapshot?.TotalPieces,
             EquivalentUnitPrice = salesSnapshot?.EquivalentUnitPrice,
-            SalesDisplaySummary = salesSnapshot?.SalesDisplaySummary
+            SalesDisplaySummary = salesSnapshot?.SalesDisplaySummary,
+            ProductImageUrl = string.IsNullOrWhiteSpace(productImageUrl) ? null : productImageUrl.Trim()
         };
     }
 
