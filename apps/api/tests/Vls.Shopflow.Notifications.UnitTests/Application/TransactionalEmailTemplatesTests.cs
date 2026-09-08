@@ -63,11 +63,16 @@ public sealed class TransactionalEmailTemplatesTests
     }
 
     [Fact]
-    public void OrderShipped_IncludesTrackingWhenPresent()
+    public void OrderShipped_UsesSeparatedCopyAndIncludesTrackingWhenPresent()
     {
         var order = SampleOrder() with { TrackingCode = "BR123", FinalDeliveryMethod = "Carrier" };
-        var (_, html, text) = TransactionalEmailTemplates.OrderShipped(App, order);
+        var (subject, html, text) = TransactionalEmailTemplates.OrderShipped(App, order);
 
+        subject.Should().Be("Seu pedido #10582 foi separado");
+        html.Should().Contain("foi separado pela equipe");
+        html.Should().NotContain("enviado");
+        text.Should().Contain("separado pela equipe");
+        text.Should().NotContain("enviado");
         html.Should().Contain("BR123");
         html.Should().Contain("Carrier");
         text.Should().Contain("BR123");
