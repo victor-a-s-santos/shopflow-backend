@@ -73,6 +73,36 @@ public sealed class EmailNotificationServiceTests
     }
 
     [Fact]
+    public async Task EnqueueOrderShipped_UsesSeparatedCopy()
+    {
+        EmailOutboxMessage? saved = null;
+        var outbox = new Mock<IEmailOutboxRepository>();
+        outbox.Setup(x => x.ExistsByIdempotencyKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        outbox.Setup(x => x.TryAddNewAsync(It.IsAny<EmailOutboxMessage>(), It.IsAny<CancellationToken>()))
+            .Callback<EmailOutboxMessage, CancellationToken>((m, _) => saved = m)
+            .ReturnsAsync(true);
+
+        var sut = new EmailNotificationService(
+            outbox.Object,
+            Options.Create(new PublicAppOptions { BaseUrl = "https://loja.test" }),
+            Options.Create(new AdminNotificationsOptions()),
+            NullLogger<EmailNotificationService>.Instance);
+
+        var orderId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        await sut.EnqueueOrderShippedAsync(
+            new OrderEmailNotificationRequest(orderId, 10582, "a@b.com", "A", 10m),
+            CancellationToken.None);
+
+        saved.Should().NotBeNull();
+        saved!.IdempotencyKey.Should().Be($"order:{orderId:D}:shipped");
+        saved.Type.Should().Be(EmailNotificationType.OrderShipped);
+        saved.Subject.Should().Be("Seu pedido #10582 foi separado");
+        saved.HtmlBody.Should().Contain("separado pela equipe");
+        saved.HtmlBody.Should().NotContain("enviado");
+    }
+
+    [Fact]
     public async Task Enqueue_SkipsWhenIdempotencyKeyExists()
     {
         var outbox = new Mock<IEmailOutboxRepository>();

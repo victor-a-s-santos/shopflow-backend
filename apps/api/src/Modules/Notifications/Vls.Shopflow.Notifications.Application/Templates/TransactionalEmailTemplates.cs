@@ -102,7 +102,7 @@ public static class TransactionalEmailTemplates
         PublicAppOptions app,
         OrderEmailNotificationRequest order)
     {
-        var subject = $"Seu pedido #{order.OrderNumber} foi enviado";
+        var subject = $"Seu pedido #{order.OrderNumber} foi separado";
         var link = BuildOrderLink(app, order);
         var greeting = Greeting(order.CustomerName);
         var method = string.IsNullOrWhiteSpace(order.FinalDeliveryMethod)
@@ -116,7 +116,7 @@ public static class TransactionalEmailTemplates
             subject,
             $"""
             <p>{greeting}</p>
-            <p>Seu pedido <strong>#{order.OrderNumber}</strong> foi enviado.</p>
+            <p>Seu pedido <strong>#{order.OrderNumber}</strong> foi separado pela equipe.</p>
             {method}
             {tracking}
             {Cta(link, "Acompanhar pedido")}
@@ -125,7 +125,7 @@ public static class TransactionalEmailTemplates
         var text = new StringBuilder()
             .AppendLine(greeting)
             .AppendLine()
-            .AppendLine($"Pedido #{order.OrderNumber} enviado.")
+            .AppendLine($"Pedido #{order.OrderNumber} separado pela equipe.")
             .AppendLine(string.IsNullOrWhiteSpace(order.TrackingCode) ? "" : $"Rastreio: {order.TrackingCode}")
             .AppendLine(link)
             .ToString();
