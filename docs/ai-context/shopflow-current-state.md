@@ -7,6 +7,8 @@
 
 **Fulfillment (set/2026):** confirmação física de estoque (`StockConfirmedAt` + `POST /api/admin/orders/{id}/fulfillment/confirm-stock`). `Fulfillment__RequireStockConfirmation=true` neste cliente. “Em estoque” deixa de ser só label de `AwaitingShipment`. Sem mudança em Pix, checkout, StoreAccess ou R2.
 
+**Relatórios admin (out/2026):** demanda confirmada por SKU e pedidos `PendingPayment` em `GET /api/admin/reports/product-demand`, `.../{skuId}/orders` e `GET /api/admin/reports/unpaid-orders` (`docs/orders/admin-product-demand-report.md`). Somente leitura.
+
 ## Visão geral
 
 Shopflow é um e-commerce modular em monorepo: backend .NET (monólito modular) + frontend React (Vite). O foco atual é operação de catálogo/estoque no admin, vitrine funcional, carrinho local e checkout integrado com sessão real (`CartCheckout`). O módulo **Orders** backend MVP cria pedidos `PendingPayment` a partir de sessões de checkout — **sem integração frontend ainda**.

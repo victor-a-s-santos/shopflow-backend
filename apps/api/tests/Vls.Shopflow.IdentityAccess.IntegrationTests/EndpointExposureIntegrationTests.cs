@@ -432,6 +432,71 @@ public sealed class EndpointExposureIntegrationTests : IClassFixture<ShopflowWeb
     }
 
     [Fact]
+    public async Task AdminProductDemand_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/admin/reports/product-demand");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminProductDemandOrders_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync($"/api/admin/reports/product-demand/{Guid.NewGuid()}/orders");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminUnpaidOrders_WithoutLogin_Returns401()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/admin/reports/unpaid-orders");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminReports_AsCustomer_ReturnsForbiddenOrUnauthorized()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = await _factory.CreateAuthenticatedCustomerClientAsync();
+        var demand = await client.GetAsync("/api/admin/reports/product-demand");
+        var orders = await client.GetAsync($"/api/admin/reports/product-demand/{Guid.NewGuid()}/orders");
+        var unpaid = await client.GetAsync("/api/admin/reports/unpaid-orders");
+
+        demand.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+        orders.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+        unpaid.StatusCode.Should().BeOneOf(HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminReports_AsAdmin_Returns200()
+    {
+        if (!await _factory.CanConnectToDatabaseAsync())
+            return;
+
+        var client = _factory.CreateAuthenticatedAdminClient();
+        var demand = await client.GetAsync("/api/admin/reports/product-demand?page=1&pageSize=20");
+        var orders = await client.GetAsync($"/api/admin/reports/product-demand/{Guid.NewGuid()}/orders?page=1&pageSize=20");
+        var unpaid = await client.GetAsync("/api/admin/reports/unpaid-orders?page=1&pageSize=20");
+
+        demand.StatusCode.Should().Be(HttpStatusCode.OK);
+        orders.StatusCode.Should().Be(HttpStatusCode.OK);
+        unpaid.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task PublicCatalogCategories_WithoutLogin_Returns200()
     {
         if (!await _factory.CanConnectToDatabaseAsync())
