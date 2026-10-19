@@ -1164,6 +1164,8 @@ app.MapGroup("/api").MapOrdersEndpoints();
 
 app.MapGroup("/api").MapAdminOrdersEndpoints();
 
+app.MapGroup("/api").MapAdminReportsEndpoints();
+
 app.MapGroup("/api").MapAdminCustomersEndpoints();
 
 app.MapGroup("/api").MapAdminDeliveryBatchesEndpoints();

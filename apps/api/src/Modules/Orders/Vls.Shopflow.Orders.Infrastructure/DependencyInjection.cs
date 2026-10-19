@@ -65,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<IDeliveryBatchRepository, DeliveryBatchRepository>();
         services.AddScoped<IDeliveryBatchReadModel, DeliveryBatchReadModel>();
         services.AddScoped<IAdminOrderReadModel, AdminOrderReadModel>();
+        services.AddScoped<IAdminDemandReportReadModel, AdminDemandReportReadModel>();
         services.AddScoped<ICustomerOrderReadModel, CustomerOrderReadModel>();
         services.AddScoped<IOrderEmailIntentRepository, OrderEmailIntentRepository>();
         services.AddScoped<IGuestOrderAccessTokenRepository, GuestOrderAccessTokenRepository>();

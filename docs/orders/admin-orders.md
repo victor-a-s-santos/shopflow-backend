@@ -19,6 +19,8 @@ Detalhe inclui `items[].salesDisplay` (snapshot de lote/pacote; null em Unit/ped
 Fulfillment (envio/entrega): ver `docs/orders/delivery-fulfillment-phase-2.md`.  
 Remessa agrupada: ver `docs/orders/delivery-batch-phase-3.md` (`GET .../delivery-batch-candidates`, `/api/admin/delivery-batches`).
 
+Demanda confirmada por SKU e pedidos aguardando pagamento: `docs/orders/admin-product-demand-report.md`. Somente leitura; não substitui esta listagem.
+
 List/detail podem incluir `deliveryBatchId` / `deliveryBatchNumber` quando o pedido está em uma remessa.
 
 ## Listagem — query params
@@ -80,4 +82,4 @@ List/detail podem incluir `deliveryBatchId` / `deliveryBatchNumber` quando o ped
 - Cancelamento e reembolso
 - Nota fiscal
 - Timeline de eventos
-- Exportação CSV / relatórios
+- Exportação CSV

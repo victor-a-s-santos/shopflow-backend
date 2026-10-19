@@ -9,27 +9,47 @@ public static class OrderItemSalesDisplayMapper
     /// Package modes get a filled DTO; Unit/Min/Multiple and legacy null snapshots return null.
     /// </summary>
     public static OrderItemSalesDisplayDto? ToDto(OrderItem item)
+        => ToDto(
+            item.SalesMode,
+            item.PackageSize,
+            item.PackageLabel,
+            item.PackageDescription,
+            item.QuantityUnitLabel,
+            item.ShowTotalPieces,
+            item.TotalPieces,
+            item.EquivalentUnitPrice,
+            item.SalesDisplaySummary);
+
+    public static OrderItemSalesDisplayDto? ToDto(
+        string? salesMode,
+        int? packageSize,
+        string? packageLabel,
+        string? packageDescription,
+        string? quantityUnitLabel,
+        bool? showTotalPieces,
+        int? totalPieces,
+        decimal? equivalentUnitPrice,
+        string? summary)
     {
-        if (item.PackageSize is not { } size || size <= 1)
+        if (packageSize is not { } size || size <= 1)
             return null;
 
-        var mode = item.SalesMode;
-        if (string.IsNullOrWhiteSpace(mode)
-            || (!string.Equals(mode, "FixedPackage", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(mode, "AssortedPackage", StringComparison.OrdinalIgnoreCase)))
+        if (string.IsNullOrWhiteSpace(salesMode)
+            || (!string.Equals(salesMode, "FixedPackage", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(salesMode, "AssortedPackage", StringComparison.OrdinalIgnoreCase)))
         {
             return null;
         }
 
         return new OrderItemSalesDisplayDto(
-            SalesMode: mode,
+            SalesMode: salesMode,
             PackageSize: size,
-            PackageLabel: item.PackageLabel,
-            PackageDescription: item.PackageDescription,
-            QuantityUnitLabel: item.QuantityUnitLabel,
-            ShowTotalPieces: item.ShowTotalPieces ?? true,
-            TotalPieces: item.TotalPieces,
-            EquivalentUnitPrice: item.EquivalentUnitPrice,
-            Summary: item.SalesDisplaySummary);
+            PackageLabel: packageLabel,
+            PackageDescription: packageDescription,
+            QuantityUnitLabel: quantityUnitLabel,
+            ShowTotalPieces: showTotalPieces ?? true,
+            TotalPieces: totalPieces,
+            EquivalentUnitPrice: equivalentUnitPrice,
+            Summary: summary);
     }
 }

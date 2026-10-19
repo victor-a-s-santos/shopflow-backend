@@ -25,6 +25,7 @@ Shopflow é um e-commerce modular em monorepo. Nesta fase, **dois módulos estã
 | [architecture/WHOLESALE-SALES-RULES-DESIGN.md](./architecture/WHOLESALE-SALES-RULES-DESIGN.md) | Design regras de venda atacado/pacotes/múltiplos |
 | [catalog.md](./catalog.md) | Produtos, SKUs, atributos, endpoints, admin |
 | [inventory.md](./inventory.md) | Estoque, reservas, concorrência, admin |
+| [orders/admin-product-demand-report.md](./orders/admin-product-demand-report.md) | Demanda confirmada por SKU e pedidos aguardando pagamento |
 | [testing.md](./testing.md) | Como rodar, testar e validar manualmente |
 | [next-steps.md](./next-steps.md) | Próximos módulos e dívidas técnicas |
 | [infra/REPO-001-backend-github-setup.md](./infra/REPO-001-backend-github-setup.md) | Preparo do repo GitHub do backend |

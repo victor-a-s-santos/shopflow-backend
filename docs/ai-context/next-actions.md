@@ -24,6 +24,7 @@
 - [x] Integração frontend Checkout com `POST /api/checkout/sessions`, Orders e PaymentsPix
 - [x] Módulo **Orders** backend MVP (`PendingPayment`, snapshot da sessão)
 - [x] **Admin Orders backend** — `GET /api/admin/orders` + detalhe (`docs/orders/admin-orders.md`)
+- [x] **Relatório admin de demanda** — `GET /api/admin/reports/product-demand`, detalhe por SKU e `GET /api/admin/reports/unpaid-orders` (`docs/orders/admin-product-demand-report.md`)
 - [x] **Customer Orders backend** — `GET /api/customer/orders` + `CustomerUserId` (`docs/orders/customer-orders.md`)
 - [x] Módulo **PaymentsPix** backend MVP (provider fake, `PixPayment` Pending)
 - [x] **Worker de expiração** — `CheckoutSession`/`Order`/`PixPayment` pendentes + liberação de estoque (`docs/expiration-worker.md`)

@@ -85,6 +85,8 @@ Pedidos `PendingPayment` com sessão/Pix vencidos são marcados como **`Expired`
 
 Guest token: [`docs/security/SEC-006-guest-order-access-token.md`](./security/SEC-006-guest-order-access-token.md), [`docs/orders/ORD-002-guest-order-status.md`](./orders/ORD-002-guest-order-status.md).
 
+Relatórios admin de demanda confirmada e pedidos aguardando pagamento: [`docs/orders/admin-product-demand-report.md`](./orders/admin-product-demand-report.md). Somente leitura; não alteram checkout, pagamento ou estoque.
+
 
 ### Request — criar pedido
 
